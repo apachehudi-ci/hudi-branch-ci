@@ -516,6 +516,7 @@ public class DeltaSync implements Serializable {
         if (!isEmpty) {
           syncMeta(metrics);
         }
+        formatAdapter.postCommit();
       } else {
         LOG.info("Commit " + instantTime + " failed!");
         throw new HoodieException("Commit " + instantTime + " failed!");
