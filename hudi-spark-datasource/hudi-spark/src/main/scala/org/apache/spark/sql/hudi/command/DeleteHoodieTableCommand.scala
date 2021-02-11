@@ -17,11 +17,11 @@
 
 package org.apache.spark.sql.hudi.command
 
-import org.apache.hudi.DataSourceWriteOptions.{OPERATION, _}
+import org.apache.hudi.DataSourceWriteOptions._
 import org.apache.hudi.config.HoodieWriteConfig
 import org.apache.hudi.config.HoodieWriteConfig.TBL_NAME
 import org.apache.hudi.hive.ddl.HiveSyncMode
-import org.apache.hudi.{DataSourceWriteOptions, SparkAdapterSupport}
+import org.apache.hudi.{DataSourceWriteOptions, HoodieWriterUtils, SparkAdapterSupport}
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.plans.logical.DeleteFromTable
 import org.apache.spark.sql.execution.command.RunnableCommand
@@ -63,19 +63,20 @@ case class DeleteHoodieTableCommand(deleteTable: DeleteFromTable) extends Runnab
 
     assert(primaryColumns.nonEmpty,
       s"There are no primary key defined in table $tableId, cannot execute delete operator")
-    withSparkConf(sparkSession, targetTable.storage.properties) {
-      Map(
-        "path" -> path,
-        KEYGENERATOR_CLASS_NAME.key -> classOf[SqlKeyGenerator].getCanonicalName,
-        TBL_NAME.key -> tableId.table,
-        OPERATION.key -> DataSourceWriteOptions.DELETE_OPERATION_OPT_VAL,
-        PARTITIONPATH_FIELD.key -> targetTable.partitionColumnNames.mkString(","),
-        HIVE_SYNC_MODE.key -> HiveSyncMode.HMS.name(),
-        HIVE_SUPPORT_TIMESTAMP_TYPE.key -> "true",
-        HIVE_STYLE_PARTITIONING.key -> "true",
-        HoodieWriteConfig.DELETE_PARALLELISM_VALUE.key -> "200",
-        SqlKeyGenerator.PARTITION_SCHEMA -> targetTable.partitionSchema.toDDL
-      )
-    }
+    HoodieWriterUtils.parametersWithWriteDefaults(
+      withSparkConf(sparkSession, targetTable.storage.properties) {
+        Map(
+          "path" -> path,
+          KEYGENERATOR_CLASS_NAME.key -> classOf[SqlKeyGenerator].getCanonicalName,
+          TBL_NAME.key -> tableId.table,
+          OPERATION.key -> DataSourceWriteOptions.DELETE_OPERATION_OPT_VAL,
+          PARTITIONPATH_FIELD.key -> targetTable.partitionColumnNames.mkString(","),
+          HIVE_SYNC_MODE.key -> HiveSyncMode.HMS.name(),
+          HIVE_SUPPORT_TIMESTAMP_TYPE.key -> "true",
+          HIVE_STYLE_PARTITIONING.key -> "true",
+          HoodieWriteConfig.DELETE_PARALLELISM_VALUE.key -> "200",
+          SqlKeyGenerator.PARTITION_SCHEMA -> targetTable.partitionSchema.toDDL
+        )
+      })
   }
 }

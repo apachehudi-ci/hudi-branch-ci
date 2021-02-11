@@ -18,6 +18,8 @@
 
 package org.apache.hudi.streamer;
 
+import org.apache.hudi.common.config.DFSPropertiesConfiguration;
+import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.configuration.FlinkOptions;
@@ -50,8 +52,6 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.logical.RowType;
 
-import java.util.Properties;
-
 /**
  * An Utility which can incrementally consume data from Kafka and apply it to the target table.
  * currently, it only supports COW table and insert, upsert operation.
@@ -76,7 +76,8 @@ public class HoodieFlinkStreamer {
       env.setStateBackend(new FsStateBackend(cfg.flinkCheckPointPath));
     }
 
-    Properties kafkaProps = StreamerUtil.appendKafkaProps(cfg);
+    TypedProperties kafkaProps = DFSPropertiesConfiguration.getGlobalConfig();
+    kafkaProps.putAll(StreamerUtil.appendKafkaProps(cfg));
 
     // Read from kafka source
     RowType rowType =

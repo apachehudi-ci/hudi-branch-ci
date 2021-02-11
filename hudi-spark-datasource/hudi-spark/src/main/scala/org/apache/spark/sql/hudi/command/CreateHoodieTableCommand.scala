@@ -98,7 +98,7 @@ case class CreateHoodieTableCommand(table: CatalogTable, ignoreIfExists: Boolean
 
      // Get options from the external table and append with the options in ddl.
      val originTableConfig =  HoodieOptionConfig.mappingTableConfigToSqlOption(
-       metaClient.getTableConfig.getProps.asScala.toMap)
+       metaClient.getTableConfig.getProps(true).asScala.toMap)
 
      val allPartitionPaths = getAllPartitionPaths(sparkSession, table)
      var upgrateConfig = Map.empty[String, String]

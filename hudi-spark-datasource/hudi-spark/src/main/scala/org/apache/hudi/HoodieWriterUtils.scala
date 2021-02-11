@@ -19,7 +19,7 @@ package org.apache.hudi
 
 import org.apache.hudi.DataSourceWriteOptions._
 import org.apache.hudi.common.config.HoodieMetadataConfig.{ENABLE, VALIDATE_ENABLE}
-import org.apache.hudi.common.config.{HoodieConfig, TypedProperties}
+import org.apache.hudi.common.config.{DFSPropertiesConfiguration, HoodieConfig, TypedProperties}
 import org.apache.hudi.keygen.factory.HoodieSparkKeyGeneratorFactory
 
 import java.util.Properties
@@ -42,6 +42,7 @@ object HoodieWriterUtils {
     * @return
     */
   def parametersWithWriteDefaults(parameters: Map[String, String]): Map[String, String] = {
+    val globalProps = DFSPropertiesConfiguration.getGlobalConfig.asScala
     Map(OPERATION.key -> OPERATION.defaultValue,
       TABLE_TYPE.key -> TABLE_TYPE.defaultValue,
       PRECOMBINE_FIELD.key -> PRECOMBINE_FIELD.defaultValue,
@@ -77,7 +78,7 @@ object HoodieWriterUtils {
       ENABLE_ROW_WRITER.key -> ENABLE_ROW_WRITER.defaultValue,
       RECONCILE_SCHEMA.key -> RECONCILE_SCHEMA.defaultValue.toString,
       DROP_PARTITION_COLUMNS.key -> DROP_PARTITION_COLUMNS.defaultValue
-    ) ++ DataSourceOptionsHelper.translateConfigurations(parameters)
+    ) ++ globalProps ++ DataSourceOptionsHelper.translateConfigurations(parameters)
   }
 
   def toProperties(params: Map[String, String]): TypedProperties = {

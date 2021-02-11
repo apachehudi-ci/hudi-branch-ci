@@ -29,6 +29,7 @@ import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.common.HoodieSparkEngineContext;
 import org.apache.hudi.client.utils.OperationConverter;
 import org.apache.hudi.common.bootstrap.index.HFileBootstrapIndex;
+import org.apache.hudi.common.config.HoodieConfig;
 import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieTableType;
@@ -72,6 +73,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -120,15 +122,18 @@ public class HoodieDeltaStreamer implements Serializable {
   public HoodieDeltaStreamer(Config cfg, JavaSparkContext jssc, FileSystem fs, Configuration conf,
                              Option<TypedProperties> props) throws IOException {
     // Resolving the properties first in a consistent way
+    HoodieConfig hoodieConfig = new HoodieConfig();
     if (props.isPresent()) {
-      this.properties = setDefaults(props.get());
+      hoodieConfig.setAll(props.get());
     } else if (cfg.propsFilePath.equals(Config.DEFAULT_DFS_SOURCE_PROPERTIES)) {
-      this.properties = setDefaults(UtilHelpers.getConfig(cfg.configs).getConfig());
+      hoodieConfig.setAll(UtilHelpers.getConfig(cfg.configs).getConfig());
     } else {
-      this.properties = setDefaults(UtilHelpers.readConfig(
+      hoodieConfig.setAll(UtilHelpers.readConfig(
           FSUtils.getFs(cfg.propsFilePath, jssc.hadoopConfiguration()),
           new Path(cfg.propsFilePath), cfg.configs).getConfig());
     }
+    hoodieConfig.setDefaultValue(DataSourceWriteOptions.RECONCILE_SCHEMA());
+    this.properties = (TypedProperties) hoodieConfig.getProps(true);
 
     if (cfg.initialCheckpointProvider != null && cfg.checkpoint == null) {
       InitialCheckPointProvider checkPointProvider =
@@ -145,13 +150,6 @@ public class HoodieDeltaStreamer implements Serializable {
 
   public void shutdownGracefully() {
     deltaSyncService.ifPresent(ds -> ds.shutdown(false));
-  }
-
-  private TypedProperties setDefaults(TypedProperties props) {
-    if (!props.containsKey(DataSourceWriteOptions.RECONCILE_SCHEMA().key())) {
-      props.setProperty(DataSourceWriteOptions.RECONCILE_SCHEMA().key(), DataSourceWriteOptions.RECONCILE_SCHEMA().defaultValue().toString());
-    }
-    return props;
   }
 
   /**

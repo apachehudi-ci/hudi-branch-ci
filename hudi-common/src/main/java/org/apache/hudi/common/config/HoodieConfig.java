@@ -58,6 +58,10 @@ public class HoodieConfig implements Serializable {
     props.setProperty(cfg.key(), val);
   }
 
+  public void setAll(Properties properties) {
+    props.putAll(properties);
+  }
+
   public <T> void setDefaultValue(ConfigProperty<T> configProperty) {
     if (!contains(configProperty)) {
       Option<T> inferValue = Option.empty();
@@ -163,7 +167,17 @@ public class HoodieConfig implements Serializable {
   }
 
   public Properties getProps() {
-    return props;
+    return getProps(false);
+  }
+
+  public Properties getProps(Boolean includeHudiConf) {
+    if (includeHudiConf) {
+      Properties mergedProps = DFSPropertiesConfiguration.getGlobalConfig();
+      mergedProps.putAll(props);
+      return mergedProps;
+    } else {
+      return props;
+    }
   }
 
   public void setDefaultOnCondition(boolean condition, HoodieConfig config) {
