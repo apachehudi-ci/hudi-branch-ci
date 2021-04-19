@@ -85,6 +85,7 @@ public class TestHoodieRealtimeRecordReader {
     jobConf.set(HoodieRealtimeConfig.MAX_DFS_STREAM_BUFFER_SIZE_PROP, String.valueOf(1024 * 1024));
     hadoopConf = HoodieTestUtils.getDefaultHadoopConf();
     fs = FSUtils.getFs(basePath.toString(), hadoopConf);
+    System.out.println(hadoopConf.get("fs.default.name"));
   }
 
   @TempDir
