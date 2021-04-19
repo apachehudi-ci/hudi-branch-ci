@@ -201,6 +201,7 @@ public class TestHoodieRealtimeRecordReader {
         assertEquals(1.0, recordReader.getProgress(), 0.05);
         recordReader.close();
       } catch (Exception ioe) {
+        ioe.printStackTrace();
         throw new HoodieException(ioe.getMessage(), ioe);
       }
     });
