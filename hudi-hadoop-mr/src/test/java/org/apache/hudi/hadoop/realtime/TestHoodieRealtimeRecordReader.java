@@ -172,7 +172,7 @@ public class TestHoodieRealtimeRecordReader {
         fileSlice.addLogFile(writer.getLogFile());
         HoodieRealtimeFileSplit split = new HoodieRealtimeFileSplit(
             new FileSplit(new Path(partitionDir + "/fileid0_1-0-1_" + baseInstant + ".parquet"), 0, 1, jobConf),
-            basePath.toString(), fileSlice.getLogFiles().sorted(HoodieLogFile.getLogFileComparator())
+            "file://" + basePath.toString(), fileSlice.getLogFiles().sorted(HoodieLogFile.getLogFileComparator())
             .map(h -> h.getPath().toString()).collect(Collectors.toList()),
             instantTime);
 
