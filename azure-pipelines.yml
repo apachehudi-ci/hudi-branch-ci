@@ -151,15 +151,5 @@ stages:
               wget http://archive.apache.org/dist/spark/spark-$(SPARK_VERSION)/spark-$(SPARK_VERSION)-bin-hadoop$(HADOOP_VERSION).tgz -O $(Pipeline.Workspace)/spark-$(SPARK_VERSION).tgz
               tar -xvf $(Pipeline.Workspace)/spark-$(SPARK_VERSION).tgz
               mkdir /tmp/spark-events/
-          - task: Maven@3
-            inputs:
-              mavenPomFile: 'pom.xml'
-              goals: 'verify'
-              options: -Pintegration-tests
-              publishJUnitResults: false
-              testResultsFiles: '**/surefire-reports/TEST-*.xml'
-              testRunTitle: 'unit tests utilities'
-              javaHomeOption: 'JDKVersion'
-              jdkVersionOption: '1.8'
-              jdkArchitectureOption: 'x64'
-              mavenOptions: '-Xmx2g $(MAVEN_OPTS)'
+              ls -lta $(Pipeline.Workspace)/ /tmp/
+              mvn -Pintegration-tests verify
