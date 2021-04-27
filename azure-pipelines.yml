@@ -148,8 +148,8 @@ stages:
         steps:
           - script: |
               echo 'Downloading spark-$(SPARK_VERSION)-bin-hadoop$(HADOOP_VERSION)'
-              wget http://archive.apache.org/dist/spark/spark-$(SPARK_VERSION)/spark-$(SPARK_VERSION)-bin-hadoop$(HADOOP_VERSION).tgz -O /tmp/spark-$(SPARK_VERSION).tgz
-              tar -xvf /tmp/spark-$(SPARK_VERSION).tgz
+              wget http://archive.apache.org/dist/spark/spark-$(SPARK_VERSION)/spark-$(SPARK_VERSION)-bin-hadoop$(HADOOP_VERSION).tgz -O $(Pipeline.Workspace)/spark-$(SPARK_VERSION).tgz
+              tar -xvf $(Pipeline.Workspace)/spark-$(SPARK_VERSION).tgz
               mkdir /tmp/spark-events/
           - task: Maven@3
             inputs:
