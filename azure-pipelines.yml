@@ -149,7 +149,7 @@ stages:
           - script: |
               echo 'Downloading spark-$(SPARK_VERSION)-bin-hadoop$(HADOOP_VERSION)'
               wget http://archive.apache.org/dist/spark/spark-$(SPARK_VERSION)/spark-$(SPARK_VERSION)-bin-hadoop$(HADOOP_VERSION).tgz -O $(Pipeline.Workspace)/spark-$(SPARK_VERSION).tgz
-              tar -xvf $(Pipeline.Workspace)/spark-$(SPARK_VERSION).tgz
+              tar -xvf $(Pipeline.Workspace)/spark-$(SPARK_VERSION).tgz -C $(Pipeline.Workspace)/
               mkdir /tmp/spark-events/
               ls -lta $(Pipeline.Workspace)/ /tmp/
               PATH=$PATH:$(SPARK_HOME)/bin
