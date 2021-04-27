@@ -153,6 +153,8 @@ public class ITTestCompactionCommand extends AbstractShellIntegrationTest {
     CommandResult cr = getShell().executeCommand(
         String.format("compaction validate --instant %s --sparkMaster %s", instance, "local"));
 
+    cr.getException().printStackTrace();
+
     assertAll("Command run failed",
         () -> assertTrue(cr.isSuccess()),
         () -> assertTrue(
