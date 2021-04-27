@@ -92,9 +92,7 @@ public class ITTestCommitsCommand extends AbstractShellIntegrationTest {
 
     CommandResult cr = getShell().executeCommand(String.format("commit rollback --commit %s --sparkMaster %s --sparkMemory %s",
         rollbackCommit, "local", "4G"));
-    System.out.println(cr);
     cr.getException().printStackTrace();
-    assertNotNull(cr.getException());
     assertTrue(cr.isSuccess());
 
     metaClient = HoodieTableMetaClient.reload(HoodieCLI.getTableMetaClient());

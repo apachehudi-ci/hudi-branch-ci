@@ -152,4 +152,6 @@ stages:
               tar -xvf $(Pipeline.Workspace)/spark-$(SPARK_VERSION).tgz
               mkdir /tmp/spark-events/
               ls -lta $(Pipeline.Workspace)/ /tmp/
+              echo $PATH
+              PATH=$PATH:$(SPARK_HOME)
               mvn -Pintegration-tests verify
