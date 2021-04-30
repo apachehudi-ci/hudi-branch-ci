@@ -78,7 +78,7 @@ public class HoodieConfig implements Serializable {
     if (props.containsKey(configProperty.key())) {
       return true;
     }
-    return Arrays.stream(configProperty.getAlternatives()).anyMatch(props::containsKey);
+    return configProperty.getAlternatives().stream().anyMatch(props::containsKey);
   }
 
   private <T> Option<Object> getRawValue(ConfigProperty<T> configProperty) {
