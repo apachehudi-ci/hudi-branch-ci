@@ -506,4 +506,8 @@ public class HoodieHiveClient extends AbstractSyncHoodieClient {
       throw new HoodieHiveSyncException("Failed to get update last commit time synced to " + lastCommitSynced, e);
     }
   }
+
+  public IMetaStoreClient getClient() {
+    return client;
+  }
 }

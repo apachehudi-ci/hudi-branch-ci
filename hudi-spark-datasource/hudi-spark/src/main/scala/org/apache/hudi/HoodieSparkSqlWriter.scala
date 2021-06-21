@@ -19,7 +19,6 @@ package org.apache.hudi
 
 import java.util
 import java.util.Properties
-
 import org.apache.avro.generic.GenericRecord
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -36,7 +35,6 @@ import org.apache.hudi.common.util.{CommitUtils, ReflectionUtils}
 import org.apache.hudi.config.HoodieBootstrapConfig.{BOOTSTRAP_BASE_PATH_PROP, BOOTSTRAP_INDEX_CLASS_PROP, DEFAULT_BOOTSTRAP_INDEX_CLASS}
 import org.apache.hudi.config.HoodieWriteConfig
 import org.apache.hudi.exception.HoodieException
-import org.apache.hudi.hive.util.ConfigUtils
 import org.apache.hudi.hive.{HiveSyncConfig, HiveSyncTool}
 import org.apache.hudi.internal.DataSourceInternalWriterHelper
 import org.apache.hudi.sync.common.AbstractSyncTool
@@ -45,16 +43,14 @@ import org.apache.spark.SPARK_VERSION
 import org.apache.spark.SparkContext
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.hudi.HoodieSqlUtils
-import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.internal.StaticSQLConf.SCHEMA_STRING_LENGTH_THRESHOLD
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SQLContext, SaveMode, SparkSession}
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable.ListBuffer
-import org.apache.hudi.common.table.HoodieTableConfig.{DEFAULT_ARCHIVELOG_FOLDER}
+import org.apache.hudi.common.table.HoodieTableConfig.DEFAULT_ARCHIVELOG_FOLDER
 import org.apache.hudi.keygen.factory.HoodieSparkKeyGeneratorFactory
+import org.apache.spark.sql.internal.{SQLConf, StaticSQLConf}
 
 object HoodieSparkSqlWriter {
 
@@ -399,15 +395,15 @@ object HoodieSparkSqlWriter {
     }
   }
 
-  private def syncHive(basePath: Path, fs: FileSystem, parameters: Map[String, String]): Boolean = {
-    val hiveSyncConfig: HiveSyncConfig = buildSyncConfig(basePath, parameters)
+  private def syncHive(basePath: Path, fs: FileSystem, parameters: Map[String, String], sqlConf: SQLConf): Boolean = {
+    val hiveSyncConfig: HiveSyncConfig = buildSyncConfig(basePath, parameters, sqlConf)
     val hiveConf: HiveConf = new HiveConf()
     hiveConf.addResource(fs.getConf)
     new HiveSyncTool(hiveSyncConfig, hiveConf, fs).syncHoodieTable()
     true
   }
 
-  private def buildSyncConfig(basePath: Path, parameters: Map[String, String]): HiveSyncConfig = {
+  private def buildSyncConfig(basePath: Path, parameters: Map[String, String], sqlConf: SQLConf): HiveSyncConfig = {
     val hiveSyncConfig: HiveSyncConfig = new HiveSyncConfig()
     hiveSyncConfig.basePath = basePath.toString
     hiveSyncConfig.baseFileFormat = parameters(HIVE_BASE_FILE_FORMAT_OPT_KEY)
@@ -432,76 +428,10 @@ object HoodieSparkSqlWriter {
       DEFAULT_HIVE_AUTO_CREATE_DATABASE_OPT_KEY).toBoolean
     hiveSyncConfig.decodePartition = parameters.getOrElse(URL_ENCODE_PARTITIONING_OPT_KEY,
       DEFAULT_URL_ENCODE_PARTITIONING_OPT_VAL).toBoolean
-
-    val syncAsDtaSourceTable = parameters.getOrElse(DataSourceWriteOptions.HIVE_SYNC_AS_DATA_SOURCE_TABLE,
+    hiveSyncConfig.saveAsSparkDataSourceTable =  parameters.getOrElse(DataSourceWriteOptions.HIVE_SYNC_AS_DATA_SOURCE_TABLE,
       DataSourceWriteOptions.DEFAULT_HIVE_SYNC_AS_DATA_SOURCE_TABLE).toBoolean
-    if (syncAsDtaSourceTable) {
-      hiveSyncConfig.tableProperties = parameters.getOrElse(HIVE_TABLE_PROPERTIES, null)
-      val serdePropText = createSqlTableSerdeProperties(parameters, basePath.toString)
-      val serdeProp = ConfigUtils.toMap(serdePropText)
-      serdeProp.put(ConfigUtils.SPARK_QUERY_TYPE_KEY, DataSourceReadOptions.QUERY_TYPE_OPT_KEY)
-      serdeProp.put(ConfigUtils.SPARK_QUERY_AS_RO_KEY, DataSourceReadOptions.QUERY_TYPE_READ_OPTIMIZED_OPT_VAL)
-      serdeProp.put(ConfigUtils.SPARK_QUERY_AS_RT_KEY, DataSourceReadOptions.QUERY_TYPE_SNAPSHOT_OPT_VAL)
-
-      hiveSyncConfig.serdeProperties = ConfigUtils.configToString(serdeProp)
-
-    }
+    hiveSyncConfig.sparkSchemaLengthThreshold = sqlConf.getConf(StaticSQLConf.SCHEMA_STRING_LENGTH_THRESHOLD)
     hiveSyncConfig
-  }
-
-  /**
-   * Add Spark Sql related table properties to the HIVE_TABLE_PROPERTIES.
-   * @param sqlConf The spark sql conf.
-   * @param schema  The schema to write to the table.
-   * @param parameters The origin parameters.
-   * @return A new parameters added the HIVE_TABLE_PROPERTIES property.
-   */
-  private def addSqlTableProperties(sqlConf: SQLConf, schema: StructType,
-                                    parameters: Map[String, String]): Map[String, String] = {
-    // Convert the schema and partition info used by spark sql to hive table properties.
-    // The following code refers to the spark code in
-    // https://github.com/apache/spark/blob/master/sql/hive/src/main/scala/org/apache/spark/sql/hive/HiveExternalCatalog.scala
-
-    // Sync schema with meta fields
-    val schemaWithMetaFields = HoodieSqlUtils.addMetaFields(schema)
-    val partitionSet = parameters(HIVE_PARTITION_FIELDS_OPT_KEY)
-      .split(",").map(_.trim).filter(!_.isEmpty).toSet
-    val threshold = sqlConf.getConf(SCHEMA_STRING_LENGTH_THRESHOLD)
-
-    val (partitionCols, dataCols) = schemaWithMetaFields.partition(c => partitionSet.contains(c.name))
-    val reOrderedType = StructType(dataCols ++ partitionCols)
-    val schemaParts = reOrderedType.json.grouped(threshold).toSeq
-
-    var properties = Map(
-      "spark.sql.sources.provider" -> "hudi",
-      "spark.sql.sources.schema.numParts" -> schemaParts.size.toString
-    )
-    schemaParts.zipWithIndex.foreach { case (part, index) =>
-      properties += s"spark.sql.sources.schema.part.$index" -> part
-    }
-    // add partition columns
-    if (partitionSet.nonEmpty) {
-      properties += "spark.sql.sources.schema.numPartCols" -> partitionSet.size.toString
-      partitionSet.zipWithIndex.foreach { case (partCol, index) =>
-        properties += s"spark.sql.sources.schema.partCol.$index" -> partCol
-      }
-    }
-    var sqlPropertyText = ConfigUtils.configToString(properties)
-    sqlPropertyText = if (parameters.containsKey(HIVE_TABLE_PROPERTIES)) {
-      sqlPropertyText + "\n" + parameters(HIVE_TABLE_PROPERTIES)
-    } else {
-      sqlPropertyText
-    }
-    parameters + (HIVE_TABLE_PROPERTIES -> sqlPropertyText)
-  }
-
-  private def createSqlTableSerdeProperties(parameters: Map[String, String], basePath: String): String = {
-    val pathProp = s"path=$basePath"
-    if (parameters.containsKey(HIVE_TABLE_SERDE_PROPERTIES)) {
-      pathProp + "\n" + parameters(HIVE_TABLE_SERDE_PROPERTIES)
-    } else {
-      pathProp
-    }
   }
 
   private def metaSync(spark: SparkSession, parameters: Map[String, String], basePath: Path,
@@ -511,7 +441,6 @@ object HoodieSparkSqlWriter {
     var syncClientToolClassSet = scala.collection.mutable.Set[String]()
     parameters(META_SYNC_CLIENT_TOOL_CLASS).split(",").foreach(syncClass =>  syncClientToolClassSet += syncClass)
 
-    val newParameters = addSqlTableProperties(spark.sessionState.conf, schema, parameters)
     // for backward compatibility
     if (hiveSyncEnabled) {
       metaSyncEnabled = true
@@ -524,12 +453,12 @@ object HoodieSparkSqlWriter {
         val syncSuccess = impl.trim match {
           case "org.apache.hudi.hive.HiveSyncTool" => {
             log.info("Syncing to Hive Metastore (URL: " + parameters(HIVE_URL_OPT_KEY) + ")")
-            syncHive(basePath, fs, newParameters)
+            syncHive(basePath, fs, parameters, spark.sessionState.conf)
             true
           }
           case _ => {
             val properties = new Properties();
-            properties.putAll(newParameters)
+            properties.putAll(parameters)
             properties.put("basePath", basePath.toString)
             val syncHoodie = ReflectionUtils.loadClass(impl.trim, Array[Class[_]](classOf[Properties], classOf[FileSystem]), properties, fs).asInstanceOf[AbstractSyncTool]
             syncHoodie.syncHoodieTable()

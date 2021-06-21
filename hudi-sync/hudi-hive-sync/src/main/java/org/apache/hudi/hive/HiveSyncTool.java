@@ -38,8 +38,14 @@ import org.apache.hudi.sync.common.AbstractSyncTool;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.parquet.schema.MessageType;
+import org.apache.spark.sql.execution.datasources.parquet.ParquetToSparkSchemaConverter;
+import org.apache.spark.sql.types.Metadata;
+import org.apache.spark.sql.types.StringType$;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -180,6 +186,15 @@ public class HiveSyncTool extends AbstractSyncTool {
    */
   private void syncSchema(String tableName, boolean tableExists, boolean useRealTimeInputFormat,
                           boolean readAsOptimized, MessageType schema) {
+    // Append spark table properties & serde properties
+    Map<String, String> tableProperties = ConfigUtils.toMap(cfg.tableProperties);
+    Map<String, String> serdeProperties = ConfigUtils.toMap(cfg.serdeProperties);
+    if (cfg.saveAsSparkDataSourceTable) {
+      Map<String, String> sparkTableProperties = getSparkTableProperties(cfg.sparkSchemaLengthThreshold, schema);
+      Map<String, String> sparkSerdeProperties = getSparkSerdeProperties(readAsOptimized);
+      tableProperties.putAll(sparkTableProperties);
+      serdeProperties.putAll(sparkSerdeProperties);
+    }
     // Check and sync schema
     if (!tableExists) {
       LOG.info("Hive table " + tableName + " is not found. Creating it");
@@ -196,27 +211,11 @@ public class HiveSyncTool extends AbstractSyncTool {
       String outputFormatClassName = HoodieInputFormatUtils.getOutputFormatClassName(baseFileFormat);
       String serDeFormatClassName = HoodieInputFormatUtils.getSerDeClassName(baseFileFormat);
 
-      Map<String, String> serdeProperties = ConfigUtils.toMap(cfg.serdeProperties);
-
-      // The serdeProperties is non-empty only for spark sync meta data currently.
-      if (!serdeProperties.isEmpty()) {
-        String queryTypeKey = serdeProperties.remove(ConfigUtils.SPARK_QUERY_TYPE_KEY);
-        String queryAsROKey = serdeProperties.remove(ConfigUtils.SPARK_QUERY_AS_RO_KEY);
-        String queryAsRTKey = serdeProperties.remove(ConfigUtils.SPARK_QUERY_AS_RT_KEY);
-
-        if (queryTypeKey != null && queryAsROKey != null && queryAsRTKey != null) {
-          if (readAsOptimized) { // read optimized
-            serdeProperties.put(queryTypeKey, queryAsROKey);
-          } else { // read snapshot
-            serdeProperties.put(queryTypeKey, queryAsRTKey);
-          }
-        }
-      }
       // Custom serde will not work with ALTER TABLE REPLACE COLUMNS
       // https://github.com/apache/hive/blob/release-1.1.0/ql/src/java/org/apache/hadoop/hive
       // /ql/exec/DDLTask.java#L3488
       hoodieHiveClient.createTable(tableName, schema, inputFormatClassName,
-          outputFormatClassName, serDeFormatClassName, serdeProperties, ConfigUtils.toMap(cfg.tableProperties));
+          outputFormatClassName, serDeFormatClassName, serdeProperties, tableProperties);
     } else {
       // Check if the table schema has evolved
       Map<String, String> tableSchema = hoodieHiveClient.getTableSchema(tableName);
@@ -226,7 +225,6 @@ public class HiveSyncTool extends AbstractSyncTool {
         hoodieHiveClient.updateTableDefinition(tableName, schema);
         // Sync the table properties if the schema has changed
         if (cfg.tableProperties != null) {
-          Map<String, String> tableProperties = ConfigUtils.toMap(cfg.tableProperties);
           hoodieHiveClient.updateTableProperties(tableName, tableProperties);
           LOG.info("Sync table properties for " + tableName + ", table properties is: " + cfg.tableProperties);
         }
@@ -234,6 +232,70 @@ public class HiveSyncTool extends AbstractSyncTool {
         LOG.info("No Schema difference for " + tableName);
       }
     }
+  }
+
+  /**
+   * Get Spark Sql related table properties. This is used for spark datasource table.
+   * @param schema  The schema to write to the table.
+   * @return A new parameters added the spark's table properties.
+   */
+  private Map<String, String> getSparkTableProperties(int schemaLengthThreshold, MessageType schema)  {
+    // Convert the schema and partition info used by spark sql to hive table properties.
+    // The following code refers to the spark code in
+    // https://github.com/apache/spark/blob/master/sql/hive/src/main/scala/org/apache/spark/sql/hive/HiveExternalCatalog.scala
+
+    StructType sparkSchema =
+            new ParquetToSparkSchemaConverter(false, true).convert(schema);
+    List<String> partitionNames = cfg.partitionFields;
+    List<StructField> partitionCols = new ArrayList<>();
+    List<StructField> dataCols = new ArrayList<>();
+    Map<String, StructField> column2Field = new HashMap<>();
+    for (StructField field : sparkSchema.fields()) {
+      column2Field.put(field.name(), field);
+    }
+    for (String partitionName : partitionNames) {
+      // Default the unknown partition fields to be String.
+      // Keep the same logical with HiveSchemaUtil#getPartitionKeyType.
+      partitionCols.add(column2Field.getOrDefault(partitionName,
+              new StructField(partitionName, StringType$.MODULE$, false, Metadata.empty())));
+    }
+    for (StructField field : sparkSchema.fields()) {
+      if (!partitionNames.contains(field.name())) {
+        dataCols.add(field);
+      }
+    }
+    List<StructField> reOrderedFields = new ArrayList<>();
+    reOrderedFields.addAll(dataCols);
+    reOrderedFields.addAll(partitionCols);
+    StructType reOrderedType = new StructType(reOrderedFields.toArray(new StructField[]{}));
+
+    Map<String, String> sparkProperties = new HashMap<>();
+    sparkProperties.put("spark.sql.sources.provider", "hudi");
+    // Split the schema string to multi-parts according the schemaLengthThreshold size.
+    String schemaString = reOrderedType.json();
+    int numSchemaPart = (schemaString.length() + schemaLengthThreshold - 1) / schemaLengthThreshold;
+    sparkProperties.put("spark.sql.sources.schema.numParts", String.valueOf(numSchemaPart));
+    // Add each part of schema string to sparkProperties
+    for (int i = 0; i < numSchemaPart; i++) {
+      int start = i * schemaLengthThreshold;
+      int end = Math.min(start + schemaLengthThreshold, schemaString.length());
+      sparkProperties.put("spark.sql.sources.schema.part." + i, schemaString.substring(start, end));
+    }
+    // Add partition columns
+    if (!partitionNames.isEmpty()) {
+      sparkProperties.put("spark.sql.sources.schema.numPartCols", String.valueOf(partitionNames.size()));
+      for (int i = 0; i < partitionNames.size(); i++) {
+        sparkProperties.put("spark.sql.sources.schema.partCol." + i, partitionNames.get(i));
+      }
+    }
+    return sparkProperties;
+  }
+
+  private Map<String, String> getSparkSerdeProperties(boolean readAsOptimized) {
+    Map<String, String> sparkSerdeProperties = new HashMap<>();
+    sparkSerdeProperties.put("path", cfg.basePath);
+    sparkSerdeProperties.put(ConfigUtils.IS_QUERY_AS_RO_TABLE, String.valueOf(readAsOptimized));
+    return sparkSerdeProperties;
   }
 
   /**
