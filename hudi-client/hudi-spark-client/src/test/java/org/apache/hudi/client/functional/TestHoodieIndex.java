@@ -37,7 +37,9 @@ import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieStorageConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.index.HoodieIndex;
+import org.apache.hudi.exception.HoodieIndexException;
 import org.apache.hudi.index.HoodieIndex.IndexType;
+import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 import org.apache.hudi.table.HoodieSparkTable;
 import org.apache.hudi.table.HoodieTable;
 import org.apache.hudi.testutils.Assertions;
@@ -72,6 +74,7 @@ import scala.Tuple2;
 import static org.apache.hudi.common.testutils.SchemaTestUtil.getSchemaFromResource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -84,8 +87,10 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
         {IndexType.GLOBAL_BLOOM, true},
         {IndexType.SIMPLE, true},
         {IndexType.GLOBAL_SIMPLE, true},
+        {IndexType.BUCKET_INDEX, true},
         {IndexType.SIMPLE, false},
-        {IndexType.GLOBAL_SIMPLE, false}
+        {IndexType.GLOBAL_SIMPLE, false},
+        {IndexType.BUCKET_INDEX, false}
     };
     return Stream.of(data).map(Arguments::of);
   }
@@ -108,6 +113,9 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
         .withProperties(populateMetaFields ? new Properties() : getPropertiesForKeyGen())
         .withIndexConfig(HoodieIndexConfig.newBuilder().withIndexType(indexType)
             .build()).withAutoCommit(false).build();
+    if (indexType == IndexType.BUCKET_INDEX) {
+      config.setValue(HoodieIndexConfig.BUCKET_INDEX_BUCKET_NUM, "8");
+    }
     writeClient = getHoodieWriteClient(config);
     this.index = writeClient.getIndex();
   }
@@ -123,7 +131,7 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
     setUp(indexType, populateMetaFields);
     String newCommitTime = "001";
     int totalRecords = 10 + random.nextInt(20);
-    List<HoodieRecord> records = dataGen.generateInserts(newCommitTime, totalRecords);
+    List<HoodieRecord> records = generateInserts(newCommitTime, totalRecords, indexType);
     JavaRDD<HoodieRecord> writeRecords = jsc.parallelize(records, 1);
 
     metaClient = HoodieTableMetaClient.reload(metaClient);
@@ -173,7 +181,7 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
     setUp(indexType, populateMetaFields);
     String newCommitTime = "001";
     int totalRecords = 10 + random.nextInt(20);
-    List<HoodieRecord> records = dataGen.generateInserts(newCommitTime, totalRecords);
+    List<HoodieRecord> records = generateInserts(newCommitTime, totalRecords, indexType);
     JavaRDD<HoodieRecord> writeRecords = jsc.parallelize(records, 1);
 
     HoodieSparkTable hoodieTable = HoodieSparkTable.create(config, context, metaClient);
@@ -223,7 +231,7 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
     setUp(indexType, populateMetaFields);
     String newCommitTime = writeClient.startCommit();
     int totalRecords = 20 + random.nextInt(20);
-    List<HoodieRecord> records = dataGen.generateInserts(newCommitTime, totalRecords);
+    List<HoodieRecord> records = generateInserts(newCommitTime, totalRecords, indexType);
     JavaRDD<HoodieRecord> writeRecords = jsc.parallelize(records, 1);
     metaClient = HoodieTableMetaClient.reload(metaClient);
 
@@ -443,6 +451,19 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
     assertEquals(incomingPayloadSamePartition.getJsonData(), ((RawTripTestPayload) record.getData()).getJsonData());
   }
 
+  @Test
+  public void testBucketIndexValidityCheck() {
+    assertThrows(HoodieIndexException.class, () -> {
+      HoodieIndexConfig.newBuilder().withIndexType(IndexType.BUCKET_INDEX).build();
+    });
+    assertThrows(HoodieIndexException.class, () -> {
+      HoodieIndexConfig.newBuilder().withIndexType(IndexType.BUCKET_INDEX).withBucketNum("8").build();
+    });
+    Properties props = new Properties();
+    props.setProperty(KeyGeneratorOptions.INDEXKEY_FILED_OPT.key(), "_row_key");
+    HoodieIndexConfig.newBuilder().fromProperties(props).withIndexType(IndexType.BUCKET_INDEX).withBucketNum("8").build();
+  }
+
   private HoodieWriteConfig.Builder getConfigBuilder() {
     return HoodieWriteConfig.newBuilder().withPath(basePath).withSchema(HoodieTestDataGenerator.TRIP_EXAMPLE_SCHEMA)
         .withParallelism(2, 2).withBulkInsertParallelism(2).withFinalizeWriteParallelism(2).withDeleteParallelism(2)
@@ -463,5 +484,13 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
         ? Option.of(Pair.of(hr.getPartitionPath(), hr.getCurrentLocation().getFileId()))
         : Option.empty())
     );
+  }
+
+  private List<HoodieRecord> generateInserts(String instantTime, Integer n, IndexType indexType) {
+    if (indexType == IndexType.BUCKET_INDEX) {
+      return dataGen.generateInserts(true, instantTime, n);
+    } else {
+      return dataGen.generateInserts(instantTime, n);
+    }
   }
 }

@@ -140,6 +140,7 @@ class TestMORDataSource extends HoodieClientTestBase {
     assertEquals(updatedVerificationVal, hudiSnapshotDF3.filter(col("_row_key") === verificationRowKey).select(verificationCol).first.getString(0))
   }
 
+
   @Test def testCount() {
     // First Operation:
     // Producing parquet files to three default partitions.
@@ -631,7 +632,7 @@ class TestMORDataSource extends HoodieClientTestBase {
     val N = 20
     // Test query with partition prune if URL_ENCODE_PARTITIONING has enable
     val records1 = dataGen.generateInsertsContainsAllPartitions("000", N)
-    val inputDF1 = spark.read.json(spark.sparkContext.parallelize(recordsToStrings(records1), 2))
+    val inputDF1 = spark.read.json(spark.sparkContext.parallelize(recordsToStrings(records1).toList, 2))
     inputDF1.write.format("hudi")
       .options(commonOpts)
       .option(DataSourceWriteOptions.OPERATION.key, DataSourceWriteOptions.INSERT_OPERATION_OPT_VAL)
@@ -642,7 +643,7 @@ class TestMORDataSource extends HoodieClientTestBase {
       .save(basePath)
     val commitInstantTime1 = HoodieDataSourceHelpers.latestCommit(fs, basePath)
 
-    val countIn20160315 = records1.asScala.count(record => record.getPartitionPath == "2016/03/15")
+    val countIn20160315 = records1.toList.count(record => record.getPartitionPath == "2016/03/15")
     // query the partition by filter
     val count1 = spark.read.format("hudi")
       .option(HoodieMetadataConfig.ENABLE.key, isMetadataEnabled)
@@ -661,7 +662,7 @@ class TestMORDataSource extends HoodieClientTestBase {
 
     // Second write with Append mode
     val records2 = dataGen.generateInsertsContainsAllPartitions("000", N + 1)
-    val inputDF2 = spark.read.json(spark.sparkContext.parallelize(recordsToStrings(records2), 2))
+    val inputDF2 = spark.read.json(spark.sparkContext.parallelize(recordsToStrings(records2).toList, 2))
     inputDF2.write.format("hudi")
       .options(commonOpts)
       .option(DataSourceWriteOptions.OPERATION.key, DataSourceWriteOptions.INSERT_OPERATION_OPT_VAL)
@@ -684,9 +685,9 @@ class TestMORDataSource extends HoodieClientTestBase {
     val partitions = Array("2021/03/01", "2021/03/02", "2021/03/03", "2021/03/04", "2021/03/05")
     val newDataGen =  new HoodieTestDataGenerator(partitions)
     val records1 = newDataGen.generateInsertsContainsAllPartitions("000", 100)
-    val inputDF1 = spark.read.json(spark.sparkContext.parallelize(recordsToStrings(records1), 2))
+    val inputDF1 = spark.read.json(spark.sparkContext.parallelize(recordsToStrings(records1).toList, 2))
 
-    val partitionCounts = partitions.map(p => p -> records1.count(r => r.getPartitionPath == p)).toMap
+    val partitionCounts = partitions.map(p => p -> records1.toList.count(r => r.getPartitionPath == p)).toMap
 
     inputDF1.write.format("hudi")
       .options(commonOpts)

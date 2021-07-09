@@ -24,6 +24,9 @@ import org.apache.hudi.common.config.ConfigGroups;
 import org.apache.hudi.common.config.ConfigProperty;
 import org.apache.hudi.common.config.HoodieConfig;
 import org.apache.hudi.common.engine.EngineType;
+import org.apache.hudi.common.util.StringUtils;
+
+import org.apache.hudi.exception.HoodieIndexException;
 import org.apache.hudi.exception.HoodieNotSupportedException;
 import org.apache.hudi.index.HoodieIndex;
 
@@ -54,7 +57,7 @@ public class HoodieIndexConfig extends HoodieConfig {
       .key("hoodie.index.type")
       .noDefaultValue()
       .withDocumentation("Type of index to use. Default is Bloom filter. "
-          + "Possible options are [BLOOM | GLOBAL_BLOOM |SIMPLE | GLOBAL_SIMPLE | INMEMORY | HBASE]. "
+          + "Possible options are [BLOOM | GLOBAL_BLOOM |SIMPLE | GLOBAL_SIMPLE | INMEMORY | HBASE | BUCKET]. "
           + "Bloom filters removes the dependency on a external system "
           + "and is stored in the footer of the Parquet Data Files");
 
@@ -199,6 +202,19 @@ public class HoodieIndexConfig extends HoodieConfig {
       .key("hoodie.simple.index.update.partition.path")
       .defaultValue("true")
       .withDocumentation("Similar to " + BLOOM_INDEX_UPDATE_PARTITION_PATH_ENABLE + ", but for simple index.");
+
+  // ***** Bucket Index Configs *****
+  public static final ConfigProperty<Integer> BUCKET_INDEX_BUCKET_NUM = ConfigProperty
+      .key("hoodie.index.bucket.num")
+      .defaultValue(-1)
+      .withDocumentation("Only applies if index type is BUCKET_INDEX. Determine the bucket num of the hudi table, "
+          + "and each partition is divided to N buckets.");
+
+  public static final ConfigProperty<String> INDEX_KEY_FILED_NAME = ConfigProperty
+      .key("hoodie.index.key.field")
+      .noDefaultValue()
+      .withAlternatives("hoodie.datasource.write.indexkey.field")
+      .withDocumentation("Index key.It is used to index the record and find its file group");
 
   /**
    * Deprecated configs. These are now part of {@link HoodieHBaseIndexConfig}.
@@ -516,12 +532,18 @@ public class HoodieIndexConfig extends HoodieConfig {
       return this;
     }
 
+    public Builder withBucketNum(String bucketNum) {
+      hoodieIndexConfig.setValue(BUCKET_INDEX_BUCKET_NUM, bucketNum);
+      return this;
+    }
+
     public HoodieIndexConfig build() {
       hoodieIndexConfig.setDefaultValue(INDEX_TYPE, getDefaultIndexType(engineType));
       hoodieIndexConfig.setDefaults(HoodieIndexConfig.class.getName());
 
       // Throws IllegalArgumentException if the value set is not a known Hoodie Index Type
       HoodieIndex.IndexType.valueOf(hoodieIndexConfig.getString(INDEX_TYPE));
+      validateBucketIndexConfig();
       return hoodieIndexConfig;
     }
 
@@ -539,6 +561,17 @@ public class HoodieIndexConfig extends HoodieConfig {
 
     public EngineType getEngineType() {
       return engineType;
+    }
+
+    private void validateBucketIndexConfig() {
+      if (hoodieIndexConfig.getString(INDEX_TYPE)
+          .equalsIgnoreCase(HoodieIndex.IndexType.BUCKET_INDEX.toString())) {
+        if (StringUtils.isNullOrEmpty(hoodieIndexConfig.getString(INDEX_KEY_FILED_NAME))) {
+          throw new HoodieIndexException("When using bucket index, hoodie.index.key.field cannot be null/empty.");
+        } else if (hoodieIndexConfig.getIntOrDefault(BUCKET_INDEX_BUCKET_NUM) <= 0) {
+          throw new HoodieIndexException("When using bucket index, hoodie.index.bucket.num cannot be negative.");
+        }
+      }
     }
   }
 }

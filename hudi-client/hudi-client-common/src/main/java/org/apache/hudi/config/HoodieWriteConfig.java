@@ -1372,6 +1372,10 @@ public class HoodieWriteConfig extends HoodieConfig {
     return getBoolean(HoodieIndexConfig.SIMPLE_INDEX_UPDATE_PARTITION_PATH_ENABLE);
   }
 
+  public int getNumBuckets() {
+    return Integer.parseInt(props.getProperty(HoodieIndexConfig.BUCKET_INDEX_BUCKET_NUM.key(), "-1"));
+  }
+
   /**
    * storage properties.
    */

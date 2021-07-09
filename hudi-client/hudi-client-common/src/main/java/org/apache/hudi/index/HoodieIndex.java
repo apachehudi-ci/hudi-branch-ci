@@ -25,9 +25,12 @@ import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.FileSlice;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecordPayload;
+import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.exception.HoodieIndexException;
 import org.apache.hudi.table.HoodieTable;
+import org.apache.hudi.table.WorkloadProfile;
+import org.apache.hudi.table.action.commit.Partitioner;
 
 import java.io.Serializable;
 
@@ -98,12 +101,23 @@ public abstract class HoodieIndex<T extends HoodieRecordPayload, I, K, O> implem
   public abstract boolean isImplicitWithStorage();
 
   /**
+   * An index might need customized partitioner other than general upsert and insert partitioner.
+   */
+  @PublicAPIMethod(maturity = ApiMaturityLevel.EVOLVING)
+  public Option<Partitioner> getCustomizedPartitioner(WorkloadProfile profile,
+      HoodieEngineContext context,
+      HoodieTable table,
+      HoodieWriteConfig writeConfig) {
+    return Option.empty();
+  }
+
+  /**
    * Each index type should implement it's own logic to release any resources acquired during the process.
    */
   public void close() {
   }
 
   public enum IndexType {
-    HBASE, INMEMORY, BLOOM, GLOBAL_BLOOM, SIMPLE, GLOBAL_SIMPLE
+    HBASE, INMEMORY, BLOOM, GLOBAL_BLOOM, SIMPLE, GLOBAL_SIMPLE, BUCKET_INDEX
   }
 }

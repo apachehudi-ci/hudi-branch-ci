@@ -59,6 +59,7 @@ public class KeyGeneratorOptions extends HoodieConfig {
   public static final ConfigProperty<String> INDEXKEY_FILED_NAME = ConfigProperty
       .key("hoodie.datasource.write.indexkey.field")
       .defaultValue("")
+      .withAlternatives("hoodie.index.key.field")
       .withDocumentation("Index key.It is used to index the record and find its file group");
 
   /**
