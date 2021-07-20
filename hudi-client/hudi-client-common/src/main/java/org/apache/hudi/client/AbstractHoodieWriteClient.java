@@ -203,7 +203,7 @@ public abstract class AbstractHoodieWriteClient<T extends HoodieRecordPayload, I
   }
 
   protected void commit(HoodieTable table, String commitActionType, String instantTime, HoodieCommitMetadata metadata,
-                      List<HoodieWriteStat> stats) throws IOException {
+                        List<HoodieWriteStat> stats) throws IOException {
     LOG.info("Committing " + instantTime + " action " + commitActionType);
     HoodieActiveTimeline activeTimeline = table.getActiveTimeline();
     // Finalize write
@@ -309,6 +309,17 @@ public abstract class AbstractHoodieWriteClient<T extends HoodieRecordPayload, I
   public abstract O insert(I records, final String instantTime);
 
   /**
+   * Inserts the given Error HoodieRecords, into the table. This API is intended to be used for normal writes.
+   * <p>
+   * This API is intended to be used to write wrong records.
+   *
+   * @param records Error HoodieRecords to insert
+   * @param instantTime Instant time of the commit
+   * @return Collection of WriteStatus to inspect errors and counts
+   */
+  public abstract O insertError(I records, final String instantTime);
+
+  /**
    * Inserts the given prepared records into the Hoodie table, at the supplied instantTime.
    * <p>
    * This implementation skips the index check, skips de-duping and is able to leverage benefits such as small file
@@ -389,7 +400,7 @@ public abstract class AbstractHoodieWriteClient<T extends HoodieRecordPayload, I
    * @param metaClient
    */
   protected void preWrite(String instantTime, WriteOperationType writeOperationType,
-      HoodieTableMetaClient metaClient) {
+                          HoodieTableMetaClient metaClient) {
     setOperationType(writeOperationType);
     this.lastCompletedTxnAndMetadata = TransactionUtils.getLastCompletedTxnInstantAndMetadata(metaClient);
     this.txnManager.beginTransaction(Option.of(new HoodieInstant(State.INFLIGHT, metaClient.getCommitActionType(), instantTime)), lastCompletedTxnAndMetadata
@@ -704,8 +715,8 @@ public abstract class AbstractHoodieWriteClient<T extends HoodieRecordPayload, I
     metaClient.getActiveTimeline().filterPendingCompactionTimeline().lastInstant().ifPresent(latestPending ->
         ValidationUtils.checkArgument(
             HoodieTimeline.compareTimestamps(latestPending.getTimestamp(), HoodieTimeline.LESSER_THAN, instantTime),
-        "Latest pending compaction instant time must be earlier than this instant time. Latest Compaction :"
-            + latestPending + ",  Ingesting at " + instantTime));
+            "Latest pending compaction instant time must be earlier than this instant time. Latest Compaction :"
+                + latestPending + ",  Ingesting at " + instantTime));
     if (config.getFailedWritesCleanPolicy().isLazy()) {
       this.heartbeatClient.start(instantTime);
     }
@@ -1018,7 +1029,7 @@ public abstract class AbstractHoodieWriteClient<T extends HoodieRecordPayload, I
       HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
       Option<HoodieInstant> lastInstant =
           activeTimeline.filterCompletedInstants().filter(s -> s.getAction().equals(metaClient.getCommitActionType())
-          || s.getAction().equals(HoodieActiveTimeline.REPLACE_COMMIT_ACTION))
+              || s.getAction().equals(HoodieActiveTimeline.REPLACE_COMMIT_ACTION))
               .lastInstant();
       if (lastInstant.isPresent()) {
         HoodieCommitMetadata commitMetadata = HoodieCommitMetadata.fromBytes(

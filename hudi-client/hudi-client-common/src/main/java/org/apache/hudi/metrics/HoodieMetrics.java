@@ -131,7 +131,7 @@ public class HoodieMetrics {
   }
 
   public void updateCommitMetrics(long commitEpochTimeInMs, long durationInMs, HoodieCommitMetadata metadata,
-      String actionType) {
+                                  String actionType) {
     updateCommitTimingMetrics(commitEpochTimeInMs, durationInMs, metadata, actionType);
     if (config.isMetricsOn()) {
       long totalPartitionsWritten = metadata.fetchTotalPartitionsWritten();
@@ -147,6 +147,7 @@ public class HoodieMetrics {
       long totalCompactedRecordsUpdated = metadata.getTotalCompactedRecordsUpdated();
       long totalLogFilesCompacted = metadata.getTotalLogFilesCompacted();
       long totalLogFilesSize = metadata.getTotalLogFilesSize();
+      long totalWriteErrors = metadata.fetchTotalWriteErrors();
       Metrics.registerGauge(getMetricsName(actionType, "totalPartitionsWritten"), totalPartitionsWritten);
       Metrics.registerGauge(getMetricsName(actionType, "totalFilesInsert"), totalFilesInsert);
       Metrics.registerGauge(getMetricsName(actionType, "totalFilesUpdate"), totalFilesUpdate);
@@ -160,11 +161,12 @@ public class HoodieMetrics {
       Metrics.registerGauge(getMetricsName(actionType, "totalCompactedRecordsUpdated"), totalCompactedRecordsUpdated);
       Metrics.registerGauge(getMetricsName(actionType, "totalLogFilesCompacted"), totalLogFilesCompacted);
       Metrics.registerGauge(getMetricsName(actionType, "totalLogFilesSize"), totalLogFilesSize);
+      Metrics.registerGauge(getMetricsName(actionType, "totalWriteErrors"), totalWriteErrors);
     }
   }
 
   private void updateCommitTimingMetrics(long commitEpochTimeInMs, long durationInMs, HoodieCommitMetadata metadata,
-      String actionType) {
+                                         String actionType) {
     if (config.isMetricsOn()) {
       Pair<Option<Long>, Option<Long>> eventTimePairMinMax = metadata.getMinAndMaxEventTime();
       if (eventTimePairMinMax.getLeft().isPresent()) {
