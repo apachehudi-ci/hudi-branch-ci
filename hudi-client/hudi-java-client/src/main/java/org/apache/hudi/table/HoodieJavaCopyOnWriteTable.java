@@ -31,6 +31,7 @@ import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieRecordPayload;
+import org.apache.hudi.common.model.HoodieWriteStat;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.util.Option;
@@ -140,6 +141,16 @@ public class HoodieJavaCopyOnWriteTable<T extends HoodieRecordPayload> extends H
                                                                      List<HoodieRecord<T>> records) {
     return new JavaInsertOverwriteTableCommitActionExecutor(
         context, config, this, instantTime, records).execute();
+  }
+
+  @Override
+  public HoodieWriteMetadata<List<WriteStatus>> optimize(HoodieEngineContext context, String instantTime, List<HoodieRecord<T>> records) {
+    throw new HoodieNotSupportedException("optimize data layout is not supported yet");
+  }
+
+  @Override
+  public void updateStatistics(HoodieEngineContext context, List<HoodieWriteStat> stats, String instantTime, Boolean isOptimizeOperation) {
+    throw new HoodieNotSupportedException("update statistics is not supported yet");
   }
 
   @Override

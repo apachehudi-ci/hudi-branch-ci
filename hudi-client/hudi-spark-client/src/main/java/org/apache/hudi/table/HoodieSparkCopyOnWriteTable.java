@@ -18,6 +18,7 @@
 
 package org.apache.hudi.table;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.hudi.avro.model.HoodieCleanMetadata;
 import org.apache.hudi.avro.model.HoodieCleanerPlan;
 import org.apache.hudi.avro.model.HoodieClusteringPlan;
@@ -33,6 +34,7 @@ import org.apache.hudi.common.model.HoodieBaseFile;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieRecordPayload;
+import org.apache.hudi.common.model.HoodieWriteStat;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
@@ -64,18 +66,22 @@ import org.apache.hudi.table.action.commit.SparkInsertPreppedCommitActionExecuto
 import org.apache.hudi.table.action.commit.SparkMergeHelper;
 import org.apache.hudi.table.action.commit.SparkUpsertCommitActionExecutor;
 import org.apache.hudi.table.action.commit.SparkUpsertPreppedCommitActionExecutor;
+import org.apache.hudi.table.action.commit.SparkOptimizeWriteCommitActionExecutor;
 import org.apache.hudi.table.action.restore.SparkCopyOnWriteRestoreActionExecutor;
 import org.apache.hudi.table.action.rollback.SparkCopyOnWriteRollbackActionExecutor;
 import org.apache.hudi.table.action.savepoint.SavepointActionExecutor;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.sql.Zoptimize$;
+import scala.collection.JavaConversions;
 
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Implementation of a very heavily read-optimized Hoodie Table where, all data is stored in base files, with
@@ -147,6 +153,37 @@ public class HoodieSparkCopyOnWriteTable<T extends HoodieRecordPayload> extends 
   @Override
   public HoodieWriteMetadata<JavaRDD<WriteStatus>> insertOverwriteTable(HoodieEngineContext context, String instantTime, JavaRDD<HoodieRecord<T>> records) {
     return new SparkInsertOverwriteTableCommitActionExecutor(context, config, this, instantTime, records).execute();
+  }
+
+  @Override
+  public HoodieWriteMetadata<JavaRDD<WriteStatus>> optimize(HoodieEngineContext context, String instantTime, JavaRDD<HoodieRecord<T>> records) {
+    return new SparkOptimizeWriteCommitActionExecutor((HoodieSparkEngineContext)context, config, this, instantTime, records).execute();
+  }
+
+  @Override
+  public void updateStatistics(HoodieEngineContext context, List<HoodieWriteStat> stats, String instantTime, Boolean isOptimizeOperation) {
+    // deal with z-order/hilbert statistic info
+    if (isOptimizeOperation) {
+      updateOptimizeOperationStatistics(context, stats, instantTime);
+    }
+  }
+
+  private void updateOptimizeOperationStatistics(HoodieEngineContext context, List<HoodieWriteStat> stats, String instantTime) {
+    String cols = config.getOptimizeSortColumns();
+    String saveMode = config.getOptimizeStatisticsSaveMode();
+    String basePath = metaClient.getBasePath();
+    String indexPath = metaClient.getZindexPath();
+    List<String> validateCommits = metaClient.getCommitsTimeline()
+        .filterCompletedInstants().getInstants().map(f -> f.getTimestamp()).collect(Collectors.toList());
+    List<String> touchFiles = stats.stream().map(s -> new Path(basePath, s.getPath()).toString()).collect(Collectors.toList());
+    if (touchFiles.isEmpty() || cols.isEmpty() || indexPath.isEmpty()) {
+      LOG.warn("save nothing to index table");
+      return;
+    }
+    HoodieSparkEngineContext sparkEngineContext = (HoodieSparkEngineContext)context;
+    Zoptimize$.MODULE$.saveStatisticsInfo(sparkEngineContext
+        .getSqlContext().sparkSession().read().load(JavaConversions.asScalaBuffer(touchFiles)),
+        cols, indexPath, instantTime, saveMode, JavaConversions.asScalaBuffer(validateCommits));
   }
 
   @Override

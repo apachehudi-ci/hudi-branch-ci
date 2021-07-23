@@ -87,8 +87,14 @@ public class SparkExecuteClusteringCommitActionExecutor<T extends HoodieRecordPa
     validateWriteResult(writeMetadata);
     commitOnAutoCommit(writeMetadata);
     if (!writeMetadata.getCommitMetadata().isPresent()) {
+
+      WriteOperationType realOperationType = operationType;
+      // deal with optimize operation
+      if (!config.getOptimizeSortColumns().isEmpty()) {
+        realOperationType = WriteOperationType.OPTIMIZE;
+      }
       HoodieCommitMetadata commitMetadata = CommitUtils.buildMetadata(writeMetadata.getWriteStats().get(), writeMetadata.getPartitionToReplaceFileIds(),
-          extraMetadata, operationType, getSchemaToStoreInCommit(), getCommitActionType());
+          extraMetadata, realOperationType, getSchemaToStoreInCommit(), getCommitActionType());
       writeMetadata.setCommitMetadata(Option.of(commitMetadata));
     }
     return writeMetadata;

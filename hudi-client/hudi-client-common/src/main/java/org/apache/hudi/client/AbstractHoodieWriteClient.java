@@ -188,6 +188,9 @@ public abstract class AbstractHoodieWriteClient<T extends HoodieRecordPayload, I
     try {
       preCommit(instantTime, metadata);
       commit(table, commitActionType, instantTime, metadata, stats);
+      if (operationType != null && operationType.equals(WriteOperationType.OPTIMIZE) && config.getOptimizeEnableDataSkipping()) {
+        table.updateStatistics(context, stats, instantTime, true);
+      }
       postCommit(table, metadata, instantTime, extraMetadata);
       LOG.info("Committed " + instantTime);
       releaseResources();

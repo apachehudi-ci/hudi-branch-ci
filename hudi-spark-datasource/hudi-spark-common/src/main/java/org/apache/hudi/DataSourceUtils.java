@@ -216,6 +216,8 @@ public class DataSourceUtils {
         return client.insertOverwrite(hoodieRecords, instantTime);
       case INSERT_OVERWRITE_TABLE:
         return client.insertOverwriteTable(hoodieRecords, instantTime);
+      case OPTIMIZE:
+        return client.optimize(hoodieRecords, instantTime);
       default:
         throw new HoodieException("Not a valid operation type for doWriteOperation: " + operation.toString());
     }

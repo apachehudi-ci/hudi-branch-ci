@@ -17,7 +17,11 @@
 
 package org.apache
 
+import org.apache.hudi.common.model.HoodieRecord
+import org.apache.spark.sql.operation.HudiTableOperations
 import org.apache.spark.sql.{DataFrame, DataFrameReader, DataFrameWriter}
+
+import scala.collection.JavaConversions
 
 package object hudi {
 
@@ -35,4 +39,10 @@ package object hudi {
     def avro: String => DataFrame = reader.format("org.apache.hudi").load
   }
 
+  /**
+    * Adds a method, `hoodie`, to DataFrameReader
+    */
+  implicit def toDataFrameFunctions(df: DataFrame): HudiTableOperations = {
+    new HudiTableOperations(df.drop(JavaConversions.asScalaIterator(HoodieRecord.HOODIE_META_COLUMNS.iterator()).toSeq: _*))
+  }
 }

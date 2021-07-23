@@ -48,6 +48,8 @@ public enum WriteOperationType {
   INSERT_OVERWRITE_TABLE("insert_overwrite_table"),
   // compact
   COMPACT("compact"),
+  // optimize data layout
+  OPTIMIZE("optimize"),
   // used for old version
   UNKNOWN("unknown");
 
@@ -86,6 +88,8 @@ public enum WriteOperationType {
         return CLUSTER;
       case "compact":
         return COMPACT;
+      case "optimize":
+        return OPTIMIZE;
       case "unknown":
         return UNKNOWN;
       default:

@@ -47,7 +47,7 @@ public class CommitUtils {
    */
   public static String getCommitActionType(WriteOperationType operation, HoodieTableType tableType) {
     if (operation == WriteOperationType.INSERT_OVERWRITE || operation == WriteOperationType.INSERT_OVERWRITE_TABLE
-        || operation == WriteOperationType.DELETE_PARTITION) {
+        || operation == WriteOperationType.DELETE_PARTITION || operation == WriteOperationType.OPTIMIZE) {
       return HoodieTimeline.REPLACE_COMMIT_ACTION;
     } else {
       return getCommitActionType(tableType);
