@@ -1217,6 +1217,33 @@ public class HoodieWriteConfig extends HoodieConfig {
   }
 
   /**
+   * Data layout optimize properties.
+   */
+  public String getOptimizeDataLayoutStrategy() {
+    return getString(HoodieOptimizeConfig.DATA_LAYOUT_STRATEGY);
+  }
+
+  public String getOptimizeBuildCurveOptimizeMethod() {
+    return getString(HoodieOptimizeConfig.DATA_LAYOUT_BUILD_CURVE_STRATEGY);
+  }
+
+  public int getOptimizeSampleNumber() {
+    return getInt(HoodieOptimizeConfig.DATA_LAYOUT_CURVE_OPTIMIZE_SAMPLE_NUMBER);
+  }
+
+  public String getOptimizeSortColumns() {
+    return getString(HoodieOptimizeConfig.DATA_LAYOUT_CURVE_OPTIMIZE_SORT_COLUMNS);
+  }
+
+  public boolean getOptimizeEnableDataSkipping() {
+    return getBoolean(HoodieOptimizeConfig.DATA_LAYOUT_DATA_SKIPPING_ENABLE);
+  }
+
+  public String getOptimizeStatisticsSaveMode() {
+    return getString(HoodieOptimizeConfig.DATA_LAYOUT_DATA_STATISTICS_SAVE_MODE);
+  }
+
+  /**
    * index properties.
    */
   public HoodieIndex.IndexType getIndexType() {
@@ -1756,6 +1783,7 @@ public class HoodieWriteConfig extends HoodieConfig {
     private boolean isStorageConfigSet = false;
     private boolean isCompactionConfigSet = false;
     private boolean isClusteringConfigSet = false;
+    private boolean isOptimizeConfigSet = false;
     private boolean isMetricsConfigSet = false;
     private boolean isBootstrapConfigSet = false;
     private boolean isMemoryConfigSet = false;
@@ -1911,6 +1939,12 @@ public class HoodieWriteConfig extends HoodieConfig {
     public Builder withClusteringConfig(HoodieClusteringConfig clusteringConfig) {
       writeConfig.getProps().putAll(clusteringConfig.getProps());
       isClusteringConfigSet = true;
+      return this;
+    }
+
+    public Builder withOptimizeConfig(HoodieOptimizeConfig optimizeConfig) {
+      writeConfig.getProps().putAll(optimizeConfig.getProps());
+      isOptimizeConfigSet = true;
       return this;
     }
 
@@ -2097,6 +2131,8 @@ public class HoodieWriteConfig extends HoodieConfig {
           HoodieCompactionConfig.newBuilder().fromProperties(writeConfig.getProps()).build());
       writeConfig.setDefaultOnCondition(!isClusteringConfigSet,
           HoodieClusteringConfig.newBuilder().fromProperties(writeConfig.getProps()).build());
+      writeConfig.setDefaultOnCondition(!isOptimizeConfigSet,
+          HoodieOptimizeConfig.newBuilder().fromProperties(writeConfig.getProps()).build());
       writeConfig.setDefaultOnCondition(!isMetricsConfigSet, HoodieMetricsConfig.newBuilder().fromProperties(
           writeConfig.getProps()).build());
       writeConfig.setDefaultOnCondition(!isBootstrapConfigSet,
