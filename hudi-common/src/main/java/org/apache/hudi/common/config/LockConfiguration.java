@@ -74,6 +74,15 @@ public class LockConfiguration implements Serializable {
 
   public static final String ZK_LOCK_KEY_PROP_KEY = ZOOKEEPER_BASED_LOCK_PROPERTY_PREFIX + "lock_key";
 
+  // configs for DynamoDb based locks
+  public static final String DYNAMODB_BASED_LOCK_PROPERTY_PREFIX = LOCK_PREFIX + "dynamodb.";
+
+  public static final String DYNAMODB_TABLE_NAME_PROP_KEY = DYNAMODB_BASED_LOCK_PROPERTY_PREFIX + "table";
+
+  public static final String DYNAMODB_PARTITION_KEY_PROP_KEY = DYNAMODB_BASED_LOCK_PROPERTY_PREFIX + "partition_key";
+
+  public static final String DYNAMODB_REGION_PROP_KEY = DYNAMODB_BASED_LOCK_PROPERTY_PREFIX + "region";
+
   private final TypedProperties props;
 
   public LockConfiguration(Properties props) {

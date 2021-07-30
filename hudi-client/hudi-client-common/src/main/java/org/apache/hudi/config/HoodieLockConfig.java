@@ -35,6 +35,9 @@ import static org.apache.hudi.common.config.LockConfiguration.DEFAULT_LOCK_ACQUI
 import static org.apache.hudi.common.config.LockConfiguration.DEFAULT_LOCK_ACQUIRE_RETRY_WAIT_TIME_IN_MILLIS;
 import static org.apache.hudi.common.config.LockConfiguration.DEFAULT_ZK_CONNECTION_TIMEOUT_MS;
 import static org.apache.hudi.common.config.LockConfiguration.DEFAULT_ZK_SESSION_TIMEOUT_MS;
+import static org.apache.hudi.common.config.LockConfiguration.DYNAMODB_PARTITION_KEY_PROP_KEY;
+import static org.apache.hudi.common.config.LockConfiguration.DYNAMODB_REGION_PROP_KEY;
+import static org.apache.hudi.common.config.LockConfiguration.DYNAMODB_TABLE_NAME_PROP_KEY;
 import static org.apache.hudi.common.config.LockConfiguration.FILESYSTEM_LOCK_PATH_PROP_KEY;
 import static org.apache.hudi.common.config.LockConfiguration.HIVE_DATABASE_NAME_PROP_KEY;
 import static org.apache.hudi.common.config.LockConfiguration.HIVE_METASTORE_URI_PROP_KEY;
@@ -52,7 +55,6 @@ import static org.apache.hudi.common.config.LockConfiguration.ZK_CONNECT_URL_PRO
 import static org.apache.hudi.common.config.LockConfiguration.ZK_LOCK_KEY_PROP_KEY;
 import static org.apache.hudi.common.config.LockConfiguration.ZK_PORT_PROP_KEY;
 import static org.apache.hudi.common.config.LockConfiguration.ZK_SESSION_TIMEOUT_MS_PROP_KEY;
-
 
 /**
  * Hoodie Configs for Locks.
@@ -196,6 +198,22 @@ public class HoodieLockConfig extends HoodieConfig {
   @Deprecated
   public static final String ZK_LOCK_KEY_PROP = ZK_LOCK_KEY.key();
 
+  public static final ConfigProperty<String> DYNAMODB_TABLE_NAME_PROP = ConfigProperty
+      .key(DYNAMODB_TABLE_NAME_PROP_KEY)
+      .noDefaultValue()
+      .withDocumentation("For DynamoDb based lock provider, the name of the DynamoDb table acting as lock table");
+
+  public static final ConfigProperty<String> DYNAMODB_PARTITION_KEY_PROP = ConfigProperty
+      .key(DYNAMODB_PARTITION_KEY_PROP_KEY)
+      .noDefaultValue()
+      .withDocumentation("For DynamoDb based lock provider, the primary key for the DynamoDb lock table");
+
+  public static final ConfigProperty<String> DYNAMODB_REGION_PROP = ConfigProperty
+      .key(DYNAMODB_REGION_PROP_KEY)
+      .defaultValue("us-east-1")
+      .withDocumentation("For DynamoDb based lock provider, the region used in endpoint for Amazon DynamoDB service"
+              + "example: us-east-1");
+
   // Pluggable type of lock provider
   public static final ConfigProperty<String> LOCK_PROVIDER_CLASS = ConfigProperty
       .key(LOCK_PREFIX + "provider")
@@ -287,6 +305,21 @@ public class HoodieLockConfig extends HoodieConfig {
 
     public HoodieLockConfig.Builder withZkSessionTimeoutInMs(Long sessionTimeoutInMs) {
       lockConfig.setValue(ZK_SESSION_TIMEOUT_MS, String.valueOf(sessionTimeoutInMs));
+      return this;
+    }
+
+    public HoodieLockConfig.Builder withDynamoDbTable(String dynamoDbTableName) {
+      lockConfig.setValue(DYNAMODB_TABLE_NAME_PROP, dynamoDbTableName);
+      return this;
+    }
+
+    public HoodieLockConfig.Builder withDynamoDbPartitionKey(String partitionKey) {
+      lockConfig.setValue(DYNAMODB_PARTITION_KEY_PROP, partitionKey);
+      return this;
+    }
+
+    public HoodieLockConfig.Builder withDynamoDbRegion(String region) {
+      lockConfig.setValue(DYNAMODB_REGION_PROP, region);
       return this;
     }
 

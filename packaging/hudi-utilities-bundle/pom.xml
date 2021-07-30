@@ -90,6 +90,10 @@
                   <include>org.antlr:stringtemplate</include>
                   <include>org.apache.parquet:parquet-avro</include>
 
+                  <include>com.amazonaws:dynamodb-lock-client</include>
+                  <include>software.amazon.awssdk:dynamodb</include>
+                  <include>software.amazon.awssdk:regions</include>
+
                   <include>com.twitter:bijection-avro_${scala.binary.version}</include>
                   <include>com.twitter:bijection-core_${scala.binary.version}</include>
                   <include>io.confluent:kafka-avro-serializer</include>

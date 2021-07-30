@@ -144,6 +144,10 @@
 
                   <include>org.apache.hbase:hbase-common</include>
                   <include>commons-codec:commons-codec</include>
+
+                  <include>com.amazonaws:dynamodb-lock-client</include>
+                  <include>software.amazon.awssdk:dynamodb</include>
+                  <include>software.amazon.awssdk:regions</include>
                 </includes>
               </artifactSet>
               <relocations>

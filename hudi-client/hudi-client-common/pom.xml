@@ -29,6 +29,10 @@
   <name>hudi-client-common</name>
   <packaging>jar</packaging>
 
+  <properties>
+    <dynamodb-local.version>1.15.0</dynamodb-local.version>
+  </properties>
+
   <dependencies>
     <!-- Hoodie -->
     <dependency>
@@ -218,6 +222,27 @@
       <version>${zk-curator.version}</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>dynamodb-lock-client</artifactId>
+      <version>${dynamodb.lockclient.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>dynamodb</artifactId>
+      <version>${aws.sdk.v2.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>regions</artifactId>
+      <version>${aws.sdk.v2.version}</version>
+    </dependency>
 
   </dependencies>
 
@@ -274,6 +299,45 @@
         <configuration>
           <skip>false</skip>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>io.fabric8</groupId>
+        <artifactId>docker-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>prepare-it-database</id>
+            <phase>pre-integration-test</phase>
+            <goals>
+              <goal>start</goal>
+            </goals>
+            <configuration>
+              <images>
+                <image>
+                  <name>amazon/dynamodb-local:${dynamodb-local.version}</name>
+                  <alias>it-database</alias>
+                  <run>
+                    <ports>
+                      <port>${dynamodb-local.port}:${dynamodb-local.port}</port>
+                    </ports>
+                    <wait>
+                      <http>
+                        <url>${dynamodb-local.endpoint}/shell/</url>
+                      </http>
+                      <time>10000</time>
+                    </wait>
+                  </run>
+                </image>
+              </images>
+            </configuration>
+          </execution>
+          <execution>
+            <id>remove-it-database</id>
+            <phase>post-integration-test</phase>
+            <goals>
+              <goal>stop</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.rat</groupId>
