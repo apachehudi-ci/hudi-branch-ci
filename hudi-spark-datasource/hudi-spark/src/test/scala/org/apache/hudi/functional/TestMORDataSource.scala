@@ -99,7 +99,7 @@ class TestMORDataSource extends HoodieClientTestBase {
     val hudiRODF1 = spark.read.format("org.apache.hudi")
       .option(DataSourceReadOptions.QUERY_TYPE.key, DataSourceReadOptions.QUERY_TYPE_READ_OPTIMIZED_OPT_VAL)
       .option(HoodieMetadataConfig.METADATA_ENABLE_PROP.key, isMetadataEnabled)
-      .load(basePath + "/*/*/*")
+      .load(basePath)
 
     assertEquals(100, hudiRODF1.count()) // still 100, since we only updated
     val insertCommitTime = HoodieDataSourceHelpers.latestCommit(fs, basePath)
@@ -120,7 +120,7 @@ class TestMORDataSource extends HoodieClientTestBase {
     val hudiSnapshotDF2 = spark.read.format("org.apache.hudi")
       .option(DataSourceReadOptions.QUERY_TYPE.key, DataSourceReadOptions.QUERY_TYPE_SNAPSHOT_OPT_VAL)
       .option(HoodieMetadataConfig.METADATA_ENABLE_PROP.key, isMetadataEnabled)
-      .load(basePath + "/*/*/*")
+      .load(basePath)
 
     val updateCommitTimes = hudiSnapshotDF2.select("_hoodie_commit_time").distinct().collectAsList().map(r => r.getString(0)).toList
     assertEquals(List(updateCommitTime), updateCommitTimes)
@@ -137,7 +137,7 @@ class TestMORDataSource extends HoodieClientTestBase {
 
     val hudiSnapshotDF3 = spark.read.format("hudi")
       .option(HoodieMetadataConfig.METADATA_ENABLE_PROP.key, isMetadataEnabled)
-      .load(basePath + "/*/*/*")
+      .load(basePath)
     assertEquals(100, hudiSnapshotDF3.count())
     assertEquals(updatedVerificationVal, hudiSnapshotDF3.filter(col("_row_key") === verificationRowKey).select(verificationCol).first.getString(0))
   }

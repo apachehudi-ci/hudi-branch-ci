@@ -176,7 +176,7 @@ class TestCOWDataSource extends HoodieClientTestBase {
     // Snapshot query
     val snapshotDF1 = spark.read.format("org.apache.hudi")
       .option(HoodieMetadataConfig.METADATA_ENABLE_PROP.key, isMetadataEnabled)
-      .load(basePath + "/*/*/*")
+      .load(basePath)
     assertEquals(100, snapshotDF1.count())
 
     // Upsert based on the written table with Hudi metadata columns
@@ -192,7 +192,7 @@ class TestCOWDataSource extends HoodieClientTestBase {
 
     val snapshotDF2 = spark.read.format("hudi")
       .option(HoodieMetadataConfig.METADATA_ENABLE_PROP.key, isMetadataEnabled)
-      .load(basePath + "/*/*/*")
+      .load(basePath)
     assertEquals(100, snapshotDF2.count())
     assertEquals(updatedVerificationVal, snapshotDF2.filter(col("_row_key") === verificationRowKey).select(verificationCol).first.getString(0))
 
@@ -213,7 +213,7 @@ class TestCOWDataSource extends HoodieClientTestBase {
     // Snapshot Query
     val snapshotDF3 = spark.read.format("org.apache.hudi")
       .option(HoodieMetadataConfig.METADATA_ENABLE_PROP.key, isMetadataEnabled)
-      .load(basePath + "/*/*/*")
+      .load(basePath)
     assertEquals(100, snapshotDF3.count()) // still 100, since we only updated
 
     // Read Incremental Query
