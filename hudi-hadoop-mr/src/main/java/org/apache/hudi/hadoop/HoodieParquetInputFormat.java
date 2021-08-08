@@ -18,6 +18,8 @@
 
 package org.apache.hudi.hadoop;
 
+import org.apache.hadoop.hive.ql.exec.Utilities;
+import org.apache.hadoop.hive.ql.io.parquet.read.ParquetRecordReaderWrapper;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieDefaultTimeline;
@@ -26,6 +28,7 @@ import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.exception.HoodieIOException;
+import org.apache.hudi.hadoop.avro.HudiAvroParquetInputFormat;
 import org.apache.hudi.hadoop.utils.HoodieHiveUtils;
 import org.apache.hudi.hadoop.utils.HoodieInputFormatUtils;
 
@@ -47,8 +50,10 @@ import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
+import org.apache.parquet.hadoop.ParquetInputFormat;
 
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -68,6 +73,40 @@ public class HoodieParquetInputFormat extends MapredParquetInputFormat implement
   private static final Logger LOG = LogManager.getLogger(HoodieParquetInputFormat.class);
 
   protected Configuration conf;
+
+  private HudiAvroParquetInputFormat inputFormat = null;
+
+  /**
+   * Spark2 use `parquet.hadoopParquetInputFormat` in `com.twitter:parquet-hadoop-bundle`.
+   * So that we need to distinguish the constructions of classes with
+   *  `parquet.hadoopParquetInputFormat` or `org.apache.parquet.hadoop.ParquetInputFormat`.
+   * If we use `org.apache.parquet:parquet-hadoop`, we can use `HudiAvroParquetInputFormat`
+   *  in Hive or Spark3 to get timestamp with correct type.
+   */
+  public HoodieParquetInputFormat() {
+    super();
+    Constructor[] constructors = ParquetRecordReaderWrapper.class.getConstructors();
+    if (Arrays.stream(constructors)
+            .anyMatch(c -> c.getParameterCount() > 0 && c.getParameterTypes()[0]
+                    .getName().equals(ParquetInputFormat.class.getName()))) {
+      inputFormat = new HudiAvroParquetInputFormat();
+    }
+  }
+
+  private RecordReader<NullWritable, ArrayWritable> getHudiReader(
+          final InputSplit split, final JobConf job, final Reporter reporter) {
+    try {
+      if (Utilities.getUseVectorizedInputFileFormat(job)) {
+        return super.getRecordReader(split, job, reporter);
+      } else if (inputFormat != null) {
+        return new ParquetRecordReaderWrapper(inputFormat, split, job, reporter);
+      } else {
+        return super.getRecordReader(split, job, reporter);
+      }
+    } catch (final InterruptedException | IOException e) {
+      throw new RuntimeException("Cannot create a RecordReaderWrapper", e);
+    }
+  }
 
   protected HoodieDefaultTimeline filterInstantsTimeline(HoodieDefaultTimeline timeline) {
     return HoodieInputFormatUtils.filterInstantsTimeline(timeline);
@@ -188,9 +227,9 @@ public class HoodieParquetInputFormat extends MapredParquetInputFormat implement
           .filter(p -> !HoodieRecord.HOODIE_META_COLUMNS.contains(p.getKey())).collect(Collectors.toList());
       LOG.info("colNameWithTypes =" + colNameWithTypes + ", Num Entries =" + colNameWithTypes.size());
       if (hoodieColsProjected.isEmpty()) {
-        return super.getRecordReader(eSplit.getBootstrapFileSplit(), job, reporter);
+        return getHudiReader(eSplit.getBootstrapFileSplit(), job, reporter);
       } else if (externalColsProjected.isEmpty()) {
-        return super.getRecordReader(split, job, reporter);
+        return getHudiReader(split, job, reporter);
       } else {
         FileSplit rightSplit = eSplit.getBootstrapFileSplit();
         // Hive PPD works at row-group level and only enabled when hive.optimize.index.filter=true;
@@ -203,9 +242,9 @@ public class HoodieParquetInputFormat extends MapredParquetInputFormat implement
         jobConfCopy.unset(ConvertAstToSearchArg.SARG_PUSHDOWN);
 
         LOG.info("Generating column stitching reader for " + eSplit.getPath() + " and " + rightSplit.getPath());
-        return new BootstrapColumnStichingRecordReader(super.getRecordReader(eSplit, jobConfCopy, reporter),
+        return new BootstrapColumnStichingRecordReader(getHudiReader(eSplit, jobConfCopy, reporter),
             HoodieRecord.HOODIE_META_COLUMNS.size(),
-            super.getRecordReader(rightSplit, jobConfCopy, reporter),
+                getHudiReader(rightSplit, jobConfCopy, reporter),
             colNamesWithTypesForExternal.size(),
             true);
       }
@@ -213,7 +252,7 @@ public class HoodieParquetInputFormat extends MapredParquetInputFormat implement
     if (LOG.isDebugEnabled()) {
       LOG.debug("EMPLOYING DEFAULT RECORD READER - " + split);
     }
-    return super.getRecordReader(split, job, reporter);
+    return getHudiReader(split, job, reporter);
   }
 
   @Override

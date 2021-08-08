@@ -287,6 +287,8 @@ public abstract class ITTestBase {
     }
 
     if (times != count) {
+      LOG.error("expectedOutput is: " + expectedOutput);
+      LOG.error("stdOutErr is: " + stdOutErr);
       saveUpLogs();
     }
 

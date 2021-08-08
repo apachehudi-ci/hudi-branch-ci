@@ -18,6 +18,8 @@
 
 package org.apache.hudi.hadoop.utils;
 
+import org.apache.hadoop.hive.serde2.io.TimestampWritable;
+import org.apache.hive.common.util.HiveVersionInfo;
 import org.apache.hudi.avro.HoodieAvroUtils;
 import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.exception.HoodieException;
@@ -50,7 +52,11 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
@@ -153,6 +159,35 @@ public class HoodieRealtimeRecordReaderUtils {
   }
 
   /**
+   * Get timestamp writeable object from long value.
+   * Hive3 use TimestampWritableV2 to build timestamp objects and Hive2 use TimestampWritable.
+   * So that we need to initialize timestamp according to the version of Hive.
+   * Because the currently Hive version 2.3, the objects of Hive3 are initialized by reflection temporarily.
+   */
+  public static Writable getTimestampWriteable(long value) {
+    if (HiveVersionInfo.getShortVersion().startsWith("3")) {
+      try {
+        Class tclass = Class.forName("org.apache.hadoop.hive.common.type.Timestamp");
+        Object timestamp = tclass.newInstance();
+        Method setTimeInMillis = tclass.getDeclaredMethod("setTimeInMillis", long.class);
+        setTimeInMillis.invoke(timestamp, value / 1000);
+
+        Class twclass = Class.forName("org.apache.hadoop.hive.serde2.io.TimestampWritableV2");
+        Constructor constructor = twclass.getConstructor(tclass);
+
+        return (Writable) constructor.newInstance(timestamp);
+      } catch (ClassNotFoundException | NoSuchMethodException e) {
+        throw new HoodieException("can not find hive3 class or method!", e);
+      } catch (IllegalAccessException | InstantiationException | InvocationTargetException e) {
+        throw new HoodieException("can not create writable class!", e);
+      }
+    } else {
+      Timestamp timestamp = new Timestamp(value / 1000);
+      return new TimestampWritable(timestamp);
+    }
+  }
+
+  /**
    * Convert the projected read from delta record into an array writable.
    */
   public static Writable avroToArrayWritable(Object value, Schema schema) {
@@ -172,6 +207,9 @@ public class HoodieRealtimeRecordReaderUtils {
         }
         return new IntWritable((Integer) value);
       case LONG:
+        if (schema.getLogicalType() != null && schema.getLogicalType().getName().equals("timestamp-micros")) {
+          return getTimestampWriteable((Long) value);
+        }
         return new LongWritable((Long) value);
       case FLOAT:
         return new FloatWritable((Float) value);

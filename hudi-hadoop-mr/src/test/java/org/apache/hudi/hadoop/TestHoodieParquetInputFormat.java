@@ -18,10 +18,15 @@
 
 package org.apache.hudi.hadoop;
 
+import org.apache.avro.generic.GenericData;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hive.common.util.HiveVersionInfo;
 import org.apache.hudi.avro.model.HoodieCompactionPlan;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
 import org.apache.hudi.common.model.HoodieFileFormat;
+import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.HoodieWriteStat;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
@@ -43,6 +48,7 @@ import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.parquet.avro.AvroParquetWriter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -53,6 +59,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -579,5 +589,46 @@ public class TestHoodieParquetInputFormat {
     }
     assertEquals(expectedNumberOfRecordsInCommit, actualCount, msg);
     assertEquals(totalExpected, totalCount, msg);
+  }
+
+  @Test
+  public void testHoodieParquetInputFormatReadTimestamp() throws IOException {
+    long testTimestampLong = System.currentTimeMillis();
+
+    Schema schema = getSchemaFromResource(getClass(), "/test_timestamp.avsc");
+    String commit = "20160628071126";
+    HoodieTestUtils.init(HoodieTestUtils.getDefaultHadoopConf(), basePath.toString(),
+            HoodieTableType.COPY_ON_WRITE, HoodieFileFormat.PARQUET);
+    java.nio.file.Path partitionPath = basePath.resolve(Paths.get("2016", "06", "28"));
+    String fileId = FSUtils.makeDataFileName(commit, "1-0-1", "fileid1",
+            HoodieFileFormat.PARQUET.getFileExtension());
+    try (AvroParquetWriter parquetWriter = new AvroParquetWriter(
+            new Path(partitionPath.resolve(fileId).toString()), schema)) {
+      GenericData.Record record = new GenericData.Record(schema);
+      record.put("test_timestamp", testTimestampLong * 1000);
+      record.put("test_long", testTimestampLong * 1000);
+      parquetWriter.write(record);
+    }
+
+    InputFormatTestUtil.commit(basePath, commit);
+    FileInputFormat.setInputPaths(jobConf, partitionPath.toFile().getPath());
+
+    InputSplit[] splits = inputFormat.getSplits(jobConf, 1);
+    for (InputSplit split : splits) {
+      RecordReader<NullWritable, ArrayWritable> recordReader = inputFormat
+              .getRecordReader(split, jobConf, null);
+      NullWritable key = recordReader.createKey();
+      ArrayWritable writable = recordReader.createValue();
+      while (recordReader.next(key, writable)) {
+        if (HiveVersionInfo.getShortVersion().startsWith("3")) {
+          LocalDateTime localDateTime = LocalDateTime.ofInstant(
+                  Instant.ofEpochMilli(testTimestampLong), ZoneOffset.UTC);
+          assertEquals(Timestamp.valueOf(localDateTime).toString(), String.valueOf(writable.get()[0]));
+        } else {
+          assertEquals(new Timestamp(testTimestampLong).toString(), String.valueOf(writable.get()[0]));
+        }
+        assertEquals(testTimestampLong * 1000, ((LongWritable) writable.get()[1]).get());
+      }
+    }
   }
 }
