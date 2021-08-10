@@ -24,6 +24,7 @@ import org.apache.hudi.common.model.EmptyHoodieRecordPayload;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
+import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
 import org.apache.hudi.common.table.view.FileSystemViewStorageType;
@@ -87,7 +88,6 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
         {IndexType.GLOBAL_BLOOM, true},
         {IndexType.SIMPLE, true},
         {IndexType.GLOBAL_SIMPLE, true},
-        {IndexType.BUCKET_INDEX, true},
         {IndexType.SIMPLE, false},
         {IndexType.GLOBAL_SIMPLE, false},
         {IndexType.BUCKET_INDEX, false}
@@ -109,13 +109,14 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
     initFileSystem();
     metaClient = HoodieTestUtils.init(hadoopConf, basePath, HoodieTableType.COPY_ON_WRITE, populateMetaFields ? new Properties()
         : getPropertiesForKeyGen());
+    HoodieIndexConfig.Builder indexBuilder = HoodieIndexConfig.newBuilder().withIndexType(indexType);
+    if (indexType == IndexType.BUCKET_INDEX) {
+      indexBuilder.withBucketNum("8").withIndexKeyField(getPropertiesForKeyGen()
+          .getProperty(HoodieTableConfig.HOODIE_TABLE_RECORDKEY_FIELDS.key()));
+    }
     config = getConfigBuilder()
         .withProperties(populateMetaFields ? new Properties() : getPropertiesForKeyGen())
-        .withIndexConfig(HoodieIndexConfig.newBuilder().withIndexType(indexType)
-            .build()).withAutoCommit(false).build();
-    if (indexType == IndexType.BUCKET_INDEX) {
-      config.setValue(HoodieIndexConfig.BUCKET_INDEX_BUCKET_NUM, "8");
-    }
+        .withIndexConfig(indexBuilder.build()).withAutoCommit(false).build();
     writeClient = getHoodieWriteClient(config);
     this.index = writeClient.getIndex();
   }
@@ -238,7 +239,7 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
     // Insert 200 records
     JavaRDD<WriteStatus> writeStatues = writeClient.upsert(writeRecords, newCommitTime);
     Assertions.assertNoWriteErrors(writeStatues.collect());
-
+    List<String> fileIds = writeStatues.map(WriteStatus::getFileId).collect();
     // commit this upsert
     writeClient.commit(newCommitTime, writeStatues);
     HoodieTable hoodieTable = HoodieSparkTable.create(config, context, metaClient);
@@ -248,7 +249,6 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
     assert (javaRDD.filter(HoodieRecord::isCurrentLocationKnown).collect().size() == totalRecords);
 
     // check tagged records are tagged with correct fileIds
-    List<String> fileIds = writeStatues.map(WriteStatus::getFileId).collect();
     assert (javaRDD.filter(record -> record.getCurrentLocation().getFileId() == null).collect().size() == 0);
     List<String> taggedFileIds = javaRDD.map(record -> record.getCurrentLocation().getFileId()).distinct().collect();
 
@@ -472,7 +472,6 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
         .withCompactionConfig(HoodieCompactionConfig.newBuilder().compactionSmallFileSize(1024 * 1024).build())
         .withStorageConfig(HoodieStorageConfig.newBuilder().hfileMaxFileSize(1024 * 1024).parquetMaxFileSize(1024 * 1024).build())
         .forTable("test-trip-table")
-        .withIndexConfig(HoodieIndexConfig.newBuilder().withIndexType(indexType).build())
         .withEmbeddedTimelineServerEnabled(true).withFileSystemViewConfig(FileSystemViewStorageConfig.newBuilder()
             .withStorageType(FileSystemViewStorageType.EMBEDDED_KV_STORE).build());
   }
