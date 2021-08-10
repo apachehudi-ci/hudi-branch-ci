@@ -17,20 +17,48 @@
 
 package org.apache.hudi.functional
 
+import org.apache.spark.sql._
+import org.apache.spark.sql.execution.datasources.LogicalRelation
+import org.apache.log4j.LogManager
 import org.apache.hudi.common.testutils.HoodieTestDataGenerator
-import org.apache.hudi.config.HoodieIndexConfig
+import org.apache.hudi.config.{HoodieIndexConfig, HoodieWriteConfig}
 import org.apache.hudi.{DataSourceReadOptions, DataSourceWriteOptions, HoodieDataSourceHelpers, MergeOnReadSnapshotRelation}
 import org.apache.hudi.common.testutils.RawTripTestPayload.recordsToStrings
 import org.apache.hudi.index.HoodieIndex.IndexType
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions
-import org.apache.spark.sql._
+import org.apache.hudi.testutils.HoodieClientTestBase
+import org.junit.jupiter.api.{AfterEach, BeforeEach, Test}
 import org.junit.jupiter.api.Assertions.{assertEquals, assertTrue}
-import org.apache.spark.sql.execution.datasources.LogicalRelation
-import org.junit.jupiter.api.Test
 
-class TestMORDataSourceWithBucket extends TestMORDataSource {
+import scala.collection.JavaConversions._
 
+class TestMORDataSourceWithBucket extends HoodieClientTestBase {
+
+  var spark: SparkSession = null
+  private val log = LogManager.getLogger(classOf[TestMORDataSourceWithBucket])
+  val commonOpts = Map(
+    "hoodie.insert.shuffle.parallelism" -> "4",
+    "hoodie.upsert.shuffle.parallelism" -> "4",
+    DataSourceWriteOptions.RECORDKEY_FIELD.key -> "_row_key",
+    DataSourceWriteOptions.PARTITIONPATH_FIELD.key -> "partition",
+    DataSourceWriteOptions.PRECOMBINE_FIELD.key -> "timestamp",
+    HoodieWriteConfig.TABLE_NAME.key -> "hoodie_test"
+  )
   private val bucketSpec = "8\t_row_key";
+
+  @BeforeEach override def setUp() {
+    initPath()
+    initSparkContexts()
+    spark = sqlContext.sparkSession
+    initTestDataGenerator()
+    initFileSystem()
+  }
+
+  @AfterEach override def tearDown() = {
+    cleanupSparkContexts()
+    cleanupTestDataGenerator()
+    cleanupFileSystem()
+  }
 
   @Test def testCountWithBucketIndex(): Unit = {
     // First Operation:
@@ -41,8 +69,8 @@ class TestMORDataSourceWithBucket extends TestMORDataSource {
     inputDF1.write.format("org.apache.hudi")
         .options(commonOpts)
         .option("hoodie.compact.inline", "false") // else fails due to compaction & deltacommit instant times being same
-        .option(DataSourceWriteOptions.OPERATION_OPT_KEY.key, DataSourceWriteOptions.INSERT_OVERWRITE_OPERATION_OPT_VAL)
-        .option(DataSourceWriteOptions.TABLE_TYPE_OPT_KEY.key, DataSourceWriteOptions.MOR_TABLE_TYPE_OPT_VAL)
+        .option(DataSourceWriteOptions.OPERATION.key, DataSourceWriteOptions.INSERT_OVERWRITE_OPERATION_OPT_VAL)
+        .option(DataSourceWriteOptions.TABLE_TYPE.key, DataSourceWriteOptions.MOR_TABLE_TYPE_OPT_VAL)
         .option(HoodieIndexConfig.INDEX_TYPE_PROP.key, IndexType.BUCKET_INDEX.name())
         .option(HoodieIndexConfig.BUCKET_INDEX_BUCKET_NUM.key, "8")
         .option(KeyGeneratorOptions.INDEXKEY_FILED_OPT.key, "_row_key")
@@ -50,7 +78,7 @@ class TestMORDataSourceWithBucket extends TestMORDataSource {
         .save(basePath)
     assertTrue(HoodieDataSourceHelpers.hasNewCommits(fs, basePath, "000"))
     val hudiSnapshotDF1 = spark.read.format("org.apache.hudi")
-        .option(DataSourceReadOptions.QUERY_TYPE_OPT_KEY.key, DataSourceReadOptions.QUERY_TYPE_SNAPSHOT_OPT_VAL)
+        .option(DataSourceReadOptions.QUERY_TYPE.key, DataSourceReadOptions.QUERY_TYPE_SNAPSHOT_OPT_VAL)
         .option("bucketSpec", bucketSpec)
         .load(basePath + "/*/*/*/*")
     assertEquals(100, hudiSnapshotDF1.count()) // still 100, since we only updated
@@ -73,7 +101,7 @@ class TestMORDataSourceWithBucket extends TestMORDataSource {
         .mode(SaveMode.Append)
         .save(basePath)
     val hudiSnapshotDF2 = spark.read.format("org.apache.hudi")
-        .option(DataSourceReadOptions.QUERY_TYPE_OPT_KEY.key, DataSourceReadOptions.QUERY_TYPE_SNAPSHOT_OPT_VAL)
+        .option(DataSourceReadOptions.QUERY_TYPE.key, DataSourceReadOptions.QUERY_TYPE_SNAPSHOT_OPT_VAL)
         .option("bucketSpec", bucketSpec)
         .load(basePath + "/*/*/*/*")
     hudiSnapshotDF2.queryExecution
@@ -97,7 +125,7 @@ class TestMORDataSourceWithBucket extends TestMORDataSource {
         .mode(SaveMode.Append)
         .save(basePath)
     val hudiSnapshotDF4 = spark.read.format("org.apache.hudi")
-        .option(DataSourceReadOptions.QUERY_TYPE_OPT_KEY.key, DataSourceReadOptions.QUERY_TYPE_SNAPSHOT_OPT_VAL)
+        .option(DataSourceReadOptions.QUERY_TYPE.key, DataSourceReadOptions.QUERY_TYPE_SNAPSHOT_OPT_VAL)
         .option("bucketSpec", bucketSpec)
         .load(basePath + "/*/*/*/*")
     // 200, because we insert 100 records to a new partition
