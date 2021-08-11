@@ -344,6 +344,7 @@ object HoodieSparkSqlWriter {
       val recordKeyFields = hoodieConfig.getString(DataSourceWriteOptions.RECORDKEY_FIELD)
       val keyGenProp = hoodieConfig.getString(HoodieTableConfig.HOODIE_TABLE_KEY_GENERATOR_CLASS)
       val populateMetaFields = parameters.getOrElse(HoodieTableConfig.HOODIE_POPULATE_META_FIELDS.key(), HoodieTableConfig.HOODIE_POPULATE_META_FIELDS.defaultValue()).toBoolean
+      val baseFileFormat = hoodieConfig.getStringOrDefault(HoodieTableConfig.HOODIE_BASE_FILE_FORMAT_PROP)
 
       HoodieTableMetaClient.withPropertyBuilder()
         .setTableType(HoodieTableType.valueOf(tableType))
@@ -353,6 +354,7 @@ object HoodieSparkSqlWriter {
         .setPayloadClassName(hoodieConfig.getStringOrDefault(PAYLOAD_CLASS))
         .setPreCombineField(hoodieConfig.getStringOrDefault(PRECOMBINE_FIELD, null))
         .setBootstrapIndexClass(bootstrapIndexClass)
+        .setBaseFileFormat(baseFileFormat)
         .setBootstrapBasePath(bootstrapBasePath)
         .setPartitionFields(partitionColumns)
         .setPopulateMetaFields(populateMetaFields)
