@@ -112,7 +112,7 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
     HoodieIndexConfig.Builder indexBuilder = HoodieIndexConfig.newBuilder().withIndexType(indexType);
     if (indexType == IndexType.BUCKET_INDEX) {
       indexBuilder.withBucketNum("8").withIndexKeyField(getPropertiesForKeyGen()
-          .getProperty(HoodieTableConfig.HOODIE_TABLE_RECORDKEY_FIELDS.key()));
+          .getProperty(HoodieTableConfig.RECORDKEY_FIELDS.key()));
     }
     config = getConfigBuilder()
         .withProperties(populateMetaFields ? new Properties() : getPropertiesForKeyGen())
@@ -460,7 +460,7 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
       HoodieIndexConfig.newBuilder().withIndexType(IndexType.BUCKET_INDEX).withBucketNum("8").build();
     });
     Properties props = new Properties();
-    props.setProperty(KeyGeneratorOptions.INDEXKEY_FILED_OPT.key(), "_row_key");
+    props.setProperty(KeyGeneratorOptions.INDEX_KEY_FILED_NAME.key(), "_row_key");
     HoodieIndexConfig.newBuilder().fromProperties(props).withIndexType(IndexType.BUCKET_INDEX).withBucketNum("8").build();
   }
 

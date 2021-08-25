@@ -106,7 +106,6 @@ public class SparkBucketIndex<T extends HoodieRecordPayload> extends SparkHoodie
       }
       return record;
     });
-
     return taggedRecordRDD;
   }
 

@@ -538,7 +538,7 @@ public class HoodieIndexConfig extends HoodieConfig {
     }
 
     public Builder withIndexKeyField(String keyField) {
-      hoodieIndexConfig.setValue(INDEXKEY_FILED_OPT_KEY, keyField);
+      hoodieIndexConfig.setValue(INDEX_KEY_FILED_NAME, keyField);
       return this;
     }
 

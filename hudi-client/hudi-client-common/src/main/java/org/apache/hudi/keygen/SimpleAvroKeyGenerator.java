@@ -33,8 +33,8 @@ public class SimpleAvroKeyGenerator extends BaseKeyGenerator {
   public SimpleAvroKeyGenerator(TypedProperties props) {
     this(props, props.getString(KeyGeneratorOptions.RECORDKEY_FIELD_NAME.key()),
         props.getString(KeyGeneratorOptions.PARTITIONPATH_FIELD_NAME.key()),
-        props.getString(KeyGeneratorOptions.INDEXKEY_FILED_OPT.key(),
-            KeyGeneratorOptions.INDEXKEY_FILED_OPT.defaultValue()));
+        props.getString(KeyGeneratorOptions.INDEX_KEY_FILED_NAME.key(),
+            KeyGeneratorOptions.INDEX_KEY_FILED_NAME.defaultValue()));
   }
 
   SimpleAvroKeyGenerator(TypedProperties props, String partitionPathField) {

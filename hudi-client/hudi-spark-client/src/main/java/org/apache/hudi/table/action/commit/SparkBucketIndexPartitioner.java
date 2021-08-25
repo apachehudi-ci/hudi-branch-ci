@@ -55,7 +55,7 @@ public class SparkBucketIndexPartitioner<T extends HoodieRecordPayload<T>> exten
   private final int totalPartitionPaths;
   private final List<String> partitionPaths;
   private final Map<String, Integer> partitionPathOffset;
-  private Map<String, Set<String>> partitionPathFileIds;
+  private Map<String, Set<String>> updatePartitionPathFileIds;
 
   public SparkBucketIndexPartitioner(WorkloadProfile profile,
                                      HoodieEngineContext context,
@@ -80,17 +80,17 @@ public class SparkBucketIndexPartitioner<T extends HoodieRecordPayload<T>> exten
   }
 
   private void assignUpdates(WorkloadProfile profile) {
-    partitionPathFileIds = new HashMap<>();
+    updatePartitionPathFileIds = new HashMap<>();
     // each update location gets a partition
     Set<Entry<String, WorkloadStat>> partitionStatEntries = profile.getPartitionPathStatMap()
         .entrySet();
     for (Entry<String, WorkloadStat> partitionStat : partitionStatEntries) {
-      if (!partitionPathFileIds.containsKey(partitionStat.getKey())) {
-        partitionPathFileIds.put(partitionStat.getKey(), new HashSet<>());
+      if (!updatePartitionPathFileIds.containsKey(partitionStat.getKey())) {
+        updatePartitionPathFileIds.put(partitionStat.getKey(), new HashSet<>());
       }
       for (Entry<String, Pair<String, Long>> updateLocEntry :
           partitionStat.getValue().getUpdateLocationToCount().entrySet()) {
-        partitionPathFileIds.get(partitionStat.getKey()).add(updateLocEntry.getKey());
+        updatePartitionPathFileIds.get(partitionStat.getKey()).add(updateLocEntry.getKey());
       }
     }
   }
@@ -99,7 +99,7 @@ public class SparkBucketIndexPartitioner<T extends HoodieRecordPayload<T>> exten
   public BucketInfo getBucketInfo(int bucketNumber) {
     String partitionPath = partitionPaths.get(bucketNumber / numBuckets);
     String bucketId = BucketUtils.bucketIdStr(bucketNumber % numBuckets);
-    Option<String> fileIdOption = Option.fromJavaOptional(partitionPathFileIds
+    Option<String> fileIdOption = Option.fromJavaOptional(updatePartitionPathFileIds
         .getOrDefault(partitionPath, Collections.emptySet()).stream()
         .filter(e -> e.startsWith(bucketId))
         .findFirst());

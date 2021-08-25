@@ -91,12 +91,8 @@ public abstract class BaseKeyGenerator extends KeyGenerator {
    * If index key exists, it should be the subset of the record key list.
    */
   protected void validateIndexKeyField() {
-    if (indexKeyFields.size() != 0) {
-      for (String indexKeyField : indexKeyFields) {
-        if (!recordKeyFields.contains(indexKeyField)) {
-          throw new HoodieException("Index key (if configured) must be subset of record key.");
-        }
-      }
+    if (indexKeyFields.size() != 0 && !recordKeyFields.containsAll(indexKeyFields)) {
+      throw new HoodieException("Index key (if configured) must be subset of record key.");
     }
   }
 }

@@ -38,7 +38,7 @@ public class GlobalAvroDeleteKeyGenerator extends BaseKeyGenerator {
     super(config);
     this.recordKeyFields = Arrays.asList(config.getString(KeyGeneratorOptions.RECORDKEY_FIELD_NAME.key()).split(","));
     this.indexKeyFields = config.getStringList(
-        KeyGeneratorOptions.INDEXKEY_FILED_OPT.key(), ",", Collections.emptyList());
+        KeyGeneratorOptions.INDEX_KEY_FILED_NAME.key(), ",", Collections.emptyList());
     super.validateIndexKeyField();
   }
 

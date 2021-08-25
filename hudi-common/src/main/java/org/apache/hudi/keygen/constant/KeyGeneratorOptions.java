@@ -56,7 +56,7 @@ public class KeyGeneratorOptions extends HoodieConfig {
       .withDocumentation("Partition path field. Value to be used at the partitionPath component of HoodieKey. "
           + "Actual value ontained by invoking .toString()");
 
-  public static final ConfigProperty<String> INDEXKEY_FILED_NAME = ConfigProperty
+  public static final ConfigProperty<String> INDEX_KEY_FILED_NAME = ConfigProperty
       .key("hoodie.datasource.write.indexkey.field")
       .defaultValue("")
       .withAlternatives("hoodie.index.key.field")

@@ -41,7 +41,7 @@ public class NonpartitionedAvroKeyGenerator extends BaseKeyGenerator {
         .split(",")).map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
     this.partitionPathFields = EMPTY_PARTITION_FIELD_LIST;
     this.indexKeyFields = props.getStringList(
-        KeyGeneratorOptions.INDEXKEY_FILED_OPT.key(), ",", Collections.emptyList());
+        KeyGeneratorOptions.INDEX_KEY_FILED_NAME.key(), ",", Collections.emptyList());
     super.validateIndexKeyField();
   }
 

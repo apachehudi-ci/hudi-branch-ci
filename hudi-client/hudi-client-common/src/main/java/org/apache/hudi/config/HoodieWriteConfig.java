@@ -1373,7 +1373,7 @@ public class HoodieWriteConfig extends HoodieConfig {
   }
 
   public int getNumBuckets() {
-    return Integer.parseInt(props.getProperty(HoodieIndexConfig.BUCKET_INDEX_BUCKET_NUM.key(), "-1"));
+    return getIntOrDefault(HoodieIndexConfig.BUCKET_INDEX_BUCKET_NUM);
   }
 
   /**
