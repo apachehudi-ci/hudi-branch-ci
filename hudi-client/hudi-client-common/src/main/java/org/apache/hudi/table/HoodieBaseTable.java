@@ -58,6 +58,7 @@ import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.exception.HoodieIOException;
 import org.apache.hudi.exception.HoodieInsertException;
 import org.apache.hudi.exception.HoodieUpsertException;
+import org.apache.hudi.index.IndexDelegate;
 import org.apache.hudi.metadata.HoodieTableMetadata;
 import org.apache.hudi.metadata.HoodieTableMetadataWriter;
 import org.apache.hudi.table.action.HoodieWriteMetadata;
@@ -89,6 +90,7 @@ public abstract class HoodieBaseTable<I, K, O> implements SchemaAware, Serializa
   protected final SerializableConfiguration hadoopConfiguration;
   protected final TaskContextSupplier taskContextSupplier;
   protected final HoodieTableMetadata metadata;
+  protected IndexDelegate<I> indexDelegate;
 
   protected transient FileSystemViewManager viewManager;
   protected final transient HoodieEngineContext context;
@@ -113,6 +115,10 @@ public abstract class HoodieBaseTable<I, K, O> implements SchemaAware, Serializa
       viewManager = FileSystemViewManager.createViewManager(getContext(), config.getMetadataConfig(), config.getViewStorageConfig(), config.getCommonConfig(), () -> metadata);
     }
     return viewManager;
+  }
+
+  public IndexDelegate<I> getIndexDelegate() {
+    return indexDelegate;
   }
 
   /**
