@@ -73,8 +73,7 @@ public class SparkV2WriteHelper {
     return df;
   }
 
-  private Dataset<Row> tagOnCondition(boolean condition, Dataset<Row> dedupedDf, HoodieEngineContext context, HoodieBaseTable table) {
-    // TODO(rxu) impl. tagging
-    return condition ? dedupedDf : dedupedDf;
+  private Dataset<Row> tagOnCondition(boolean condition, Dataset<Row> dedupedDf, HoodieEngineContext context, HoodieBaseTable<Dataset<Row>, Dataset<HoodieKey>, Dataset<HoodieInternalWriteStatus>> table) {
+    return condition ? table.getIndexDelegate().tagLocation(dedupedDf, context, table) : dedupedDf;
   }
 }
