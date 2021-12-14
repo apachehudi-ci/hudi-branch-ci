@@ -163,9 +163,3 @@ stages:
               jdkVersionOption: '1.8'
               jdkArchitectureOption: 'x64'
               mavenOptions: '-Xmx2g $(MAVEN_OPTS)'
-          - task: InstallSSHKey@0
-            displayName: 'Install an SSH key'
-            inputs:
-              knownHostsEntry: 'AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ=='
-              sshPublicKey: 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC3V7/S4xcskv2T5KYx+P2qr9XV+/Q6dfTCFpjojoymr+BQBkfciOMKzyEmFxi4AoHLJ/irfSAflffxM+PXHM7F4XNyVeCy00iMQABIWJ41KgOwyPWU3HFJOBXnE3x0umLcAJeodyJDBzyqUKAPMYgFDvMq2a5ULwAws1PTegNBb4RO9WIBiX4Q2jVpD/gJPXpBz/ju/6XUCz3TnKQJU2KAODnrWabqIdpPiXOACcKxfWOa8XQAVG830KbxrQYf3tFTx4OA48B6mcVfiFCsKf74W3t4b91T0zWahssneB0Ju+PHfN/SdTLKEbtzH8yEWBaeQjFTnHMiJ6azRD+h84S88cvYs5M4ZTkQImT7HG/PzAJAj7MVh8WuVwCDwWZu5OtPqdxdI7k66bK5lSkZMeO8ENLKeB5bo3R16VtUbIkgkbg/x4w0rXKKd066QUJlOKb1uUen/0mtrytSLGslD4VGKajDK+GVXwkTG1lhrgzwbwv3qU1GtamUH4RD2D9bDSE= nsb@Sivabalans-MBP.attlocal.net'
-              sshKeySecureFile: 'id_rsa'
