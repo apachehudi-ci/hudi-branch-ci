@@ -27,6 +27,7 @@ import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
 import org.apache.hudi.common.testutils.HoodieMetadataTestTable;
 import org.apache.hudi.common.testutils.HoodieTestTable;
+import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieCompactionConfig;
 import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieStorageConfig;
@@ -74,12 +75,22 @@ public class TestHoodieMetadataBase extends HoodieClientTestHarness {
     init(tableType, true);
   }
 
+  public void init(HoodieTableType tableType, HoodieWriteConfig writeConfig) throws IOException {
+    init(tableType, Option.of(writeConfig), true, false, false, false);
+  }
+
   public void init(HoodieTableType tableType, boolean enableMetadataTable) throws IOException {
     init(tableType, enableMetadataTable, true, false, false);
   }
 
   public void init(HoodieTableType tableType, boolean enableMetadataTable, boolean enableFullScan, boolean enableMetrics, boolean
-                   validateMetadataPayloadStateConsistency) throws IOException {
+      validateMetadataPayloadStateConsistency) throws IOException {
+    init(tableType, Option.empty(), enableMetadataTable, enableFullScan, enableMetrics,
+        validateMetadataPayloadStateConsistency);
+  }
+
+  public void init(HoodieTableType tableType, Option<HoodieWriteConfig> writeConfig, boolean enableMetadataTable,
+                   boolean enableFullScan, boolean enableMetrics, boolean validateMetadataPayloadStateConsistency) throws IOException {
     this.tableType = tableType;
     initPath();
     initSparkContexts("TestHoodieMetadata");
@@ -89,9 +100,12 @@ public class TestHoodieMetadataBase extends HoodieClientTestHarness {
     initMetaClient(tableType);
     initTestDataGenerator();
     metadataTableBasePath = HoodieTableMetadata.getMetadataTableBasePath(basePath);
-    writeConfig = getWriteConfigBuilder(HoodieFailedWritesCleaningPolicy.EAGER, true, enableMetadataTable, enableMetrics,
-        enableFullScan, true, validateMetadataPayloadStateConsistency).build();
-    initWriteConfigAndMetatableWriter(writeConfig, enableMetadataTable);
+    this.writeConfig = writeConfig.isPresent()
+        ? writeConfig.get() : getWriteConfigBuilder(HoodieFailedWritesCleaningPolicy.EAGER, true,
+        enableMetadataTable, enableMetrics, enableFullScan, true,
+        validateMetadataPayloadStateConsistency)
+        .build();
+    initWriteConfigAndMetatableWriter(this.writeConfig, enableMetadataTable);
   }
 
   protected void initWriteConfigAndMetatableWriter(HoodieWriteConfig writeConfig, boolean enableMetadataTable) {
