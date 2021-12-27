@@ -49,9 +49,14 @@ import org.apache.log4j.Logger;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.FileVisitOption;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -65,6 +70,47 @@ public class KafkaConnectUtils {
 
   private static final Logger LOG = LogManager.getLogger(KafkaConnectUtils.class);
   private static final String HOODIE_CONF_PREFIX = "hoodie.";
+  private static final List<Path> DEFAULT_HADOOP_CONF_FILES;
+
+  static {
+    DEFAULT_HADOOP_CONF_FILES = new ArrayList<>();
+    try {
+      String hadoopConfigPath = System.getenv("HADOOP_CONF_DIR");
+      String hadoopHomePath = System.getenv("HADOOP_HOME");
+      DEFAULT_HADOOP_CONF_FILES.addAll(getHadoopConfigFiles(hadoopConfigPath, hadoopHomePath));
+      if (!DEFAULT_HADOOP_CONF_FILES.isEmpty()) {
+        LOG.info(String.format("Found Hadoop default config files %s", DEFAULT_HADOOP_CONF_FILES));
+      }
+    } catch (IOException e) {
+      LOG.error("An error occurred while getting the default Hadoop configuration. "
+              + "Please use hadoop.conf.dir or hadoop.home to configure Hadoop environment variables", e);
+    }
+  }
+
+  /**
+   * Get hadoop config files by HADOOP_CONF_DIR or HADOOP_HOME
+   */
+  public static List<Path> getHadoopConfigFiles(String hadoopConfigPath, String hadoopHomePath)
+          throws IOException {
+    List<Path> hadoopConfigFiles = new ArrayList<>();
+    if (!StringUtils.isNullOrEmpty(hadoopConfigPath)) {
+      hadoopConfigFiles.addAll(walkTree(Paths.get(hadoopConfigPath)));
+    }
+    if (hadoopConfigFiles.isEmpty() && !StringUtils.isNullOrEmpty(hadoopHomePath)) {
+      hadoopConfigFiles.addAll(walkTree(Paths.get(hadoopHomePath, "etc", "hadoop")));
+    }
+    return hadoopConfigFiles;
+  }
+
+  private static List<Path> walkTree(Path basePath) throws IOException {
+    if (Files.notExists(basePath)) {
+      return new ArrayList<>();
+    }
+    return Files.walk(basePath, FileVisitOption.FOLLOW_LINKS)
+            .filter(path -> path.toFile().isFile())
+            .filter(path -> path.toString().endsWith(".xml"))
+            .collect(Collectors.toList());
+  }
 
   public static int getLatestNumPartitions(String bootstrapServers, String topicName) {
     Properties props = new Properties();
@@ -87,8 +133,23 @@ public class KafkaConnectUtils {
    *
    * @return
    */
-  public static Configuration getDefaultHadoopConf(KafkaConnectConfigs connectConfigs) {
+  public static Configuration getDefaultHadoopConf(KafkaConnectConfigs connectConfigs) throws HoodieException {
     Configuration hadoopConf = new Configuration();
+
+    // add hadoop config files
+    if (!StringUtils.isNullOrEmpty(connectConfigs.getHadoopConfDir())
+            || !StringUtils.isNullOrEmpty(connectConfigs.getHadoopConfHome())) {
+      try {
+        List<Path> configFiles = getHadoopConfigFiles(connectConfigs.getHadoopConfDir(),
+                connectConfigs.getHadoopConfHome());
+        configFiles.forEach(f -> hadoopConf.addResource(f.toString()));
+      } catch (Exception e) {
+        throw new HoodieException(e);
+      }
+    } else {
+      DEFAULT_HADOOP_CONF_FILES.forEach(f -> hadoopConf.addResource(f.toString()));
+    }
+
     connectConfigs.getProps().keySet().stream().filter(prop -> {
       // In order to prevent printing unnecessary warn logs, here filter out the hoodie
       // configuration items before passing to hadoop/hive configs
