@@ -185,6 +185,8 @@ public class TestHoodieBackedMetadata extends TestHoodieMetadataBase {
     // trigger couple of upserts
     doWriteOperation(testTable, "0000005");
     doWriteOperation(testTable, "0000006");
+    doWriteOperation(testTable, "0000007");
+    doCleanAndValidate(testTable, "0000008", Arrays.asList("0000007"));
     validateMetadata(testTable, true);
   }
 
@@ -339,6 +341,7 @@ public class TestHoodieBackedMetadata extends TestHoodieMetadataBase {
     if (tableType == MERGE_ON_READ) {
       doCompaction(testTable, "0000004");
     }
+    doCleanAndValidate(testTable, "0000005", Arrays.asList("0000001"));
     validateMetadata(testTable, emptyList(), true);
   }
 
