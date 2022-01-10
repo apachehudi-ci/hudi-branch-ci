@@ -62,6 +62,13 @@ public class HoodieGlobalBloomIndex<T extends HoodieRecordPayload<T>> extends Ho
     return super.loadInvolvedFiles(allPartitionPaths, context, hoodieTable);
   }
 
+  @Override
+  List<Pair<String, BloomIndexFileInfo>> loadColumnStats(List<String> partitions, HoodieEngineContext context, HoodieTable hoodieTable) {
+    HoodieTableMetaClient metaClient = hoodieTable.getMetaClient();
+    List<String> allPartitionPaths = FSUtils.getAllPartitionPaths(context, config.getMetadataConfig(), metaClient.getBasePath());
+    return super.loadColumnStats(allPartitionPaths, context, hoodieTable);
+  }
+
   /**
    * For each incoming record, produce N output records, 1 each for each file against which the record's key needs to be
    * checked. For tables, where the keys have a definite insert order (e.g: timestamp as prefix), the number of files
