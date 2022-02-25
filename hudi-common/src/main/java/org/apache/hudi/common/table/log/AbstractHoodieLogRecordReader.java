@@ -35,6 +35,7 @@ import org.apache.hudi.common.table.log.block.HoodieParquetDataBlock;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.SpillableMapUtils;
+import org.apache.hudi.common.util.TableInternalSchemaUtils;
 import org.apache.hudi.common.util.ValidationUtils;
 import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.exception.HoodieException;
@@ -45,6 +46,10 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.IndexedRecord;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hudi.internal.schema.InternalSchema;
+import org.apache.hudi.internal.schema.convert.AvroInternalSchemaConverter;
+import org.apache.hudi.internal.schema.utils.AvroSchemaUtil;
+import org.apache.hudi.internal.schema.utils.InternalSchemaUtils;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
@@ -108,6 +113,9 @@ public abstract class AbstractHoodieLogRecordReader {
   private final FileSystem fs;
   // Total log files read - for metrics
   private AtomicLong totalLogFiles = new AtomicLong(0);
+  // Internal schema
+  private final InternalSchema internalSchema;
+  private final String path;
   // Total log blocks read - for metrics
   private AtomicLong totalLogBlocks = new AtomicLong(0);
   // Total log records read - for metrics
@@ -134,14 +142,14 @@ public abstract class AbstractHoodieLogRecordReader {
                                           int bufferSize, Option<InstantRange> instantRange,
                                           boolean withOperationField) {
     this(fs, basePath, logFilePaths, readerSchema, latestInstantTime, readBlocksLazily, reverseReader, bufferSize,
-        instantRange, withOperationField, true, Option.empty());
+        instantRange, withOperationField, true, Option.empty(), null);
   }
 
   protected AbstractHoodieLogRecordReader(FileSystem fs, String basePath, List<String> logFilePaths,
                                           Schema readerSchema, String latestInstantTime, boolean readBlocksLazily,
                                           boolean reverseReader, int bufferSize, Option<InstantRange> instantRange,
                                           boolean withOperationField, boolean enableFullScan,
-                                          Option<String> partitionName) {
+                                          Option<String> partitionName, InternalSchema internalSchema) {
     this.readerSchema = readerSchema;
     this.latestInstantTime = latestInstantTime;
     this.hoodieTableMetaClient = HoodieTableMetaClient.builder().setConf(fs.getConf()).setBasePath(basePath).build();
@@ -158,6 +166,8 @@ public abstract class AbstractHoodieLogRecordReader {
     this.instantRange = instantRange;
     this.withOperationField = withOperationField;
     this.enableFullScan = enableFullScan;
+    this.internalSchema = internalSchema;
+    this.path = basePath;
 
     // Key fields when populate meta fields is disabled (that is, virtual keys enabled)
     if (!tableConfig.populateMetaFields()) {
@@ -201,7 +211,7 @@ public abstract class AbstractHoodieLogRecordReader {
       // Iterate over the paths
       logFormatReaderWrapper = new HoodieLogFormatReader(fs,
           logFilePaths.stream().map(logFile -> new HoodieLogFile(new Path(logFile))).collect(Collectors.toList()),
-          readerSchema, readBlocksLazily, reverseReader, bufferSize, !enableFullScan, keyField);
+          readerSchema, readBlocksLazily, reverseReader, bufferSize, !enableFullScan, keyField, internalSchema);
       Set<HoodieLogFile> scannedLogFiles = new HashSet<>();
       while (logFormatReaderWrapper.hasNext()) {
         HoodieLogFile logFile = logFormatReaderWrapper.getLogFile();
@@ -365,6 +375,12 @@ public abstract class AbstractHoodieLogRecordReader {
       recs = dataBlock.getRecords();
     } else {
       recs = dataBlock.getRecords(keys.get());
+    }
+    if (internalSchema != null && !recs.isEmpty()) {
+      Long currentTime = Long.parseLong(dataBlock.getLogBlockHeader().get(INSTANT_TIME));
+      InternalSchema fileSchema = TableInternalSchemaUtils.searchSchemaAndCache(currentTime, path, fs.getConf());
+      Schema mergeSchema = AvroInternalSchemaConverter.convert(InternalSchemaUtils.mergeSchema(fileSchema, internalSchema, true, false), readerSchema != null ? readerSchema.getName() : "tableName");
+      recs = recs.stream().map(rec -> AvroSchemaUtil.rewriteRecord((GenericRecord) rec, mergeSchema)).collect(Collectors.toList());
     }
     totalLogRecords.addAndGet(recs.size());
     for (IndexedRecord rec : recs) {

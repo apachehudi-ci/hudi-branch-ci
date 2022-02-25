@@ -27,6 +27,7 @@ import org.apache.hudi.common.table.view.HoodieTableFileSystemView
 import org.apache.hudi.exception.HoodieException
 import org.apache.hudi.hadoop.utils.HoodieInputFormatUtils.{getCommitMetadata, getWritePartitionPaths, listAffectedFilesForCommits}
 import org.apache.hudi.hadoop.utils.HoodieRealtimeRecordReaderUtils.getMaxCompactionMemoryInBytes
+import org.apache.hudi.internal.schema.convert.AvroInternalSchemaConverter
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources.PartitionedFile
@@ -111,11 +112,12 @@ class MergeOnReadIncrementalRelation(sqlContext: SQLContext,
 
       val fetchedColumns: Array[String] = appendMandatoryColumns(requiredColumns)
 
-      val (requiredAvroSchema, requiredStructSchema) =
-        HoodieSparkUtils.getRequiredSchema(tableAvroSchema, fetchedColumns)
+      val (requiredAvroSchema, requiredStructSchema, requiredInternalSchema) =
+        HoodieSparkUtils.getRequiredSchema(tableAvroSchema, fetchedColumns, internalSchema)
 
       val partitionSchema = StructType(Nil)
-      val tableSchema = HoodieTableSchema(tableStructSchema, tableAvroSchema.toString)
+      val tableSchema = HoodieTableSchema(tableStructSchema,
+        if (internalSchema == null) tableAvroSchema.toString else AvroInternalSchemaConverter.convert(internalSchema, tableAvroSchema.getName).toString)
       val requiredSchema = HoodieTableSchema(requiredStructSchema, requiredAvroSchema.toString)
 
       val fullSchemaParquetReader = createBaseFileReader(
@@ -134,7 +136,7 @@ class MergeOnReadIncrementalRelation(sqlContext: SQLContext,
         options = optParams,
         // NOTE: We have to fork the Hadoop Config here as Spark will be modifying it
         //       to configure Parquet reader appropriately
-        hadoopConf = new Configuration(conf)
+        hadoopConf = HoodieDataSourceHelper.getConfigurationForInternalSchema(new Configuration(conf), internalSchema, metaClient.getBasePath)
       )
       val requiredSchemaParquetReader = createBaseFileReader(
         spark = sqlContext.sparkSession,
@@ -145,10 +147,12 @@ class MergeOnReadIncrementalRelation(sqlContext: SQLContext,
         options = optParams,
         // NOTE: We have to fork the Hadoop Config here as Spark will be modifying it
         //       to configure Parquet reader appropriately
-        hadoopConf = new Configuration(conf)
+        hadoopConf = HoodieDataSourceHelper.getConfigurationForInternalSchema(new Configuration(conf), requiredInternalSchema, metaClient.getBasePath)
       )
 
-      val hoodieTableState = HoodieMergeOnReadTableState(fileIndex, HoodieRecord.RECORD_KEY_METADATA_FIELD, preCombineFieldOpt)
+      val hoodieTableState = HoodieMergeOnReadTableState(fileIndex,
+        HoodieRecord.RECORD_KEY_METADATA_FIELD, preCombineFieldOpt,
+        if (internalSchema == null) None else Some(internalSchema), if (internalSchema == null) None else Some(requiredInternalSchema))
 
       // TODO implement incremental span record filtering w/in RDD to make sure returned iterator is appropriately
       //      filtered, since file-reader might not be capable to perform filtering

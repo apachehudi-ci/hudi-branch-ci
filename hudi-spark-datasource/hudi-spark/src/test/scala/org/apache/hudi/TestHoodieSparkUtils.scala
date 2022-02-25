@@ -250,7 +250,7 @@ class TestHoodieSparkUtils {
 
     val tableAvroSchema = new Schema.Parser().parse(avroSchemaString)
 
-    val (requiredAvroSchema, requiredStructSchema) =
+    val (requiredAvroSchema, requiredStructSchema, _) =
       HoodieSparkUtils.getRequiredSchema(tableAvroSchema, Array("ts"))
 
     assertEquals("timestamp-millis",

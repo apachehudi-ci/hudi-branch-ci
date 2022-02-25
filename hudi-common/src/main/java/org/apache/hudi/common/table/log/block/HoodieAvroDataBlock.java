@@ -31,8 +31,10 @@ import org.apache.avro.io.EncoderFactory;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hudi.common.fs.SizeAwareDataInputStream;
 import org.apache.hudi.common.model.HoodieRecord;
+import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.exception.HoodieIOException;
+import org.apache.hudi.internal.schema.InternalSchema;
 
 import javax.annotation.Nonnull;
 import java.io.ByteArrayInputStream;
@@ -61,6 +63,17 @@ public class HoodieAvroDataBlock extends HoodieDataBlock {
 
   private final ThreadLocal<BinaryEncoder> encoderCache = new ThreadLocal<>();
   private final ThreadLocal<BinaryDecoder> decoderCache = new ThreadLocal<>();
+
+  public HoodieAvroDataBlock(FSDataInputStream inputStream,
+                             Option<byte[]> content,
+                             boolean readBlockLazily,
+                             HoodieLogBlockContentLocation logBlockContentLocation,
+                             Option<Schema> readerSchema,
+                             Map<HeaderMetadataType, String> header,
+                             Map<HeaderMetadataType, String> footer,
+                             String keyField, InternalSchema internalSchema) {
+    super(content, inputStream, readBlockLazily, Option.of(logBlockContentLocation), readerSchema, header, footer, keyField, false, internalSchema);
+  }
 
   public HoodieAvroDataBlock(FSDataInputStream inputStream,
                              Option<byte[]> content,
@@ -140,7 +153,12 @@ public class HoodieAvroDataBlock extends HoodieDataBlock {
     // Get schema from the header
     Schema writerSchema = new Schema.Parser().parse(super.getLogBlockHeader().get(HeaderMetadataType.SCHEMA));
 
-    GenericDatumReader<IndexedRecord> reader = new GenericDatumReader<>(writerSchema, readerSchema);
+    Schema finalReadSchema = readerSchema;
+    if (internalSchema != null && !TableSchemaResolver.isSchemaCompatible(readerSchema, writerSchema)) {
+      finalReadSchema = writerSchema;
+    }
+
+    GenericDatumReader<IndexedRecord> reader = new GenericDatumReader<>(writerSchema, finalReadSchema);
 
     // 2. Get the total records
     int totalRecords = 0;
@@ -181,12 +199,16 @@ public class HoodieAvroDataBlock extends HoodieDataBlock {
     super(records, Collections.singletonMap(HeaderMetadataType.SCHEMA, schema.toString()), new HashMap<>(), HoodieRecord.RECORD_KEY_METADATA_FIELD);
   }
 
+  public static HoodieAvroDataBlock getBlock(byte[] content, Schema readerSchema) throws IOException {
+    return getBlock(content, readerSchema, null);
+  }
+
   /**
    * This method is retained to provide backwards compatibility to HoodieArchivedLogs which were written using
    * HoodieLogFormat V1.
    */
   @Deprecated
-  public static HoodieAvroDataBlock getBlock(byte[] content, Schema readerSchema) throws IOException {
+  public static HoodieAvroDataBlock getBlock(byte[] content, Schema readerSchema, InternalSchema internalSchema) throws IOException {
 
     SizeAwareDataInputStream dis = new SizeAwareDataInputStream(new DataInputStream(new ByteArrayInputStream(content)));
 
@@ -197,6 +219,10 @@ public class HoodieAvroDataBlock extends HoodieDataBlock {
     Schema writerSchema = new Schema.Parser().parse(decompress(compressedSchema));
 
     if (readerSchema == null) {
+      readerSchema = writerSchema;
+    }
+
+    if (internalSchema != null && !TableSchemaResolver.isSchemaCompatible(readerSchema, writerSchema)) {
       readerSchema = writerSchema;
     }
 

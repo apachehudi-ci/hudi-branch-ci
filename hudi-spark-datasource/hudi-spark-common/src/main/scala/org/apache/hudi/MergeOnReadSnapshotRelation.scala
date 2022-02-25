@@ -27,6 +27,8 @@ import org.apache.hudi.common.table.HoodieTableMetaClient
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView
 import org.apache.hudi.hadoop.utils.HoodieRealtimeInputFormatUtils
 import org.apache.hudi.hadoop.utils.HoodieRealtimeRecordReaderUtils.getMaxCompactionMemoryInBytes
+import org.apache.hudi.internal.schema.InternalSchema
+import org.apache.hudi.internal.schema.convert.AvroInternalSchemaConverter
 import org.apache.hudi.metadata.HoodieMetadataPayload
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
@@ -48,7 +50,7 @@ case class HoodieMergeOnReadFileSplit(dataFile: Option[PartitionedFile],
 
 case class HoodieMergeOnReadTableState(hoodieRealtimeFileSplits: List[HoodieMergeOnReadFileSplit],
                                        recordKeyField: String,
-                                       preCombineFieldOpt: Option[String])
+                                       preCombineFieldOpt: Option[String], internalSchema: Option[InternalSchema] = None, requiredInternalSchema: Option[InternalSchema] = None)
 
 class MergeOnReadSnapshotRelation(sqlContext: SQLContext,
                                   optParams: Map[String, String],
@@ -102,12 +104,13 @@ class MergeOnReadSnapshotRelation(sqlContext: SQLContext,
     //       filtered out upstream
     val fetchedColumns: Array[String] = appendMandatoryColumns(requiredColumns)
 
-    val (requiredAvroSchema, requiredStructSchema) =
-      HoodieSparkUtils.getRequiredSchema(tableAvroSchema, fetchedColumns)
+    val (requiredAvroSchema, requiredStructSchema, requiredInternalSchema) =
+      HoodieSparkUtils.getRequiredSchema(tableAvroSchema, fetchedColumns, internalSchema)
     val fileIndex = buildFileIndex(filters)
 
     val partitionSchema = StructType(Nil)
-    val tableSchema = HoodieTableSchema(tableStructSchema, tableAvroSchema.toString)
+    val tableSchema = HoodieTableSchema(tableStructSchema,
+      if (internalSchema == null) tableAvroSchema.toString else AvroInternalSchemaConverter.convert(internalSchema, tableAvroSchema.getName).toString)
     val requiredSchema = HoodieTableSchema(requiredStructSchema, requiredAvroSchema.toString)
 
     val fullSchemaParquetReader = createBaseFileReader(
@@ -123,7 +126,7 @@ class MergeOnReadSnapshotRelation(sqlContext: SQLContext,
       options = optParams,
       // NOTE: We have to fork the Hadoop Config here as Spark will be modifying it
       //       to configure Parquet reader appropriately
-      hadoopConf = new Configuration(conf)
+      hadoopConf = HoodieDataSourceHelper.getConfigurationForInternalSchema(new Configuration(conf), internalSchema, metaClient.getBasePath)
     )
     val requiredSchemaParquetReader = createBaseFileReader(
       spark = sqlContext.sparkSession,
@@ -134,10 +137,11 @@ class MergeOnReadSnapshotRelation(sqlContext: SQLContext,
       options = optParams,
       // NOTE: We have to fork the Hadoop Config here as Spark will be modifying it
       //       to configure Parquet reader appropriately
-      hadoopConf = new Configuration(conf)
+      hadoopConf = HoodieDataSourceHelper.getConfigurationForInternalSchema(new Configuration(conf), requiredInternalSchema, metaClient.getBasePath)
     )
 
-    val tableState = HoodieMergeOnReadTableState(fileIndex, recordKeyField, preCombineFieldOpt)
+    val tableState = HoodieMergeOnReadTableState(fileIndex, recordKeyField, preCombineFieldOpt,
+      if (internalSchema == null) None else Some(internalSchema), if (internalSchema == null) None else Some(requiredInternalSchema))
 
     val rdd = new HoodieMergeOnReadRDD(sqlContext.sparkContext, jobConf, fullSchemaParquetReader,
       requiredSchemaParquetReader, tableState, tableSchema, requiredSchema)

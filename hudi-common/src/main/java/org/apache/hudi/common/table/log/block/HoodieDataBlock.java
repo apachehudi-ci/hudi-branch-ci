@@ -23,6 +23,7 @@ import org.apache.avro.generic.IndexedRecord;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.exception.HoodieIOException;
+import org.apache.hudi.internal.schema.InternalSchema;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -55,6 +56,8 @@ public abstract class HoodieDataBlock extends HoodieLogBlock {
   private final boolean enablePointLookups;
 
   protected final Schema readerSchema;
+
+  protected InternalSchema internalSchema;
 
   /**
    * NOTE: This ctor is used on the write-path (ie when records ought to be written into the log)
@@ -89,6 +92,25 @@ public abstract class HoodieDataBlock extends HoodieLogBlock {
     // If no reader-schema has been provided assume writer-schema as one
     this.readerSchema = readerSchema.orElseGet(() -> getWriterSchema(super.getLogBlockHeader()));
     this.enablePointLookups = enablePointLookups;
+  }
+
+  protected HoodieDataBlock(Option<byte[]> content,
+                            FSDataInputStream inputStream,
+                            boolean readBlockLazily,
+                            Option<HoodieLogBlockContentLocation> blockContentLocation,
+                            Option<Schema> readerSchema,
+                            Map<HeaderMetadataType, String> headers,
+                            Map<HeaderMetadataType, String> footer,
+                            String keyFieldName,
+                            boolean enablePointLookups,
+                            InternalSchema internalSchema) {
+    super(headers, footer, blockContentLocation, content, inputStream, readBlockLazily);
+    this.records = Option.empty();
+    this.keyFieldName = keyFieldName;
+    // If no reader-schema has been provided assume writer-schema as one
+    this.readerSchema = readerSchema.orElseGet(() -> getWriterSchema(super.getLogBlockHeader()));
+    this.enablePointLookups = enablePointLookups;
+    this.internalSchema = internalSchema;
   }
 
   @Override
