@@ -128,12 +128,9 @@ class Spark3Adapter extends SparkAdapter {
   }
 
   override def createExtendedSparkParser: Option[(SparkSession, ParserInterface) => ParserInterface] = {
-    if (SPARK_VERSION.startsWith("3.1") || SPARK_VERSION.startsWith("3.2.0")) {
-      val loadClassName = if (SPARK_VERSION.startsWith("3.1")) {
-        "org.apache.spark.sql.parser.HoodieSpark31ExtendedSqlParser"
-      } else {
-        "org.apache.spark.sql.parser.HoodieSpark32ExtendedSqlParser"
-      }
+    // since spark3.2.1 support datasourceV2, so we need to a new SqlParser to deal DDL statment
+    if (SPARK_VERSION.startsWith("3.1")) {
+      val loadClassName = "org.apache.spark.sql.parser.HoodieSpark312ExtendedSqlParser"
       Some {
         (spark: SparkSession, delegate: ParserInterface) => {
           val clazz = Class.forName(loadClassName, true, Thread.currentThread().getContextClassLoader)
@@ -149,7 +146,7 @@ class Spark3Adapter extends SparkAdapter {
   override def createResolveHudiAlterTableCommand(sparkSession: SparkSession): Rule[LogicalPlan] = {
     if (SPARK_VERSION.startsWith("3.1") || SPARK_VERSION.startsWith("3.2")) {
       val loadClassName = if (SPARK_VERSION.startsWith("3.1")) {
-        "org.apache.spark.sql.hudi.HoodieSpark31ExtendedSqlParser"
+        "org.apache.spark.sql.hudi.ResolveHudiAlterTableCommand312"
       } else {
         "org.apache.spark.sql.hudi.ResolveHudiAlterTableCommandSpark32"
       }
@@ -166,7 +163,7 @@ class Spark3Adapter extends SparkAdapter {
   override def createHoodieParquetFileFormat(): Option[ParquetFileFormat] = {
     if (SPARK_VERSION.startsWith("3.1") || SPARK_VERSION.startsWith("3.2")) {
       val loadClassName = if (SPARK_VERSION.startsWith("3.1")) {
-        "org.apache.spark.sql.execution.datasources.parquet.Spark31HoodieParquetFileFormat"
+        "org.apache.spark.sql.execution.datasources.parquet.Spark312HoodieParquetFileFormat"
       } else {
         "org.apache.spark.sql.execution.datasources.parquet.Spark32HoodieParquetFileFormat"
       }
