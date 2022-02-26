@@ -50,7 +50,9 @@ case class HoodieMergeOnReadFileSplit(dataFile: Option[PartitionedFile],
 
 case class HoodieMergeOnReadTableState(hoodieRealtimeFileSplits: List[HoodieMergeOnReadFileSplit],
                                        recordKeyField: String,
-                                       preCombineFieldOpt: Option[String], internalSchema: Option[InternalSchema] = None, requiredInternalSchema: Option[InternalSchema] = None)
+                                       preCombineFieldOpt: Option[String],
+                                       internalSchema: InternalSchema = InternalSchema.getDummyInternalSchema,
+                                       requiredInternalSchema: InternalSchema = InternalSchema.getDummyInternalSchema)
 
 class MergeOnReadSnapshotRelation(sqlContext: SQLContext,
                                   optParams: Map[String, String],
@@ -110,7 +112,7 @@ class MergeOnReadSnapshotRelation(sqlContext: SQLContext,
 
     val partitionSchema = StructType(Nil)
     val tableSchema = HoodieTableSchema(tableStructSchema,
-      if (internalSchema == null) tableAvroSchema.toString else AvroInternalSchemaConverter.convert(internalSchema, tableAvroSchema.getName).toString)
+      if (internalSchema.isDummySchema) tableAvroSchema.toString else AvroInternalSchemaConverter.convert(internalSchema, tableAvroSchema.getName).toString)
     val requiredSchema = HoodieTableSchema(requiredStructSchema, requiredAvroSchema.toString)
 
     val fullSchemaParquetReader = createBaseFileReader(
@@ -141,7 +143,7 @@ class MergeOnReadSnapshotRelation(sqlContext: SQLContext,
     )
 
     val tableState = HoodieMergeOnReadTableState(fileIndex, recordKeyField, preCombineFieldOpt,
-      if (internalSchema == null) None else Some(internalSchema), if (internalSchema == null) None else Some(requiredInternalSchema))
+      internalSchema, requiredInternalSchema)
 
     val rdd = new HoodieMergeOnReadRDD(sqlContext.sparkContext, jobConf, fullSchemaParquetReader,
       requiredSchemaParquetReader, tableState, tableSchema, requiredSchema)

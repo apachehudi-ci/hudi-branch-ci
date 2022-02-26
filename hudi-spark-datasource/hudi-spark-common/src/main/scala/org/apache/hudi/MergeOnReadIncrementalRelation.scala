@@ -117,7 +117,7 @@ class MergeOnReadIncrementalRelation(sqlContext: SQLContext,
 
       val partitionSchema = StructType(Nil)
       val tableSchema = HoodieTableSchema(tableStructSchema,
-        if (internalSchema == null) tableAvroSchema.toString else AvroInternalSchemaConverter.convert(internalSchema, tableAvroSchema.getName).toString)
+        if (internalSchema.isDummySchema) tableAvroSchema.toString else AvroInternalSchemaConverter.convert(internalSchema, tableAvroSchema.getName).toString)
       val requiredSchema = HoodieTableSchema(requiredStructSchema, requiredAvroSchema.toString)
 
       val fullSchemaParquetReader = createBaseFileReader(
@@ -152,7 +152,7 @@ class MergeOnReadIncrementalRelation(sqlContext: SQLContext,
 
       val hoodieTableState = HoodieMergeOnReadTableState(fileIndex,
         HoodieRecord.RECORD_KEY_METADATA_FIELD, preCombineFieldOpt,
-        if (internalSchema == null) None else Some(internalSchema), if (internalSchema == null) None else Some(requiredInternalSchema))
+        internalSchema, requiredInternalSchema)
 
       // TODO implement incremental span record filtering w/in RDD to make sure returned iterator is appropriately
       //      filtered, since file-reader might not be capable to perform filtering

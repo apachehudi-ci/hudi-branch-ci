@@ -27,6 +27,7 @@ import org.apache.hudi.common.fs.FSUtils
 import org.apache.hudi.common.model.HoodieFileFormat
 import org.apache.hudi.common.table.{HoodieTableMetaClient, TableSchemaResolver}
 import org.apache.hudi.common.util.StringUtils
+import org.apache.hudi.internal.schema.InternalSchema
 import org.apache.hudi.io.storage.HoodieHFileReader
 import org.apache.hudi.metadata.HoodieTableMetadata
 import org.apache.spark.internal.Logging
@@ -58,12 +59,12 @@ abstract class HoodieBaseRelation(
     val schemaUtil = new TableSchemaResolver(metaClient)
     try {
       val internalSchema = schemaUtil.getTableInternalSchemaFromCommitMetadata
-      (schemaUtil.getTableAvroSchema, internalSchema.orElse(null))
+      (schemaUtil.getTableAvroSchema, internalSchema.orElse(InternalSchema.getDummyInternalSchema))
     } catch {
       case _: Throwable => // If there is no commit in the table, we cann't get the schema
         // with schemaUtil, use the userSchema instead.
         userSchema match {
-          case Some(s) => (SchemaConverters.toAvroType(s), null)
+          case Some(s) => (SchemaConverters.toAvroType(s), InternalSchema.getDummyInternalSchema)
           case _ => throw new IllegalArgumentException("User-provided schema is required in case the table is empty")
         }
     }

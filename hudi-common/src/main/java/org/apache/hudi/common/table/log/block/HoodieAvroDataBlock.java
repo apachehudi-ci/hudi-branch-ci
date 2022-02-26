@@ -154,7 +154,7 @@ public class HoodieAvroDataBlock extends HoodieDataBlock {
     Schema writerSchema = new Schema.Parser().parse(super.getLogBlockHeader().get(HeaderMetadataType.SCHEMA));
 
     Schema finalReadSchema = readerSchema;
-    if (internalSchema != null && !TableSchemaResolver.isSchemaCompatible(readerSchema, writerSchema)) {
+    if (!internalSchema.isDummySchema() && !TableSchemaResolver.isSchemaCompatible(readerSchema, writerSchema)) {
       finalReadSchema = writerSchema;
     }
 
@@ -200,7 +200,7 @@ public class HoodieAvroDataBlock extends HoodieDataBlock {
   }
 
   public static HoodieAvroDataBlock getBlock(byte[] content, Schema readerSchema) throws IOException {
-    return getBlock(content, readerSchema, null);
+    return getBlock(content, readerSchema, InternalSchema.getDummyInternalSchema());
   }
 
   /**
@@ -222,7 +222,7 @@ public class HoodieAvroDataBlock extends HoodieDataBlock {
       readerSchema = writerSchema;
     }
 
-    if (internalSchema != null && !TableSchemaResolver.isSchemaCompatible(readerSchema, writerSchema)) {
+    if (!internalSchema.isDummySchema() && !TableSchemaResolver.isSchemaCompatible(readerSchema, writerSchema)) {
       readerSchema = writerSchema;
     }
 

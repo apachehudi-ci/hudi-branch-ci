@@ -124,7 +124,7 @@ class HoodieMergeOnReadRDD(@transient sc: SparkContext,
       private val recordBuilder = new GenericRecordBuilder(requiredAvroSchema)
       private val deserializer = sparkAdapter.createAvroDeserializer(requiredAvroSchema, requiredSchema.structTypeSchema)
       private val unsafeProjection = UnsafeProjection.create(requiredSchema.structTypeSchema)
-      private var logScanner = HoodieMergeOnReadRDD.scanLog(split, tableAvroSchema, config, tableState.requiredInternalSchema.getOrElse(null))
+      private var logScanner = HoodieMergeOnReadRDD.scanLog(split, tableAvroSchema, config, tableState.requiredInternalSchema)
       private val logRecords = logScanner.getRecords
       private val logRecordsKeyIterator = logRecords.keySet().iterator().asScala
 
@@ -176,7 +176,7 @@ class HoodieMergeOnReadRDD(@transient sc: SparkContext,
       private val recordBuilder = new GenericRecordBuilder(requiredAvroSchema)
       private val deserializer = sparkAdapter.createAvroDeserializer(requiredAvroSchema, requiredSchema.structTypeSchema)
       private val unsafeProjection = UnsafeProjection.create(requiredSchema.structTypeSchema)
-      private var logScanner = HoodieMergeOnReadRDD.scanLog(split, tableAvroSchema, config, tableState.requiredInternalSchema.getOrElse(null))
+      private var logScanner = HoodieMergeOnReadRDD.scanLog(split, tableAvroSchema, config, tableState.requiredInternalSchema)
       private val logRecords = logScanner.getRecords
       private val logRecordsKeyIterator = logRecords.keySet().iterator().asScala
 
@@ -237,7 +237,7 @@ class HoodieMergeOnReadRDD(@transient sc: SparkContext,
       private val requiredDeserializer = sparkAdapter.createAvroDeserializer(requiredAvroSchema, requiredSchema.structTypeSchema)
       private val recordBuilder = new GenericRecordBuilder(requiredAvroSchema)
       private val unsafeProjection = UnsafeProjection.create(requiredSchema.structTypeSchema)
-      private var logScanner = HoodieMergeOnReadRDD.scanLog(split, tableAvroSchema, config, tableState.internalSchema.getOrElse(null))
+      private var logScanner = HoodieMergeOnReadRDD.scanLog(split, tableAvroSchema, config, tableState.internalSchema)
       private val logRecords = logScanner.getRecords
       private val logRecordsKeyIterator = logRecords.keySet().iterator().asScala
       private val keyToSkip = mutable.Set.empty[String]
@@ -322,7 +322,7 @@ class HoodieMergeOnReadRDD(@transient sc: SparkContext,
 private object HoodieMergeOnReadRDD {
   val CONFIG_INSTANTIATION_LOCK = new Object()
 
-  def scanLog(split: HoodieMergeOnReadFileSplit, logSchema: Schema, config: Configuration, internalSchema: InternalSchema = null): HoodieMergedLogRecordScanner = {
+  def scanLog(split: HoodieMergeOnReadFileSplit, logSchema: Schema, config: Configuration, internalSchema: InternalSchema = InternalSchema.getDummyInternalSchema): HoodieMergedLogRecordScanner = {
     val fs = FSUtils.getFs(split.tablePath, config)
     val logFiles = split.logFiles.get
 
