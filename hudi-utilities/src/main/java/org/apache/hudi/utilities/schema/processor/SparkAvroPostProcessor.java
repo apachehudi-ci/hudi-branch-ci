@@ -16,12 +16,14 @@
  * limitations under the License.
  */
 
-package org.apache.hudi.utilities.schema;
+package org.apache.hudi.utilities.schema.processor;
 
 import org.apache.hudi.AvroConversionUtils;
 import org.apache.hudi.common.config.TypedProperties;
 
 import org.apache.avro.Schema;
+import org.apache.hudi.utilities.schema.RowBasedSchemaProvider;
+import org.apache.hudi.utilities.schema.SchemaPostProcessor;
 import org.apache.spark.api.java.JavaSparkContext;
 
 /**
@@ -41,7 +43,7 @@ public class SparkAvroPostProcessor extends SchemaPostProcessor {
   @Override
   public Schema processSchema(Schema schema) {
     return schema != null ? AvroConversionUtils.convertStructTypeToAvroSchema(
-        AvroConversionUtils.convertAvroSchemaToStructType(schema), RowBasedSchemaProvider.HOODIE_RECORD_STRUCT_NAME, 
+        AvroConversionUtils.convertAvroSchemaToStructType(schema), RowBasedSchemaProvider.HOODIE_RECORD_STRUCT_NAME,
         RowBasedSchemaProvider.HOODIE_RECORD_NAMESPACE) : null;
   }
 }

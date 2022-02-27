@@ -16,11 +16,10 @@
  * limitations under the License.
  */
 
-package org.apache.hudi.utilities;
+package org.apache.hudi.utilities.schema;
 
 import org.apache.avro.Schema;
 import org.apache.hudi.common.config.TypedProperties;
-import org.apache.hudi.utilities.schema.SchemaProvider;
 import org.apache.spark.api.java.JavaSparkContext;
 
 public class SparkAvroSchemaProvider extends SchemaProvider {

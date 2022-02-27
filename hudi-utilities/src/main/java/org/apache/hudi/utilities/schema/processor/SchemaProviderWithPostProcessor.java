@@ -16,10 +16,12 @@
  * limitations under the License.
  */
 
-package org.apache.hudi.utilities.schema;
+package org.apache.hudi.utilities.schema.processor;
 
 import org.apache.avro.Schema;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.utilities.schema.SchemaPostProcessor;
+import org.apache.hudi.utilities.schema.SchemaProvider;
 
 /**
  * A schema provider which applies schema post process hook on schema.
