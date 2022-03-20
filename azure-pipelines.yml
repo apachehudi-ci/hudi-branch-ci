@@ -84,7 +84,7 @@ stages:
               jdkVersionOption: '1.8'
               mavenOptions: '-Xmx2g $(MAVEN_OPTS)'
       - job: UT_FT_3
-        displayName: UT FT clients & cli & utilities & sync/hive-sync
+        displayName: UT FT clients & cli & utilities & sync/hive-sync & integ-test
         timeoutInMinutes: '90'
         steps:
           - task: Maven@3
@@ -92,7 +92,7 @@ stages:
             inputs:
               mavenPomFile: 'pom.xml'
               goals: 'clean install'
-              options: -T 2.5C -DskipTests
+              options: -T 2.5C -Pintegration-tests -DskipTests
               publishJUnitResults: false
               jdkVersionOption: '1.8'
               mavenOptions: '-Xmx2g $(MAVEN_OPTS)'
@@ -102,6 +102,15 @@ stages:
               mavenPomFile: 'pom.xml'
               goals: 'test'
               options: -Punit-tests -pl hudi-client/hudi-client-common,hudi-client/hudi-flink-client,hudi-client/hudi-java-client,hudi-cli,hudi-utilities,hudi-sync/hudi-hive-sync
+              publishJUnitResults: false
+              jdkVersionOption: '1.8'
+              mavenOptions: '-Xmx2g $(MAVEN_OPTS)'
+          - task: Maven@3
+            displayName: UT integ-test
+            inputs:
+              mavenPomFile: 'pom.xml'
+              goals: 'test'
+              options: -Pintegration-tests -DskipUTs=false -DskipITs=true -pl hudi-integ-test test
               publishJUnitResults: false
               jdkVersionOption: '1.8'
               mavenOptions: '-Xmx2g $(MAVEN_OPTS)'
