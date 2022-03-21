@@ -247,6 +247,7 @@ public class HiveSyncTool extends AbstractSyncTool implements AutoCloseable {
     // Append spark table properties & serde properties
     Map<String, String> tableProperties = ConfigUtils.toMap(hiveSyncConfig.tableProperties);
     Map<String, String> serdeProperties = ConfigUtils.toMap(hiveSyncConfig.serdeProperties);
+    tableProperties.put(HOODIE_META_SYNC_TOOL_PROP_KEY, this.getClass().getName());
     if (hiveSyncConfig.syncAsSparkDataSourceTable) {
       Map<String, String> sparkTableProperties = getSparkTableProperties(hiveSyncConfig.sparkSchemaLengthThreshold, schema);
       Map<String, String> sparkSerdeProperties = getSparkSerdeProperties(readAsOptimized);

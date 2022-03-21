@@ -29,6 +29,7 @@ import java.util.Properties;
  * Hudi table queryable through external systems.
  */
 public abstract class AbstractSyncTool {
+  public static final String HOODIE_META_SYNC_TOOL_PROP_KEY = "hudi_meta_sync_tool";
   protected final Configuration conf;
   protected final FileSystem fs;
   protected TypedProperties props;
