@@ -14,6 +14,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
+      max-parallel: 7
       matrix:
         include:
           # Spark 2.4.4
@@ -45,7 +46,7 @@ jobs:
 
 #          # Spark 3.2.x
 #          - scalaProfile: "scala-2.12"
-#            sparkProfile: "spark3"
+#            sparkProfile: "spark3.2.0"
 #            sparkVersion: "3.2.0"
 #            scalaBinaryVersion: "2.12"
 #
