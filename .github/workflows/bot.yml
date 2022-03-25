@@ -44,16 +44,16 @@ jobs:
             sparkVersion: "3.1.3"
             scalaBinaryVersion: "2.12"
 
-#          # Spark 3.2.x
-#          - scalaProfile: "scala-2.12"
-#            sparkProfile: "spark3.2.0"
-#            sparkVersion: "3.2.0"
-#            scalaBinaryVersion: "2.12"
-#
-#          - scalaProfile: "scala-2.12"
-#            sparkProfile: "spark3"
-#            sparkVersion: "3.2.1"
-#            scalaBinaryVersion: "2.12"
+          # Spark 3.2.x
+          - scalaProfile: "scala-2.12"
+            sparkProfile: "spark3.2.0"
+            sparkVersion: "3.2.0"
+            scalaBinaryVersion: "2.12"
+
+          - scalaProfile: "scala-2.12"
+            sparkProfile: "spark3"
+            sparkVersion: "3.2.1"
+            scalaBinaryVersion: "2.12"
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK 8
@@ -62,7 +62,7 @@ jobs:
           java-version: '8'
           distribution: 'adopt'
           architecture: x64
-      - name: Build Project
+      - name: Build Project Spark 2.4.x and 3.1.x
         env:
           SCALA_PROFILE: ${{ matrix.scalaProfile }}
           SPARK_PROFILE: ${{ matrix.sparkProfile }}
@@ -71,3 +71,14 @@ jobs:
         run: |
           mvn install -P "$SCALA_PROFILE,$SPARK_PROFILE" -Dspark.version="$SPARK_VERSION" -DskipTests=true -Dmaven.javadoc.skip=true -B -V
           mvn test -P "$SCALA_PROFILE,$SPARK_PROFILE,unit-tests" -Dspark.version="$SPARK_VERSION" -pl hudi-examples/hudi-examples-flink,hudi-examples/hudi-examples-java,hudi-examples/hudi-examples-spark -DfailIfNoTests=false -D "$SPARK_PROFILE" -Dscala.binary.version="$SCALA_BINARY_VERSION"
+        if: !startsWith(${{ matrix.sparkVersion }}, '3.2.')
+      - name: Build Project Spark 3.2.x
+        env:
+          SCALA_PROFILE: ${{ matrix.scalaProfile }}
+          SPARK_PROFILE: ${{ matrix.sparkProfile }}
+          SPARK_VERSION: ${{ matrix.sparkVersion }}
+          SCALA_BINARY_VERSION: ${{ matrix.scalaBinaryVersion }}
+        run:
+          mvn install -P "$SCALA_PROFILE,$SPARK_PROFILE" -Dspark.version="$SPARK_VERSION" -DskipTests=true -Dmaven.javadoc.skip=true -B -V
+        if: startsWith(${{ matrix.sparkVersion }}, '3.2.')
+
