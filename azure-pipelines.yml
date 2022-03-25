@@ -133,7 +133,7 @@ stages:
             inputs:
               mavenPomFile: 'pom.xml'
               goals: 'test'
-              options: -Punit-tests -pl $(TESTED_MODULES)
+              options: -Punit-tests -pl $(EXCLUDE_TESTED_MODULES)
               publishJUnitResults: false
               jdkVersionOption: '1.8'
               mavenOptions: '-Xmx2g $(MAVEN_OPTS)'
@@ -142,7 +142,7 @@ stages:
             inputs:
               mavenPomFile: 'pom.xml'
               goals: 'test'
-              options: -Pfunctional-tests -pl $(TESTED_MODULES)
+              options: -Pfunctional-tests -pl $(EXCLUDE_TESTED_MODULES)
               publishJUnitResults: false
               jdkVersionOption: '1.8'
               mavenOptions: '-Xmx2g $(MAVEN_OPTS)'
