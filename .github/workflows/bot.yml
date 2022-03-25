@@ -68,7 +68,7 @@ jobs:
           SPARK_PROFILE: ${{ matrix.sparkProfile }}
           SPARK_VERSION: ${{ matrix.sparkVersion }}
           SCALA_BINARY_VERSION: ${{ matrix.scalaBinaryVersion }}
-        run: |
+        run:
           mvn install -P "$SCALA_PROFILE,$SPARK_PROFILE" -Dspark.version="$SPARK_VERSION" -DskipTests=true -Dmaven.javadoc.skip=true -B -V
       - name: Quickstart Test
         env:
@@ -77,5 +77,5 @@ jobs:
           SPARK_VERSION: ${{ matrix.sparkVersion }}
           SCALA_BINARY_VERSION: ${{ matrix.scalaBinaryVersion }}
         if: ${{ !startsWith($SPARK_VERSION, '3.2.') }}
-        run: |
+        run:
           mvn install -P "$SCALA_PROFILE,$SPARK_PROFILE" -Dspark.version="$SPARK_VERSION" -DskipTests=true -Dmaven.javadoc.skip=true -B -V
