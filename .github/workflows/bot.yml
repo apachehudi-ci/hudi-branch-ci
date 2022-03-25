@@ -70,5 +70,12 @@ jobs:
           SCALA_BINARY_VERSION: ${{ matrix.scalaBinaryVersion }}
         run: |
           mvn install -P "$SCALA_PROFILE,$SPARK_PROFILE" -Dspark.version="$SPARK_VERSION" -DskipTests=true -Dmaven.javadoc.skip=true -B -V
-          mvn test -P "$SCALA_PROFILE,$SPARK_PROFILE,unit-tests" -Dspark.version="$SPARK_VERSION" -pl hudi-examples/hudi-examples-flink,hudi-examples/hudi-examples-java,hudi-examples/hudi-examples-spark -DfailIfNoTests=false -D "$SPARK_PROFILE" -Dscala.binary.version="$SCALA_BINARY_VERSION"
-
+      - name: Quickstart Test
+        env:
+          SCALA_PROFILE: ${{ matrix.scalaProfile }}
+          SPARK_PROFILE: ${{ matrix.sparkProfile }}
+          SPARK_VERSION: ${{ matrix.sparkVersion }}
+          SCALA_BINARY_VERSION: ${{ matrix.scalaBinaryVersion }}
+        if: ${{ !startsWith($SPARK_VERSION, '3.2.') }}
+        run: |
+          mvn install -P "$SCALA_PROFILE,$SPARK_PROFILE" -Dspark.version="$SPARK_VERSION" -DskipTests=true -Dmaven.javadoc.skip=true -B -V
