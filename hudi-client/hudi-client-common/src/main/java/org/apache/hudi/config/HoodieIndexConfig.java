@@ -18,6 +18,7 @@
 
 package org.apache.hudi.config;
 
+import com.google.common.collect.Sets;
 import org.apache.hudi.common.bloom.BloomFilterTypeCode;
 import org.apache.hudi.common.config.ConfigClassProperty;
 import org.apache.hudi.common.config.ConfigGroups;
@@ -64,8 +65,9 @@ public class HoodieIndexConfig extends HoodieConfig {
 
   public static final ConfigProperty<String> INDEX_TYPE = ConfigProperty
       .key("hoodie.index.type")
-      .defaultValue(SIMPLE.name())
-      .withValidValues(Arrays.asList(
+      // Builder#getDefaultIndexType has already set it according to engine type
+      .noDefaultValue()
+      .withValidValues(Sets.newHashSet(
           HBASE.name(), INMEMORY.name(), BLOOM.name(), GLOBAL_BLOOM.name(),
           SIMPLE.name(), GLOBAL_SIMPLE.name(), BUCKET.name()
       ))
@@ -152,7 +154,7 @@ public class HoodieIndexConfig extends HoodieConfig {
   public static final ConfigProperty<String> BLOOM_FILTER_TYPE = ConfigProperty
       .key("hoodie.bloom.index.filter.type")
       .defaultValue(BloomFilterTypeCode.DYNAMIC_V0.name())
-      .withValidValues(Arrays.asList(
+      .withValidValues(Sets.newHashSet(
           BloomFilterTypeCode.SIMPLE.name(), BloomFilterTypeCode.DYNAMIC_V0.name()
       ))
       .withDocumentation("Filter type used. Default is BloomFilterTypeCode.DYNAMIC_V0. "

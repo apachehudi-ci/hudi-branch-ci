@@ -17,6 +17,7 @@
 
 package org.apache.hudi
 
+import com.google.common.collect.Sets
 import org.apache.hudi.DataSourceReadOptions.{QUERY_TYPE, QUERY_TYPE_READ_OPTIMIZED_OPT_VAL, QUERY_TYPE_SNAPSHOT_OPT_VAL}
 import org.apache.hudi.HoodieConversionUtils.toScalaOption
 import org.apache.hudi.common.config.{ConfigProperty, HoodieConfig}
@@ -57,7 +58,7 @@ object DataSourceReadOptions {
     .key("hoodie.datasource.query.type")
     .defaultValue(QUERY_TYPE_SNAPSHOT_OPT_VAL)
     .withAlternatives("hoodie.datasource.view.type")
-    .withValidValues(Arrays.asList(
+    .withValidValues(Sets.newHashSet(
       QUERY_TYPE_SNAPSHOT_OPT_VAL,
       QUERY_TYPE_READ_OPTIMIZED_OPT_VAL,
       QUERY_TYPE_INCREMENTAL_OPT_VAL
@@ -71,7 +72,7 @@ object DataSourceReadOptions {
   val REALTIME_MERGE: ConfigProperty[String] = ConfigProperty
     .key("hoodie.datasource.merge.type")
     .defaultValue(REALTIME_PAYLOAD_COMBINE_OPT_VAL)
-    .withValidValues(Arrays.asList(
+    .withValidValues(Sets.newHashSet(
       REALTIME_SKIP_MERGE_OPT_VAL,
       REALTIME_PAYLOAD_COMBINE_OPT_VAL
     ))
@@ -220,7 +221,7 @@ object DataSourceWriteOptions {
   val OPERATION: ConfigProperty[String] = ConfigProperty
     .key("hoodie.datasource.write.operation")
     .defaultValue(UPSERT_OPERATION_OPT_VAL)
-    .withValidValues(Arrays.asList(
+    .withValidValues(Sets.newHashSet(
       WriteOperationType.INSERT.value,
       WriteOperationType.INSERT_PREPPED.value,
       WriteOperationType.UPSERT.value,
@@ -247,7 +248,7 @@ object DataSourceWriteOptions {
   val TABLE_TYPE: ConfigProperty[String] = ConfigProperty
     .key("hoodie.datasource.write.table.type")
     .defaultValue(COW_TABLE_TYPE_OPT_VAL)
-    .withValidValues(Arrays.asList(COW_TABLE_TYPE_OPT_VAL, MOR_TABLE_TYPE_OPT_VAL))
+    .withValidValues(Sets.newHashSet(COW_TABLE_TYPE_OPT_VAL, MOR_TABLE_TYPE_OPT_VAL))
     .withAlternatives("hoodie.datasource.write.storage.type")
     .withDocumentation("The table type for the underlying data, for this write. This can’t change between writes.")
 
