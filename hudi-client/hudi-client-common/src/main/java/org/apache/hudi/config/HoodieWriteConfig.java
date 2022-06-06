@@ -1085,6 +1085,10 @@ public class HoodieWriteConfig extends HoodieConfig {
     return MarkerType.valueOf(markerType.toUpperCase());
   }
 
+  public boolean isHiveStylePartitioningEnabled() {
+    return getBooleanOrDefault(KeyGeneratorOptions.HIVE_STYLE_PARTITIONING_ENABLE);
+  }
+
   public int getMarkersTimelineServerBasedBatchNumThreads() {
     return getInt(MARKERS_TIMELINE_SERVER_BASED_BATCH_NUM_THREADS);
   }
