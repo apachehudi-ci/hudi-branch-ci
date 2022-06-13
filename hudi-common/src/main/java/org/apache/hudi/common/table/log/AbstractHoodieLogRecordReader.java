@@ -385,10 +385,21 @@ public abstract class AbstractHoodieLogRecordReader {
     Map<String, Object> mapperConfig = MapperUtils.buildMapperConfig(this.payloadClassFQN, this.preCombineField, this.simpleKeyGenFields, this.withOperationField, this.partitionName);
     try (ClosableIterator<HoodieRecord> recordIterator = getRecordsIterator(dataBlock, keySpecOpt, recordType, mapperConfig)) {
       Option<Schema> schemaOption = getMergedSchema(dataBlock);
+      Schema finalReadSchema;
+      if (recordIterator instanceof MappingIterator) {
+        Schema schema = ((MappingIterator) recordIterator).getSchema();
+        if (schema != null) {
+          finalReadSchema = schema;
+        } else {
+          finalReadSchema = dataBlock.getSchema();
+        }
+      } else {
+        finalReadSchema = dataBlock.getSchema();
+      }
       while (recordIterator.hasNext()) {
         HoodieRecord<?> currentRecord = recordIterator.next();
         HoodieRecord<?> record = schemaOption.isPresent()
-            ? currentRecord.rewriteRecordWithNewSchema(dataBlock.getSchema(), new Properties(), schemaOption.get(), new HashMap<>()) : currentRecord;
+            ? currentRecord.rewriteRecordWithNewSchema(finalReadSchema, new Properties(), schemaOption.get(), new HashMap<>()) : currentRecord;
         processNextRecord(record);
         totalLogRecords.incrementAndGet();
       }
