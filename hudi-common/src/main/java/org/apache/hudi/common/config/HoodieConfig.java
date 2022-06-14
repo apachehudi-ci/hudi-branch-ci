@@ -145,7 +145,7 @@ public class HoodieConfig implements Serializable {
   public <T> Integer getIntOrDefault(ConfigProperty<T> configProperty) {
     Option<Object> rawValue = getRawValue(configProperty);
     return rawValue.map(v -> Integer.parseInt(v.toString()))
-        .orElse((Integer) configProperty.defaultValue());
+        .orElse(Integer.parseInt(configProperty.defaultValue().toString()));
   }
 
   public <T> Boolean getBoolean(ConfigProperty<T> configProperty) {
@@ -167,14 +167,32 @@ public class HoodieConfig implements Serializable {
     return rawValue.map(v -> Long.parseLong(v.toString())).orElse(null);
   }
 
+  public <T> Long getLongOrDefault(ConfigProperty<T> configProperty) {
+    Option<Object> rawValue = getRawValue(configProperty);
+    return rawValue.map(v -> Long.parseLong(v.toString()))
+            .orElseGet(() -> Long.parseLong(configProperty.defaultValue().toString()));
+  }
+
   public <T> Float getFloat(ConfigProperty<T> configProperty) {
     Option<Object> rawValue = getRawValue(configProperty);
     return rawValue.map(v -> Float.parseFloat(v.toString())).orElse(null);
   }
 
+  public <T> Float getFloatOrDefault(ConfigProperty<T> configProperty) {
+    Option<Object> rawValue = getRawValue(configProperty);
+    return rawValue.map(v -> Float.parseFloat(v.toString()))
+            .orElseGet(() -> Float.parseFloat(configProperty.defaultValue().toString()));
+  }
+
   public <T> Double getDouble(ConfigProperty<T> configProperty) {
     Option<Object> rawValue = getRawValue(configProperty);
     return rawValue.map(v -> Double.parseDouble(v.toString())).orElse(null);
+  }
+
+  public <T> Double getDoubleOrDefault(ConfigProperty<T> configProperty) {
+    Option<Object> rawValue = getRawValue(configProperty);
+    return rawValue.map(v -> Double.parseDouble(v.toString()))
+            .orElseGet(() -> Double.parseDouble(configProperty.defaultValue().toString()));
   }
 
   public <T> String getStringOrDefault(ConfigProperty<T> configProperty) {
