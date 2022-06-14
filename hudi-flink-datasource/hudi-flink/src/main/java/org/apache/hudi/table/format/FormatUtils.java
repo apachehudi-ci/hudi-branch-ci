@@ -21,6 +21,7 @@ package org.apache.hudi.table.format;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieOperation;
 import org.apache.hudi.common.model.HoodieRecord;
+import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
 import org.apache.hudi.common.table.log.HoodieMergedLogRecordScanner;
 import org.apache.hudi.common.table.log.HoodieUnMergedLogRecordScanner;
 import org.apache.hudi.common.util.DefaultSizeEstimator;
@@ -167,6 +168,10 @@ public class FormatUtils {
                 HoodieRealtimeConfig.DEFAULT_MAX_DFS_STREAM_BUFFER_SIZE))
         .withInstantRange(split.getInstantRange())
         .withLogRecordScannerCallback(callback)
+        .withCombiningEngineClassFQN(flinkConf.getString(FlinkOptions.COMBINE_ENGINE_CLASS_NAME,
+            FlinkOptions.COMBINE_ENGINE_CLASS_NAME.defaultValue()))
+        // TODO pass from flink options
+        .withRecordType(HoodieRecordType.AVRO)
         .build();
   }
 

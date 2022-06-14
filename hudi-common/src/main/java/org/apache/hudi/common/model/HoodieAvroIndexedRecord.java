@@ -20,12 +20,9 @@ package org.apache.hudi.common.model;
 
 import org.apache.hudi.avro.HoodieAvroUtils;
 import org.apache.hudi.common.config.TypedProperties;
-import org.apache.hudi.common.util.MapperUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.ReflectionUtils;
-import org.apache.hudi.common.util.SpillableMapUtils;
 import org.apache.hudi.common.util.ValidationUtils;
-import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.keygen.BaseKeyGenerator;
 
@@ -41,13 +38,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import static org.apache.hudi.common.table.HoodieTableConfig.PAYLOAD_CLASS_NAME;
 import static org.apache.hudi.common.table.HoodieTableConfig.POPULATE_META_FIELDS;
-import static org.apache.hudi.common.table.HoodieTableConfig.PRECOMBINE_FIELD;
-import static org.apache.hudi.common.util.MapperUtils.PARTITION_NAME;
-import static org.apache.hudi.common.util.MapperUtils.SIMPLE_KEY_GEN_FIELDS_OPT;
-import static org.apache.hudi.common.util.MapperUtils.WITH_OPERATION_FIELD;
-import static org.apache.hudi.TypeUtils.unsafeCast;
 
 /**
  * This only use by reader returning.
@@ -170,24 +161,7 @@ public class HoodieAvroIndexedRecord extends HoodieRecord<IndexedRecord> {
 
   @Override
   public HoodieRecord expansion(Schema schema, Properties prop, Map<String, Object> mapperConfig) {
-    Option<Pair<String, String>> keyGen = unsafeCast(mapperConfig.getOrDefault(SIMPLE_KEY_GEN_FIELDS_OPT, Option.empty()));
-    String payloadClass = (String) mapperConfig.get(PAYLOAD_CLASS_NAME.key());
-    String preCombineField = (String) mapperConfig.get(PRECOMBINE_FIELD.key());
-    boolean withOperationField = Boolean.parseBoolean(mapperConfig.get(WITH_OPERATION_FIELD).toString());
-    boolean populateMetaFields = Boolean.parseBoolean(mapperConfig.getOrDefault(MapperUtils.POPULATE_META_FIELDS, false).toString());
-    Option<String> partitionName = unsafeCast(mapperConfig.getOrDefault(PARTITION_NAME, Option.empty()));
-    if (populateMetaFields) {
-      return SpillableMapUtils.convertToHoodieRecordPayload((GenericRecord) data,
-              payloadClass, preCombineField, withOperationField);
-      // Support HoodieFileSliceReader
-    } else if (keyGen.isPresent()) {
-      // TODO in HoodieFileSliceReader may partitionName=option#empty
-      return SpillableMapUtils.convertToHoodieRecordPayload((GenericRecord) data,
-              payloadClass, preCombineField, keyGen.get(), withOperationField, partitionName);
-    } else {
-      return SpillableMapUtils.convertToHoodieRecordPayload((GenericRecord) data,
-              payloadClass, preCombineField, withOperationField, partitionName);
-    }
+    return HoodieAvroUtils.createHoodieRecordFromAvro(data, mapperConfig);
   }
 
   @Override
