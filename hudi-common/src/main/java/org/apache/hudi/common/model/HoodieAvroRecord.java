@@ -33,7 +33,6 @@ import org.apache.avro.generic.IndexedRecord;
 import javax.annotation.Nonnull;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -172,7 +171,8 @@ public class HoodieAvroRecord<T extends HoodieRecordPayload> extends HoodieRecor
 
   @Override
   public HoodieRecord expansion(Schema schema, Properties prop, Map<String, Object> mapperConfig) throws IOException {
-    throw new UnsupportedEncodingException();
+    IndexedRecord value = (IndexedRecord) data.getInsertValue(schema, prop).get();
+    return HoodieAvroUtils.createHoodieRecordFromAvro(value, mapperConfig);
   }
 
   @Override
