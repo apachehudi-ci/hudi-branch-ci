@@ -42,7 +42,7 @@ import org.apache.hudi.internal.DataSourceInternalWriterHelper
 import org.apache.hudi.internal.schema.InternalSchema
 import org.apache.hudi.internal.schema.utils.{AvroSchemaEvolutionUtils, SerDeHelper}
 import org.apache.hudi.keygen.factory.HoodieSparkKeyGeneratorFactory
-import org.apache.hudi.keygen.{BuiltinKeyGenerator, ComplexKeyGenerator, NonpartitionedKeyGenerator, SimpleKeyGenerator, TimestampBasedAvroKeyGenerator, TimestampBasedKeyGenerator}
+import org.apache.hudi.keygen.{BuiltinKeyGenerator, ComplexKeyGenerator, SimpleKeyGenerator, TimestampBasedAvroKeyGenerator, TimestampBasedKeyGenerator}
 import org.apache.hudi.sync.common.HoodieSyncConfig
 import org.apache.hudi.sync.common.util.SyncUtilHelpers
 import org.apache.hudi.table.BulkInsertPartitioner
@@ -52,13 +52,11 @@ import org.apache.spark.api.java.{JavaRDD, JavaSparkContext}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
 import org.apache.spark.sql.internal.StaticSQLConf
-import org.apache.spark.sql.types.{DataTypes, StructType}
+import org.apache.spark.sql.types.StructType
 import org.apache.spark.{SPARK_VERSION, SparkContext}
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 
-import org.apache.spark.sql.api.java.UDF1
-import org.apache.spark.sql.catalyst.CatalystTypeConverters.convertToCatalyst
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.functions.callUDF
 
@@ -761,7 +759,6 @@ object HoodieSparkSqlWriter {
         HoodieWriteConfig.COMBINE_BEFORE_INSERT.defaultValue()).toBoolean
     val precombineField = config.getString(PRECOMBINE_FIELD)
     val keyGenerator = HoodieSparkKeyGeneratorFactory.createKeyGenerator(new TypedProperties(config.getProps))
-      .asInstanceOf[BuiltinKeyGenerator]
     val recordKeyFields = config.getString(DataSourceWriteOptions.RECORDKEY_FIELD)
     val partitionCols = HoodieSparkUtils.getPartitionColumns(keyGenerator, toProperties(parameters))
     val dropPartitionColumns = config.getBoolean(DataSourceWriteOptions.DROP_PARTITION_COLUMNS)
@@ -787,7 +784,9 @@ object HoodieSparkSqlWriter {
         }).toJavaRDD()
       case HoodieRecord.HoodieRecordType.SPARK =>
         import org.apache.spark.sql.functions.col
-        val hoodieKeyRDD = (keyGenerator match {
+        // ut will use AvroKeyGenerator, so we need to cast it in spark record
+        val builtinKeyGenerator = keyGenerator.asInstanceOf[BuiltinKeyGenerator]
+        val hoodieKeyRDD = (builtinKeyGenerator match {
           case _: SimpleKeyGenerator => df.select(col(recordKeyFields).cast("string").as(recordKeyFields),
             col(partitionCols).cast("string").as(partitionCols))
           case _: ComplexKeyGenerator if !recordKeyFields.contains(",") && !partitionCols.contains(",")
@@ -799,8 +798,8 @@ object HoodieSparkSqlWriter {
             import org.apache.spark.sql.functions.udf
             val recordKeyUdfFn = s"hudi_recordkey_gen_function_$tblName"
             val partitionPathUdfFn = s"hudi_partition_gen_function_$tblName"
-            df.sqlContext.udf.register(recordKeyUdfFn, udf(keyGenerator.getRecordKey(_: Row)))
-            df.sqlContext.udf.register(partitionPathUdfFn, udf(keyGenerator.getPartitionPath(_: Row)))
+            df.sqlContext.udf.register(recordKeyUdfFn, udf(builtinKeyGenerator.getRecordKey(_: Row)))
+            df.sqlContext.udf.register(partitionPathUdfFn, udf(builtinKeyGenerator.getPartitionPath(_: Row)))
             // TODO: only record/partition field as arguments
             val columns = df.schema.fields.map(f => new Column(f.name))
             df.select(callUDF(recordKeyUdfFn, columns: _*), callUDF(partitionPathUdfFn, columns: _*))
