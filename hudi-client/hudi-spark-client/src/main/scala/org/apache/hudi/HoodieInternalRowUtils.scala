@@ -20,7 +20,7 @@ package org.apache.hudi
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
-import scala.collection.mutable
+
 import org.apache.avro.Schema
 import org.apache.avro.generic.IndexedRecord
 import org.apache.hudi.HoodieSparkUtils.sparkAdapter
@@ -31,8 +31,9 @@ import org.apache.spark.sql.avro.HoodieAvroDeserializer
 import org.apache.spark.sql.catalyst.expressions.{GenericInternalRow, JoinedRow, MutableProjection, Projection}
 import org.apache.spark.sql.catalyst.util.{ArrayBasedMapData, ArrayData, GenericArrayData, MapData}
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
-import org.apache.spark.sql.hudi.ColumnStatsExpressionUtils.AllowedTransformationExpression.exprUtils.generateMutableProjection
 import org.apache.spark.sql.types._
+
+import scala.collection.mutable
 
 object HoodieInternalRowUtils {
 
@@ -212,7 +213,9 @@ object HoodieInternalRowUtils {
     if (!projectionMap.contains(schemaPair)) {
       projectionMap.synchronized {
         if (!projectionMap.contains(schemaPair)) {
-          val projection = generateMutableProjection(from, to)
+          val utilsClazz = Class.forName("org.apache.hudi.HoodieSparkProjectionUtils")
+          val getProjectionMethod = utilsClazz.getMethod("generateMutableProjection", classOf[StructType], classOf[StructType])
+          val projection = getProjectionMethod.invoke(null, from, to).asInstanceOf[MutableProjection]
           projectionMap.put(schemaPair, projection)
         }
       }

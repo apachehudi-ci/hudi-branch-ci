@@ -49,7 +49,7 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.{Partition, SerializableWritable, SparkContext, TaskContext}
 import java.io.Closeable
 import java.util.Properties
-
+import org.apache.hudi.commmon.model.HoodieSparkRecord
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.util.Try
