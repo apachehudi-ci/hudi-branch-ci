@@ -39,7 +39,6 @@ import org.apache.hudi.hadoop.utils.HoodieRealtimeRecordReaderUtils.getMaxCompac
 import org.apache.hudi.metadata.HoodieTableMetadata.getDataTableBasePathFromMetadataTable
 import org.apache.hudi.metadata.{HoodieBackedTableMetadata, HoodieTableMetadata}
 import org.apache.hudi.internal.schema.InternalSchema
-
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.avro.HoodieAvroDeserializer
 import org.apache.spark.sql.catalyst.InternalRow
@@ -49,7 +48,7 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.{Partition, SerializableWritable, SparkContext, TaskContext}
 import java.io.Closeable
 import java.util.Properties
-
+import org.apache.hudi.commmon.model.HoodieSparkRecord
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.util.Try

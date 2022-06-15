@@ -16,8 +16,10 @@
  * limitations under the License.
  */
 
-package org.apache.hudi;
+package org.apache.hudi.commmon.model;
 
+import org.apache.hudi.HoodieInternalRowUtils;
+import org.apache.hudi.util.HoodieSparkRecordUtils;
 import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieOperation;
@@ -213,8 +215,10 @@ public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
         throw new HoodieException("Only SparkKeyGeneratorInterface are supported when meta columns are disabled ", e);
       }
     }
-    String key = keyGeneratorOpt.isPresent() ? keyGeneratorOpt.get().getRecordKey(data, structType) : data.get(HoodieMetadataField.RECORD_KEY_METADATA_FIELD.ordinal(), StringType).toString();
-    String partition = keyGeneratorOpt.isPresent() ? keyGeneratorOpt.get().getPartitionPath(data, structType) : data.get(HoodieMetadataField.PARTITION_PATH_METADATA_FIELD.ordinal(), StringType).toString();
+    String key = keyGeneratorOpt.isPresent() ? keyGeneratorOpt.get().getRecordKey(data, structType)
+        : data.get(HoodieMetadataField.RECORD_KEY_METADATA_FIELD.ordinal(), StringType).toString();
+    String partition = keyGeneratorOpt.isPresent() ? keyGeneratorOpt.get().getPartitionPath(data, structType)
+        : data.get(HoodieMetadataField.PARTITION_PATH_METADATA_FIELD.ordinal(), StringType).toString();
     this.key = new HoodieKey(key, partition);
 
     return this;

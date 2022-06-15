@@ -16,12 +16,13 @@
  * limitations under the License.
  */
 
-package org.apache.hudi;
+package org.apache.hudi.util;
 
+import org.apache.hudi.HoodieInternalRowUtils;
+import org.apache.hudi.commmon.model.HoodieSparkRecord;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieOperation;
 import org.apache.hudi.common.model.HoodieRecord;
-import org.apache.hudi.common.util.MapperUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.StringUtils;
 import org.apache.hudi.common.util.collection.Pair;
@@ -29,15 +30,6 @@ import org.apache.hudi.common.util.collection.Pair;
 import org.apache.avro.Schema;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.types.DataType;
-
-import java.util.Map;
-import java.util.function.Function;
-
-import static org.apache.hudi.common.table.HoodieTableConfig.PRECOMBINE_FIELD;
-import static org.apache.hudi.common.util.MapperUtils.PARTITION_NAME;
-import static org.apache.hudi.common.util.MapperUtils.POPULATE_META_FIELDS;
-import static org.apache.hudi.common.util.MapperUtils.SIMPLE_KEY_GEN_FIELDS_OPT;
-import static org.apache.hudi.common.util.MapperUtils.WITH_OPERATION_FIELD;
 
 public class HoodieSparkRecordUtils {
 
