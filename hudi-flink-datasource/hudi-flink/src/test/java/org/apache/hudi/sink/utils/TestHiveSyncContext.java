@@ -18,15 +18,15 @@
 
 package org.apache.hudi.sink.utils;
 
-import org.apache.flink.configuration.Configuration;
-
 import org.apache.hudi.configuration.FlinkOptions;
 import org.apache.hudi.hive.HiveSyncConfig;
 
+import org.apache.flink.configuration.Configuration;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
 
+import static org.apache.hudi.sync.common.HoodieSyncConfig.META_SYNC_PARTITION_FIELDS;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -55,8 +55,8 @@ public class TestHiveSyncContext {
     HiveSyncConfig hiveSyncConfig1 = HiveSyncContext.buildSyncConfig(configuration1);
     HiveSyncConfig hiveSyncConfig2 = HiveSyncContext.buildSyncConfig(configuration2);
 
-    assertTrue(hiveSyncConfig1.hoodieSyncConfigParams.partitionFields.get(0).equals(hiveSyncPartitionField));
-    assertTrue(hiveSyncConfig2.hoodieSyncConfigParams.partitionFields.get(0).equals(partitionPathField));
+    assertTrue(hiveSyncConfig1.getSplitStrings(META_SYNC_PARTITION_FIELDS).get(0).equals(hiveSyncPartitionField));
+    assertTrue(hiveSyncConfig2.getSplitStrings(META_SYNC_PARTITION_FIELDS).get(0).equals(partitionPathField));
 
   }
 }
