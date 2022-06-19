@@ -101,7 +101,7 @@ public abstract class SparkFullBootstrapDataProviderBase extends FullRecordBoots
           String recordKey = sparkKeyGenerator.getRecordKey(internalRow, structType);
           String partitionPath = sparkKeyGenerator.getPartitionPath(internalRow, structType);
           HoodieKey key = new HoodieKey(recordKey, partitionPath);
-          return new HoodieSparkRecord(key, internalRow, orderingVal, structType);
+          return new HoodieSparkRecord(key, internalRow, orderingVal);
         });
       } else {
         throw new UnsupportedOperationException(recordType.name());
