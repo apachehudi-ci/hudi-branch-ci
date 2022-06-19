@@ -14,7 +14,7 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-# RFC-55: Improve Hive/Meta sync class design and hierachies
+# RFC-55: Improve metasync class design and simplify configs
 
 ## Proposers
 
@@ -42,7 +42,7 @@ The current situation is:
  
 That being said, we need a standard way to call meta sync. We also need a unified abstraction of XXXSyncTool , XXXSyncClient and XXXSyncConfig to handle all supported meta sync, including hms, bigquery, datahub, etc
 
-## Implementation
+## Classes design
 
 ![classDesign.png](classDesign.png)
 
@@ -59,7 +59,13 @@ public abstract class HoodieSyncTool implements AutoCloseable {
 
   protected HoodieSyncClient syncClient;
 
-  public HoodieSyncTool(HoodieSyncConfig syncConfig); // preferred constructor.
+  /**
+   * Sync tool class is the entrypoint to run meta sync.
+   *
+   * @param props A bag of properties passed by users. It can contain all hoodie.* and any other config.
+   * @param hadoopConf Hadoop specific configs.
+   */
+  public HoodieSyncTool(Properties props, Configuration hadoopConf);
 
   public abstract void syncHoodieTable();
 
@@ -82,7 +88,13 @@ public class HoodieSyncConfig extends HoodieConfig {
     public Properties toProps();
   }
 
-  public HoodieSyncConfig(Properties props);
+   /**
+    * XXXSyncConfig is meant to be created and used by XXXSyncTool exclusively and internally.
+    * 
+    * @param props passed from XXXSyncTool.
+    * @param hadoopConf passed from XXXSyncTool.
+    */
+  public HoodieSyncConfig(Properties props, Configuration hadoopConf);
 }
 
 public class HiveSyncConfig extends HoodieSyncConfig {
@@ -114,6 +126,14 @@ public abstract class HoodieSyncClient implements AutoCloseable {
   // metastore-agnostic APIs
 }
 ```
+
+## Config simplification
+
+- users should not need to set additional table name
+- users should not need to set PartitionValueExtractor; partition values should be inferred automatically
+- remove `USE_JDBC` and fully adopt `SYNC_MODE`
+
+(more to be added)
 
 ## Rollout/Adoption Plan
 
