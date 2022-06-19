@@ -377,6 +377,13 @@ abstract class HoodieBaseRelation(val sqlContext: SQLContext,
   }
 
   protected def getTableState: HoodieTableState = {
+    // Get CombiningEngineClass
+    var combiningEngineClass: String = ""
+    if (optParams.contains(HoodieWriteConfig.RECORD_TYPE.key())) {
+      combiningEngineClass = optParams(HoodieWriteConfig.RECORD_TYPE.key())
+    } else {
+      combiningEngineClass = tableConfig.getCombiningEngineClass
+    }
     // Subset of the state of table's configuration as of at the time of the query
     HoodieTableState(
       tablePath = basePath,
@@ -386,7 +393,7 @@ abstract class HoodieBaseRelation(val sqlContext: SQLContext,
       usesVirtualKeys = !tableConfig.populateMetaFields(),
       recordPayloadClassName = tableConfig.getPayloadClass,
       metadataConfig = fileIndex.metadataConfig,
-      combiningEngineClass = tableConfig.getCombiningEngineClass,
+      combiningEngineClass = combiningEngineClass,
       recordType = HoodieRecordType.valueOf(optParams.getOrElse(HoodieWriteConfig.RECORD_TYPE.key(), HoodieWriteConfig.RECORD_TYPE.defaultValue()))
     )
   }

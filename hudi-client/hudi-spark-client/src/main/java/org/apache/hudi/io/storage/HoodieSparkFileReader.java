@@ -18,6 +18,7 @@
 
 package org.apache.hudi.io.storage;
 
+import org.apache.hudi.HoodieInternalRowUtils;
 import org.apache.hudi.commmon.model.HoodieSparkRecord;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.util.ClosableIterator;

@@ -16,19 +16,22 @@
  * limitations under the License.
  */
 
-package org.apache.hudi
+package org.apache.spark.sql
 
-import org.apache.spark.sql.catalyst.expressions.Projection
-import org.apache.spark.sql.hudi.ColumnStatsExpressionUtils.AllowedTransformationExpression.exprUtils.{generateMutableProjection, generateUnsafeProjection}
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.execution.LogicalRDD
 import org.apache.spark.sql.types.StructType
 
-object HoodieSparkProjectionUtils {
+object DataFrameUtil {
 
-  def getMutableProjection(from: StructType, to: StructType): Projection = {
-    generateMutableProjection(from, to)
-  }
-
-  def getUnsafeProjection(from: StructType, to: StructType): Projection = {
-    generateUnsafeProjection(from, to)
+  /**
+   * Creates a DataFrame out of RDD[InternalRow] that you can get
+   * using `df.queryExection.toRdd`
+   */
+  def createFromInternalRows(sparkSession: SparkSession, schema:
+  StructType, rdd: RDD[InternalRow]): DataFrame = {
+    val logicalPlan = LogicalRDD(schema.toAttributes, rdd)(sparkSession)
+    Dataset.ofRows(sparkSession, logicalPlan)
   }
 }

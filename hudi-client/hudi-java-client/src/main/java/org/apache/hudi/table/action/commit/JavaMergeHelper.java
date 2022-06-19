@@ -71,10 +71,12 @@ public class JavaMergeHelper<T> extends BaseMergeHelper<T, List<HoodieRecord<T>>
       readSchema = HoodieFileReaderFactory.getReaderFactory(table.getConfig().getRecordType()).getFileReader(table.getHadoopConf(), mergeHandle.getOldFilePath()).getSchema();
       writerSchema = readSchema;
       readerSchema = mergeHandle.getWriterSchemaWithMetaFields();
+      mergeHandle.setOldRecordSchema(readerSchema);
     } else {
       readerSchema = null;
       writerSchema = null;
       readSchema = mergeHandle.getWriterSchemaWithMetaFields();
+      mergeHandle.setOldRecordSchema(readSchema);
     }
 
     BoundedInMemoryExecutor<GenericRecord, GenericRecord, Void> wrapper = null;
@@ -87,8 +89,6 @@ public class JavaMergeHelper<T> extends BaseMergeHelper<T, List<HoodieRecord<T>>
         readerIterator = reader.getRecordIterator(readSchema);
       }
 
-      ThreadLocal<BinaryEncoder> encoderCache = new ThreadLocal<>();
-      ThreadLocal<BinaryDecoder> decoderCache = new ThreadLocal<>();
       wrapper = new BoundedInMemoryExecutor(table.getConfig().getWriteBufferLimitBytes(), new IteratorBasedQueueProducer<>(readerIterator),
           Option.of(new UpdateHandler(mergeHandle)), record -> {
         if (!externalSchemaTransformation) {

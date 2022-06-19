@@ -199,6 +199,8 @@ public abstract class HoodieRecord<T> implements Serializable {
     return data;
   }
 
+  public abstract Object getRecordColumnValues(String[] columns, Schema schema, boolean consistentLogicalTimestampEnabled);
+
   /**
    * Release the actual payload, to ease memory pressure. To be called after the record has been written to storage.
    * Once deflated, cannot be inflated.
@@ -302,7 +304,7 @@ public abstract class HoodieRecord<T> implements Serializable {
   //       for the duration of RFC-46 implementation, until migration off `HoodieRecordPayload`
   //       is complete
   //
-  public abstract HoodieRecord mergeWith(HoodieRecord other, Schema readerSchema, Schema writerSchema) throws IOException;
+  public abstract HoodieRecord mergeWith(Schema schema, HoodieRecord other, Schema otherSchema, Schema writerSchema) throws IOException;
 
   public abstract HoodieRecord rewriteRecord(Schema recordSchema, Schema targetSchema, TypedProperties props) throws IOException;
 

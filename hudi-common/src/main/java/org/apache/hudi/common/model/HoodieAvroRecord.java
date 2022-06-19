@@ -95,16 +95,21 @@ public class HoodieAvroRecord<T extends HoodieRecordPayload> extends HoodieRecor
   }
 
   @Override
+  public Object getRecordColumnValues(String[] columns, Schema schema, boolean consistentLogicalTimestampEnabled) {
+    return HoodieAvroUtils.getRecordColumnValues(this, columns, schema, consistentLogicalTimestampEnabled);
+  }
+
+  @Override
   public Option<IndexedRecord> toIndexedRecord(Schema schema, Properties prop) throws IOException {
     return getData().getInsertValue(schema, prop);
   }
 
   @Override
-  public HoodieRecord mergeWith(HoodieRecord other, Schema readerSchema, Schema writerSchema) throws IOException {
+  public HoodieRecord mergeWith(Schema schema, HoodieRecord other, Schema otherSchema, Schema writerSchema) throws IOException {
     ValidationUtils.checkState(other instanceof HoodieAvroRecord);
     GenericRecord mergedPayload = HoodieAvroUtils.stitchRecords(
-        (GenericRecord) toIndexedRecord(readerSchema, new Properties()).get(),
-        (GenericRecord) other.toIndexedRecord(readerSchema, new Properties()).get(),
+        (GenericRecord) toIndexedRecord(schema, new Properties()).get(),
+        (GenericRecord) other.toIndexedRecord(otherSchema, new Properties()).get(),
         writerSchema);
     return new HoodieAvroRecord(getKey(), instantiateRecordPayloadWrapper(mergedPayload, getOrderingValue()), getOperation());
   }

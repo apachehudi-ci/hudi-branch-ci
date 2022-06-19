@@ -64,6 +64,7 @@ import org.apache.hudi.index.HoodieIndex;
 import org.apache.hudi.keygen.SimpleAvroKeyGenerator;
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 import org.apache.hudi.keygen.constant.KeyGeneratorType;
+import org.apache.hudi.metadata.HoodieTableMetadata;
 import org.apache.hudi.metrics.MetricsReporterType;
 import org.apache.hudi.metrics.datadog.DatadogHttpClient.ApiSite;
 import org.apache.hudi.table.RandomFileIdPrefixProvider;
@@ -993,7 +994,13 @@ public class HoodieWriteConfig extends HoodieConfig {
   }
 
   public HoodieRecord.HoodieRecordType getRecordType() {
-    return HoodieRecord.HoodieRecordType.valueOf(getString(RECORD_TYPE));
+    HoodieRecordType recordType = HoodieRecord.HoodieRecordType.valueOf(getString(RECORD_TYPE));
+    String basePath = getString(BASE_PATH);
+    boolean metadataTable = HoodieTableMetadata.isMetadataTable(basePath);
+    if (metadataTable) {
+      recordType = HoodieRecordType.AVRO;
+    }
+    return recordType;
   }
 
   public boolean isConsistentLogicalTimestampEnabled() {

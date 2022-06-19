@@ -83,7 +83,7 @@ public abstract class BaseWriteHelper<T, I, K, O, R> {
    */
   public I deduplicateRecords(
       I records, HoodieTable<T, I, K, O> table, int parallelism) {
-    HoodieRecordCombiningEngine combiningEngine = ReflectionUtils.loadCombiningEngine(table.getConfig().getCombiningEngineClass());
+    HoodieRecordCombiningEngine combiningEngine = ReflectionUtils.loadCombiningEngine(table.getConfig().getCombiningEngineClass(), table.getConfig().getBasePath());
     return deduplicateRecords(records, table.getIndex(), parallelism, combiningEngine);
   }
 

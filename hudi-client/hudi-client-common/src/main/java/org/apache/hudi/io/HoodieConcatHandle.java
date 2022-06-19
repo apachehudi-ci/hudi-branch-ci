@@ -93,11 +93,10 @@ public class HoodieConcatHandle<T, I, K, O> extends HoodieMergeHandle<T, I, K, O
    */
   @Override
   public void write(HoodieRecord oldRecord) {
-    Schema schema = useWriterSchemaForCompaction ? tableSchemaWithMetaFields : tableSchema;
-    String key = oldRecord.getRecordKey(keyGeneratorOpt, schema);
+    String key = oldRecord.getRecordKey(keyGeneratorOpt, oldRecordSchema);
     try {
       // NOTE: We're enforcing preservation of the record metadata to keep existing semantic
-      writeToFile(new HoodieKey(key, partitionPath), oldRecord, schema, config.getProps(), true);
+      writeToFile(new HoodieKey(key, partitionPath), oldRecord, oldRecordSchema, config.getPayloadConfig().getProps(), true);
     } catch (IOException | RuntimeException e) {
       String errMsg = String.format("Failed to write old record into new file for key %s from old file %s to new file %s with writerSchema %s",
           key, getOldFilePath(), newFilePath, writeSchemaWithMetaFields.toString(true));

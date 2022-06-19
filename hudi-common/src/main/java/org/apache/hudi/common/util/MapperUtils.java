@@ -29,7 +29,6 @@ import org.apache.avro.generic.IndexedRecord;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.HashMap;
@@ -67,18 +66,18 @@ public class MapperUtils {
     return map;
   }
 
-  public static <T1, T2> Function<T1, HoodieRecord<T2>> createMapper(HoodieRecordType recordType, Function<T1, T2> converter) {
+  public static <T1, T2> Function<T1, HoodieRecord<T2>> createMapper(HoodieRecordType recordType, Function<T1, T2> converter, Schema schema) {
     if (recordType == HoodieRecordType.AVRO) {
       return converter.andThen((rec) -> unsafeCast(new HoodieAvroIndexedRecord((IndexedRecord) rec)));
     } else if (recordType == HoodieRecordType.SPARK) {
-      Class<?> recodeClazz = ReflectionUtils.getClass("org.apache.hudi.HoodieSparkRecord");
+      Class<?> recodeClazz = ReflectionUtils.getClass("org.apache.hudi.util.HoodieSparkRecordUtils");
       Class<?> internalRowClazz = ReflectionUtils.getClass("org.apache.spark.sql.catalyst.InternalRow");
       try {
-        Constructor<?> recordConstructor = recodeClazz.getConstructor(internalRowClazz);
+        Method method = recodeClazz.getMethod("convertToHoodieSparkRecord", internalRowClazz);
         return converter.andThen((rec) -> {
           try {
-            return unsafeCast(recordConstructor.newInstance(rec));
-          } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
+            return unsafeCast(method.invoke(null, rec));
+          } catch (IllegalAccessException | InvocationTargetException e) {
             // This can't happen
             LOG.error("Error new record instance with " + recordType);
             throw new HoodieException(e);
@@ -99,7 +98,7 @@ public class MapperUtils {
     if (dataType.equals(IndexedRecord.class.getName()) && recordType == HoodieRecordType.AVRO) {
       return unsafeCast(Function.identity());
     } else if (dataType.equals(IndexedRecord.class.getName()) && recordType == HoodieRecordType.SPARK) {
-      Class<?> utilsClazz = ReflectionUtils.getClass("org.apache.spark.sql.hudi.HoodieInternalRowUtils");
+      Class<?> utilsClazz = ReflectionUtils.getClass("org.apache.hudi.HoodieInternalRowUtils");
       try {
         Method convertAvro = utilsClazz.getMethod("avro2Row", Schema.class, IndexedRecord.class);
         return (data) -> {

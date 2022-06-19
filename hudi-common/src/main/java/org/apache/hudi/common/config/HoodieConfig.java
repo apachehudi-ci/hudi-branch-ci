@@ -19,9 +19,13 @@
 package org.apache.hudi.common.config;
 
 import org.apache.hadoop.fs.FSDataInputStream;
+
+import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.ReflectionUtils;
 import org.apache.hudi.exception.HoodieException;
+import org.apache.hudi.metadata.HoodieTableMetadata;
+
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
@@ -235,5 +239,16 @@ public class HoodieConfig implements Serializable {
     } else {
       throw new HoodieException(errorMessage);
     }
+  }
+
+  public HoodieRecordType getRecordType() {
+    // TODO: a better way to get info
+    HoodieRecordType recordType = HoodieRecordType.valueOf(getProps().getString("hoodie.datasource.write.record.type", HoodieRecordType.AVRO.toString()));
+    String basePath = getString("hoodie.base.path");
+    boolean metadataTable = HoodieTableMetadata.isMetadataTable(basePath);
+    if (metadataTable) {
+      recordType = HoodieRecordType.AVRO;
+    }
+    return recordType;
   }
 }

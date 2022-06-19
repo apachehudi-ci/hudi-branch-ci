@@ -26,12 +26,23 @@ import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.StringUtils;
 import org.apache.hudi.common.util.collection.Pair;
+import org.apache.hudi.keygen.RowKeyGeneratorHelper;
 
 import org.apache.avro.Schema;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.StructType;
+
+import java.util.List;
 
 public class HoodieSparkRecordUtils {
+
+  /**
+   * Utility method to convert bytes to HoodieRecord using schema and payload class.
+   */
+  public static HoodieRecord<InternalRow> convertToHoodieSparkRecord(InternalRow data) {
+    return new HoodieSparkRecord(data);
+  }
 
   /**
    * Utility method to convert InternalRow to HoodieRecord using schema and payload class.
@@ -95,5 +106,33 @@ public class HoodieSparkRecordUtils {
     Schema.Field field = schema.getField(fieldName);
     String fieldVal = field == null ? null : StringUtils.objToString(getValue(schema, fieldName, row));
     return Option.ofNullable(fieldVal);
+  }
+
+  /**
+   * Gets record column values into one object.
+   *
+   * @param record  Hoodie record.
+   * @param columns Names of the columns to get values.
+   * @param schema  {@link Schema} instance.
+   * @return Column value if a single column, or concatenated String values by comma.
+   */
+  public static Object getRecordColumnValues(HoodieSparkRecord record,
+      String[] columns,
+      Schema schema, boolean consistentLogicalTimestampEnabled) {
+    StructType structType = HoodieInternalRowUtils.getCacheSchema(schema);
+    InternalRow row = record.getData();
+    if (columns.length == 1) {
+      List<Integer> posList = RowKeyGeneratorHelper.getFieldSchemaInfo(structType, columns[0], false).getKey();
+      return RowKeyGeneratorHelper.getNestedFieldVal(row, structType, posList, true);
+    } else {
+      // TODO this is inefficient, instead we can simply return array of Comparable
+      StringBuilder sb = new StringBuilder();
+      for (String col : columns) {
+        // TODO support consistentLogicalTimestampEnabled
+        List<Integer> posList = RowKeyGeneratorHelper.getFieldSchemaInfo(structType, col, false).getKey();
+        sb.append(RowKeyGeneratorHelper.getNestedFieldValAsString(row, structType, posList, true));
+      }
+      return sb.toString();
+    }
   }
 }
