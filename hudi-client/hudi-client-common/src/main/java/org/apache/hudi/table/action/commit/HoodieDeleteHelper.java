@@ -91,7 +91,7 @@ public class HoodieDeleteHelper<T, R> extends
       if (config.getRecordType() == HoodieRecordType.AVRO) {
         dedupedRecords =
             dedupedKeys.map(key -> new HoodieAvroRecord(key, new EmptyHoodieRecordPayload()));
-      } else if (config.getRecordType() == HoodieRecordType.SPARK){
+      } else if (config.getRecordType() == HoodieRecordType.SPARK) {
         dedupedRecords = dedupedKeys.map(key -> {
           Class<?> recordClazz = ReflectionUtils.getClass("org.apache.hudi.commmon.model.HoodieSparkRecord");
           Method method = recordClazz.getMethod("empty", HoodieKey.class);
