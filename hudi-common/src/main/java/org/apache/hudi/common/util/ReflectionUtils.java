@@ -18,9 +18,11 @@
 
 package org.apache.hudi.common.util;
 
+import org.apache.hudi.common.model.HoodieAvroRecordCombiningEngine;
 import org.apache.hudi.common.model.HoodieRecordCombiningEngine;
 import org.apache.hudi.common.model.HoodieRecordPayload;
 import org.apache.hudi.exception.HoodieException;
+import org.apache.hudi.metadata.HoodieTableMetadata;
 
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -80,6 +82,16 @@ public class ReflectionUtils {
     } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
       throw new HoodieException("Unable to instantiate payload class ", e);
     }
+  }
+
+  /**
+   * Instantiate a given class with a generic record payload.
+   */
+  public static HoodieRecordCombiningEngine loadCombiningEngine(String recordCombiningEngine, String tablePath) {
+    if (HoodieTableMetadata.isMetadataTable(tablePath)) {
+      recordCombiningEngine = HoodieAvroRecordCombiningEngine.class.getName();
+    }
+    return loadCombiningEngine(recordCombiningEngine);
   }
 
   /**

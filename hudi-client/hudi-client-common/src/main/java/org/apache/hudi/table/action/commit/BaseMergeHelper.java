@@ -77,13 +77,13 @@ public abstract class BaseMergeHelper<T, I, K, O> {
     return new MergingIterator<>(
         (Iterator<HoodieRecord>) reader.getRecordIterator(readerSchema),
         (Iterator<HoodieRecord>) bootstrapReader.getRecordIterator(bootstrapReadSchema),
-        (oneRecord, otherRecord) -> mergeRecords(oneRecord, otherRecord, readerSchema, mergeHandle.getWriterSchemaWithMetaFields()));
+        (oneRecord, otherRecord) -> mergeRecords(oneRecord, readerSchema, otherRecord, bootstrapReadSchema, mergeHandle.getWriterSchemaWithMetaFields()));
   }
 
   @Nonnull
-  private static HoodieRecord mergeRecords(HoodieRecord one, HoodieRecord other, Schema readerSchema, Schema writerSchema) {
+  private static HoodieRecord mergeRecords(HoodieRecord left, Schema leftSchema, HoodieRecord right, Schema rightSchema, Schema writerSchema) {
     try {
-      return one.mergeWith(other, readerSchema, writerSchema);
+      return left.mergeWith(leftSchema, right, rightSchema, writerSchema);
     } catch (IOException e) {
       throw new HoodieIOException("Failed to merge records", e);
     }

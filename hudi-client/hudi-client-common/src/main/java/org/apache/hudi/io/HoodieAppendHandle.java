@@ -433,7 +433,7 @@ public class HoodieAppendHandle<T, I, K, O> extends HoodieWriteHandle<T, I, K, O
 
   @Override
   protected void doWrite(HoodieRecord record, Schema schema, TypedProperties props) {
-    Option<Map<String, String>> recordMetadata = ((HoodieRecordPayload) record.getData()).getMetadata();
+    Option<Map<String, String>> recordMetadata = record.getMetadata();
     try {
       init(record);
       flushToDiskIfRequired(record);

@@ -19,7 +19,6 @@
 package org.apache.hudi.commmon.model;
 
 import org.apache.hudi.HoodieInternalRowUtils;
-import org.apache.hudi.util.HoodieSparkRecordUtils;
 import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieOperation;
@@ -30,11 +29,13 @@ import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.keygen.BaseKeyGenerator;
 import org.apache.hudi.keygen.SparkKeyGeneratorInterface;
+import org.apache.hudi.util.HoodieSparkRecordUtils;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.IndexedRecord;
 import org.apache.spark.sql.catalyst.CatalystTypeConverters;
 import org.apache.spark.sql.catalyst.InternalRow;
+import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
@@ -63,8 +64,19 @@ import static org.apache.spark.sql.types.DataTypes.StringType;
  */
 public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
 
+  // This is the same as EmptyHoodieRecordPayload
+  public static final InternalRow EMPTY = new GenericInternalRow(new Object[0]);
+
   public HoodieSparkRecord(InternalRow data) {
     super(null, data);
+  }
+
+  public HoodieSparkRecord(InternalRow data, Comparable orderingVal) {
+    super(null, data, orderingVal);
+  }
+
+  public HoodieSparkRecord(HoodieKey key, InternalRow data) {
+    super(key, data);
   }
 
   public HoodieSparkRecord(HoodieKey key, InternalRow data, Comparable orderingVal) {
@@ -120,10 +132,16 @@ public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
   }
 
   @Override
-  public HoodieRecord mergeWith(HoodieRecord other, Schema readerSchema, Schema writerSchema) throws IOException {
-    StructType readerStructType = HoodieInternalRowUtils.getCacheSchema(readerSchema);
+  public Object getRecordColumnValues(String[] columns, Schema schema, boolean consistentLogicalTimestampEnabled) {
+    return HoodieSparkRecordUtils.getRecordColumnValues(this, columns, schema, consistentLogicalTimestampEnabled);
+  }
+
+  @Override
+  public HoodieRecord mergeWith(Schema schema, HoodieRecord other, Schema otherSchema, Schema writerSchema) throws IOException {
+    StructType structType = HoodieInternalRowUtils.getCacheSchema(schema);
+    StructType otherStructType = HoodieInternalRowUtils.getCacheSchema(otherSchema);
     StructType writerStructType = HoodieInternalRowUtils.getCacheSchema(writerSchema);
-    InternalRow mergeRow = HoodieInternalRowUtils.stitchRecords(data, readerStructType, (InternalRow) other.getData(), readerStructType, writerStructType);
+    InternalRow mergeRow = HoodieInternalRowUtils.stitchRecords(data, structType, (InternalRow) other.getData(), otherStructType, writerStructType);
     return new HoodieSparkRecord(getKey(), mergeRow, getOperation());
   }
 
@@ -234,6 +252,12 @@ public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
     if (null == data) {
       return false;
     }
+    if (schema.getField(HoodieRecord.HOODIE_IS_DELETED_FIELD) == null) {
+      return true;
+    }
+    if (data.equals(EMPTY)) {
+      return false;
+    }
     Object deleteMarker = data.get(schema.getField(HoodieRecord.HOODIE_IS_DELETED_FIELD).pos(), BooleanType);
     return !(deleteMarker instanceof Boolean && (boolean) deleteMarker);
   }
@@ -250,6 +274,14 @@ public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
 
   @Override
   public Option<IndexedRecord> toIndexedRecord(Schema schema, Properties prop) throws IOException {
-    throw new UnsupportedOperationException();
+    return Option.of(HoodieInternalRowUtils.row2Avro(schema, data));
+  }
+
+  public static HoodieSparkRecord empty(HoodieKey key, Comparable<?> orderingVal) {
+    return new HoodieSparkRecord(key, EMPTY, orderingVal);
+  }
+
+  public static HoodieSparkRecord empty(HoodieKey key) {
+    return new HoodieSparkRecord(key, EMPTY);
   }
 }

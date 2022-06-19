@@ -119,7 +119,7 @@ public abstract class BuiltinKeyGenerator extends BaseKeyGenerator implements Sp
     try {
       buildFieldSchemaInfoIfNeeded(structType);
       return RowKeyGeneratorHelper.getPartitionPathFromInternalRow(internalRow, getPartitionPathFields(),
-          hiveStylePartitioning, partitionPathSchemaInfo);
+          hiveStylePartitioning, encodePartitionPath, partitionPathSchemaInfo);
     } catch (Exception e) {
       throw new HoodieIOException("Conversion of InternalRow to Row failed with exception " + e);
     }
@@ -142,7 +142,7 @@ public abstract class BuiltinKeyGenerator extends BaseKeyGenerator implements Sp
     buildFieldSchemaInfoIfNeeded(structType);
     validatePartitionFieldsForInternalRow();
     return RowKeyGeneratorHelper.getPartitionPathFromInternalRow(row, getPartitionPathFields(),
-        hiveStylePartitioning, partitionPathSchemaInfo);
+        hiveStylePartitioning, encodePartitionPath, partitionPathSchemaInfo);
   }
 
   protected void validatePartitionFieldsForInternalRow() {

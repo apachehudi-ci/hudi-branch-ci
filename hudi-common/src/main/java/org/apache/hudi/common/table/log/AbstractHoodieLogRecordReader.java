@@ -141,7 +141,7 @@ public abstract class AbstractHoodieLogRecordReader {
   // Populate meta fields for the records
   private boolean populateMetaFields = true;
   // Record type read from log block
-  private final HoodieRecordType recordType;
+  protected final HoodieRecordType recordType;
 
   protected AbstractHoodieLogRecordReader(FileSystem fs, String basePath, List<String> logFilePaths,
                                           Schema readerSchema,

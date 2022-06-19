@@ -83,6 +83,8 @@ public abstract class HoodieWriteHandle<T, I, K, O> extends HoodieIOHandle<T, I,
   // For full schema evolution
   protected final boolean schemaOnReadEnabled;
 
+  protected Schema oldRecordSchema;
+
   public HoodieWriteHandle(HoodieWriteConfig config, String instantTime, String partitionPath,
                            String fileId, HoodieTable<T, I, K, O> hoodieTable, TaskContextSupplier taskContextSupplier) {
     this(config, instantTime, partitionPath, fileId, hoodieTable,
@@ -105,7 +107,7 @@ public abstract class HoodieWriteHandle<T, I, K, O> extends HoodieIOHandle<T, I,
     this.taskContextSupplier = taskContextSupplier;
     this.writeToken = makeWriteToken();
     schemaOnReadEnabled = !isNullOrEmpty(hoodieTable.getConfig().getInternalSchema());
-    combiningEngine = ReflectionUtils.loadCombiningEngine(config.getCombiningEngineClass());
+    combiningEngine = ReflectionUtils.loadCombiningEngine(config.getCombiningEngineClass(), hoodieTable.getConfig().getBasePath());
   }
 
   /**
@@ -231,5 +233,9 @@ public abstract class HoodieWriteHandle<T, I, K, O> extends HoodieIOHandle<T, I,
   protected HoodieFileWriter createNewFileWriter(String instantTime, Path path, HoodieTable<T, I, K, O> hoodieTable,
                                                  HoodieWriteConfig config, Schema schema, TaskContextSupplier taskContextSupplier) throws IOException {
     return HoodieFileWriterFactory.getFileWriter(instantTime, path, hoodieTable.getHadoopConf(), config.getStorageConfig(), schema, taskContextSupplier);
+  }
+
+  public void setOldRecordSchema(Schema oldRecordSchema) {
+    this.oldRecordSchema = oldRecordSchema;
   }
 }

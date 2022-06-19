@@ -70,43 +70,29 @@ public class HoodieFileWriterFactory {
       case AVRO:
         return getFileWriterFactory();
       case SPARK:
-        Exception exception = null;
         try {
           Class<?> clazz = ReflectionUtils.getClass("org.apache.hudi.io.storage.HoodieSparkFileWriterFactory");
           Method method = clazz.getMethod("getFileWriterFactory", null);
           return (HoodieFileWriterFactory) method.invoke(null,null);
-        } catch (NoSuchMethodException e) {
-          exception = e;
-        } catch (IllegalAccessException e) {
-          exception = e;
-        } catch (IllegalArgumentException e) {
-          exception = e;
-        } catch (InvocationTargetException e) {
-          exception = e;
+        } catch (NoSuchMethodException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+          throw new HoodieException("Unable to create hoodie spark file writer factory", e);
         }
-        if (exception != null) {
-          throw new HoodieException("Unable to create hoodie spark file writer factory", exception);
-        }
-        break;
       default:
         throw new UnsupportedOperationException(recordType + " record type not supported yet.");
     }
-    return null;
   }
 
   public static <T, I, K, O> HoodieFileWriter getFileWriter(
       String instantTime, Path path, Configuration conf, HoodieConfig config, Schema schema,
       TaskContextSupplier taskContextSupplier) throws IOException {
     final String extension = FSUtils.getFileExtension(path.getName());
-    HoodieFileWriterFactory factory = getWriterFactory(// TODO: a better way to get info
-        HoodieRecord.HoodieRecordType.valueOf(config.getProps().getString("hoodie.datasource.write.record.type", HoodieRecord.HoodieRecordType.AVRO.toString())));
+    HoodieFileWriterFactory factory = getWriterFactory(config.getRecordType());
     return factory.getFileWriterByFormat(extension, instantTime, path, conf, config, schema, taskContextSupplier);
   }
 
   public static <T, I, K, O> HoodieFileWriter getFileWriter(HoodieFileFormat format,
       FSDataOutputStream outputStream, Configuration conf, HoodieConfig config, Schema schema) throws IOException {
-    HoodieFileWriterFactory factory = getWriterFactory(// TODO: a better way to get info
-        HoodieRecord.HoodieRecordType.valueOf(config.getProps().getString("hoodie.datasource.write.record.type", HoodieRecord.HoodieRecordType.AVRO.toString())));
+    HoodieFileWriterFactory factory = getWriterFactory(config.getRecordType());
     return factory.getFileWriterByFormat(format, outputStream, conf, config, schema);
   }
 

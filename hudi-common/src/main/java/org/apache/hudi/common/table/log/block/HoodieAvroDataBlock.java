@@ -150,9 +150,10 @@ public class HoodieAvroDataBlock extends HoodieDataBlock {
   protected <T> ClosableIterator<HoodieRecord<T>> deserializeRecords(byte[] content, HoodieRecordType type) throws IOException {
     checkState(this.readerSchema != null, "Reader's schema has to be non-null");
 
+    Schema writerSchema = new Schema.Parser().parse(getLogBlockHeader().get(HeaderMetadataType.SCHEMA));
     RecordIterator iterator = RecordIterator.getInstance(this, content, internalSchema);
     Function<IndexedRecord, ?> converter = unsafeCast(createConverter(IndexedRecord.class.getName(), type, iterator.getFinalReadSchema()));
-    Function<IndexedRecord, HoodieRecord<T>> mapper = unsafeCast(createMapper(type, converter));
+    Function<IndexedRecord, HoodieRecord<T>> mapper = unsafeCast(createMapper(type, converter, writerSchema));
     return new MappingIterator<>(iterator, mapper, iterator.getFinalReadSchema());
   }
 
@@ -284,7 +285,7 @@ public class HoodieAvroDataBlock extends HoodieDataBlock {
     List<HoodieRecord> records = new ArrayList<>(totalRecords);
 
     // 3. Read the content
-    Function<IndexedRecord, HoodieRecord<IndexedRecord>> mapper = unsafeCast(createMapper(HoodieRecordType.AVRO, Function.identity()));
+    Function<IndexedRecord, HoodieRecord<IndexedRecord>> mapper = unsafeCast(createMapper(HoodieRecordType.AVRO, Function.identity(), writerSchema));
     for (int i = 0; i < totalRecords; i++) {
       int recordLength = dis.readInt();
       Decoder decoder = DecoderFactory.get().binaryDecoder(content, dis.getNumberOfBytesRead(), recordLength, null);

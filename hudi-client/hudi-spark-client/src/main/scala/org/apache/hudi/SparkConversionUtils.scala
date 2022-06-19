@@ -18,17 +18,19 @@
 
 package org.apache.hudi
 
-import org.apache.spark.sql.catalyst.expressions.Projection
-import org.apache.spark.sql.hudi.ColumnStatsExpressionUtils.AllowedTransformationExpression.exprUtils.{generateMutableProjection, generateUnsafeProjection}
+import org.apache.hudi.common.model.HoodieRecord
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.{DataFrameUtil, Dataset, Row, SparkSession}
 
-object HoodieSparkProjectionUtils {
+object SparkConversionUtils {
 
-  def getMutableProjection(from: StructType, to: StructType): Projection = {
-    generateMutableProjection(from, to)
-  }
-
-  def getUnsafeProjection(from: StructType, to: StructType): Projection = {
-    generateUnsafeProjection(from, to)
+  def createDataFrame[T](rdd: RDD[HoodieRecord[T]], ss: SparkSession, structType: StructType): Dataset[Row] = {
+    if (rdd.isEmpty()) {
+      ss.emptyDataFrame
+    } else {
+      DataFrameUtil.createFromInternalRows(ss, structType, rdd.map(_.getData.asInstanceOf[InternalRow]))
+    }
   }
 }

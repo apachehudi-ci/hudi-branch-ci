@@ -21,7 +21,7 @@ package org.apache.hudi.io.storage;
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hudi.AvroConversionUtils;
+import org.apache.hudi.HoodieInternalRowUtils;
 import org.apache.hudi.common.bloom.BloomFilter;
 import org.apache.hudi.common.model.HoodieFileFormat;
 import org.apache.hudi.common.util.BaseFileUtils;
@@ -34,6 +34,7 @@ import org.apache.parquet.io.InputFile;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupport;
 import org.apache.spark.sql.internal.SQLConf;
+import org.apache.spark.sql.types.StructType;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -70,7 +71,8 @@ public class HoodieSparkParquetReader implements HoodieSparkFileReader {
 
   @Override
   public ClosableIterator<InternalRow> getInternalRowIterator(Schema schema) throws IOException {
-    conf.set(ParquetReadSupport.SPARK_ROW_REQUESTED_SCHEMA().toString(), AvroConversionUtils.convertAvroSchemaToStructType(schema).json());
+    StructType structType = HoodieInternalRowUtils.getCacheSchema(schema);
+    conf.set(ParquetReadSupport.SPARK_ROW_REQUESTED_SCHEMA(), structType.json());
     // todo: get it from spark context
     conf.setBoolean(SQLConf.PARQUET_BINARY_AS_STRING().key(),false);
     conf.setBoolean(SQLConf.PARQUET_INT96_AS_TIMESTAMP().key(), true);
@@ -81,7 +83,7 @@ public class HoodieSparkParquetReader implements HoodieSparkFileReader {
         return new ParquetReadSupport();
       }
     }.withConf(conf).build();
-    ParquetReaderIterator<InternalRow> parquetReaderIterator = new ParquetReaderIterator<>(reader);
+    ParquetReaderIterator<InternalRow> parquetReaderIterator = new ParquetReaderIterator<>(reader, InternalRow::copy);
     readerIterators.add(parquetReaderIterator);
     return parquetReaderIterator;
   }

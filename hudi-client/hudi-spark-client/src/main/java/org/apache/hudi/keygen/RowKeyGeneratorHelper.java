@@ -18,7 +18,10 @@
 
 package org.apache.hudi.keygen;
 
+import org.apache.hudi.common.util.PartitionPathEncodeUtils;
+import org.apache.hudi.common.util.StringUtils;
 import org.apache.hudi.common.util.collection.Pair;
+import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.exception.HoodieKeyException;
 
 import org.apache.spark.sql.Row;
@@ -103,7 +106,8 @@ public class RowKeyGeneratorHelper {
         if (row.isNullAt(fieldPos)) {
           val = NULL_RECORDKEY_PLACEHOLDER;
         } else {
-          val = row.get(fieldPos, StringType).toString();
+          DataType currentDataType = structType.fields()[fieldPos].dataType();
+          val = row.get(fieldPos, currentDataType).toString();
           if (val.isEmpty()) {
             val = EMPTY_RECORDKEY_PLACEHOLDER;
           } else {
@@ -166,9 +170,9 @@ public class RowKeyGeneratorHelper {
     }).collect(Collectors.joining(DEFAULT_PARTITION_PATH_SEPARATOR));
   }
 
-  public static String getPartitionPathFromInternalRow(InternalRow internalRow, List<String> partitionPathFields, boolean hiveStylePartitioning,
+  public static String getPartitionPathFromInternalRow(InternalRow internalRow, List<String> partitionPathFields, boolean hiveStylePartitioning, boolean encodePartitionPath,
                                                        Map<String, Pair<List<Integer>, DataType>> partitionPathPositions) {
-    return IntStream.range(0, partitionPathFields.size()).mapToObj(idx -> {
+    String partitionVals = IntStream.range(0, partitionPathFields.size()).mapToObj(idx -> {
       String field = partitionPathFields.get(idx);
       String val = null;
       List<Integer> fieldPositions = partitionPathPositions.get(field).getKey();
@@ -186,6 +190,9 @@ public class RowKeyGeneratorHelper {
             val = value.toString();
           }
         }
+        if (encodePartitionPath) {
+          val = PartitionPathEncodeUtils.escapePathName(val);
+        }
         if (hiveStylePartitioning) {
           val = field + "=" + val;
         }
@@ -194,6 +201,8 @@ public class RowKeyGeneratorHelper {
       }
       return val;
     }).collect(Collectors.joining(DEFAULT_PARTITION_PATH_SEPARATOR));
+
+    return partitionVals;
   }
 
   public static Object getFieldValFromInternalRow(InternalRow internalRow,
@@ -267,7 +276,8 @@ public class RowKeyGeneratorHelper {
   public static Object getNestedFieldVal(
       InternalRow row,
       StructType schema,
-      List<Integer> positions) {
+      List<Integer> positions,
+      boolean returnNullIfNotFound) {
     if (positions.size() == 1 && positions.get(0) == -1) {
       return HUDI_DEFAULT_PARTITION_PATH;
     }
@@ -278,27 +288,43 @@ public class RowKeyGeneratorHelper {
     while (index < totalCount) {
       int fieldIndex = positions.get(index);
       DataType currentDataType = schema.fields()[fieldIndex].dataType();
+      if (row.isNullAt(fieldIndex)) {
+        toReturn = NULL_RECORDKEY_PLACEHOLDER;
+        break;
+      }
+
       if (index < totalCount - 1) {
-        if (row.isNullAt(fieldIndex)) {
-          toReturn = NULL_RECORDKEY_PLACEHOLDER;
-          break;
-        }
         row = (InternalRow) row.get(fieldIndex, currentDataType);
+        schema = (StructType) currentDataType;
       } else { // last index
         Object val = row.get(fieldIndex, currentDataType);
         if (null != val && val.toString().isEmpty()) {
           toReturn = EMPTY_RECORDKEY_PLACEHOLDER;
           break;
         }
-        if (null != val && currentDataType == DataTypes.StringType) {
-          toReturn = val.toString();
-        } else {
-          toReturn = val;
-        }
+        toReturn = val;
       }
       index++;
     }
+    if (toReturn == null && returnNullIfNotFound) {
+      throw new HoodieException("Not found " + Arrays.toString(positions.toArray()));
+    }
     return toReturn;
+  }
+
+  public static Object getNestedFieldVal(
+      InternalRow row,
+      StructType schema,
+      List<Integer> positions) {
+    return getNestedFieldVal(row, schema, positions, true);
+  }
+
+  public static String getNestedFieldValAsString(
+      InternalRow row,
+      StructType schema,
+      List<Integer> positions,
+      boolean returnNullIfNotFound) {
+    return StringUtils.objToString(getNestedFieldVal(row, schema, positions, returnNullIfNotFound));
   }
 
   /**

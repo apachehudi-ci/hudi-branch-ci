@@ -20,10 +20,11 @@ package org.apache.hudi.common.table.log;
 
 import org.apache.hudi.common.config.HoodieCommonConfig;
 import org.apache.hudi.common.model.DeleteRecord;
+import org.apache.hudi.common.model.HoodieAvroRecordCombiningEngine;
+import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
 import org.apache.hudi.common.model.HoodieRecordCombiningEngine;
-import org.apache.hudi.common.model.HoodieRecordPayload;
 import org.apache.hudi.common.util.CollectionUtils;
 import org.apache.hudi.common.util.DefaultSizeEstimator;
 import org.apache.hudi.common.util.HoodieRecordSizeEstimator;
@@ -37,12 +38,15 @@ import org.apache.hudi.exception.HoodieIOException;
 import org.apache.avro.Schema;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hudi.internal.schema.InternalSchema;
+import org.apache.hudi.metadata.HoodieTableMetadata;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -95,7 +99,7 @@ public class HoodieMergedLogRecordScanner extends AbstractHoodieLogRecordReader
       this.records = new ExternalSpillableMap<>(maxMemorySizeInBytes, spillableMapBasePath, new DefaultSizeEstimator(),
           new HoodieRecordSizeEstimator(readerSchema), diskMapType, isBitCaskDiskMapCompressionEnabled);
       this.maxMemorySizeInBytes = maxMemorySizeInBytes;
-      this.combiningEngine = ReflectionUtils.loadCombiningEngine(getCombiningEngineClassFQN());
+      this.combiningEngine = ReflectionUtils.loadCombiningEngine(getCombiningEngineClassFQN(), basePath);
     } catch (IOException e) {
       throw new HoodieIOException("IOException when creating ExternalSpillableMap at " + spillableMapBasePath, e);
     }
@@ -166,7 +170,7 @@ public class HoodieMergedLogRecordScanner extends AbstractHoodieLogRecordReader
   @Override
   protected void processNextDeletedRecord(DeleteRecord deleteRecord) {
     String key = deleteRecord.getRecordKey();
-    HoodieRecord<? extends HoodieRecordPayload> oldRecord = records.get(key);
+    HoodieRecord oldRecord = records.get(key);
     if (oldRecord != null) {
       // Merge and store the merged record. The ordering val is taken to decide whether the same key record
       // should be deleted or be kept. The old record is kept only if the DELETE record has smaller ordering val.
@@ -185,8 +189,18 @@ public class HoodieMergedLogRecordScanner extends AbstractHoodieLogRecordReader
       }
     }
     // Put the DELETE record
-    records.put(key, SpillableMapUtils.generateEmptyPayload(key,
-        deleteRecord.getPartitionPath(), deleteRecord.getOrderingValue(), getPayloadClassFQN()));
+    if (recordType == HoodieRecordType.AVRO) {
+      records.put(key, SpillableMapUtils.generateEmptyPayload(key,
+          deleteRecord.getPartitionPath(), deleteRecord.getOrderingValue(), getPayloadClassFQN()));
+    } else if (recordType == HoodieRecordType.SPARK) {
+      try {
+        Class<?> recordClazz = ReflectionUtils.getClass("org.apache.hudi.commmon.model.HoodieSparkRecord");
+        Method method = recordClazz.getMethod("empty", HoodieKey.class, Comparable.class);
+        records.put(key, (HoodieRecord) method.invoke(null, new HoodieKey(key, deleteRecord.getPartitionPath()), deleteRecord.getOrderingValue()));
+      } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+        LOG.error("Unable to init empty HoodieSparkRecord", e);
+      }
+    }
   }
 
   public long getTotalTimeTakenToReadAndMergeBlocks() {
@@ -336,6 +350,12 @@ public class HoodieMergedLogRecordScanner extends AbstractHoodieLogRecordReader
       }
       assert recordType != null;
       assert combiningEngineClassFQN != null;
+
+      if (HoodieTableMetadata.isMetadataTable(basePath)) {
+        recordType = HoodieRecordType.AVRO;
+        combiningEngineClassFQN = HoodieAvroRecordCombiningEngine.class.getName();
+      }
+
       return new HoodieMergedLogRecordScanner(fs, basePath, logFilePaths, readerSchema,
           latestInstantTime, maxMemorySizeInBytes, readBlocksLazily, reverseReader,
           bufferSize, spillableMapBasePath, instantRange,

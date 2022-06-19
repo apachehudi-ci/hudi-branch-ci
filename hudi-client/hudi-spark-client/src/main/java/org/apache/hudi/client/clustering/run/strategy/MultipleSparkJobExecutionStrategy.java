@@ -146,7 +146,7 @@ public abstract class MultipleSparkJobExecutionStrategy<T>
               orderByColumns,
               layoutOptStrategy,
               getWriteConfig().getLayoutOptimizationCurveBuildMethod(),
-              HoodieAvroUtils.addMetadataFields(schema));
+              HoodieAvroUtils.addMetadataFields(schema), recordType);
         case LINEAR:
           return new RDDCustomColumnsSortPartitioner(orderByColumns, HoodieAvroUtils.addMetadataFields(schema),
               getWriteConfig().isConsistentLogicalTimestampEnabled());

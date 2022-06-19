@@ -67,10 +67,12 @@ public class FlinkMergeHelper<T> extends BaseMergeHelper<T, List<HoodieRecord<T>
       readSchema = HoodieFileReaderFactory.getReaderFactory(table.getConfig().getRecordType()).getFileReader(table.getHadoopConf(), mergeHandle.getOldFilePath()).getSchema();
       writerSchema = readSchema;
       readerSchema = mergeHandle.getWriterSchemaWithMetaFields();
+      mergeHandle.setOldRecordSchema(readerSchema);
     } else {
       readerSchema = null;
       writerSchema = null;
       readSchema = mergeHandle.getWriterSchemaWithMetaFields();
+      mergeHandle.setOldRecordSchema(readSchema);
     }
 
     BoundedInMemoryExecutor<GenericRecord, GenericRecord, Void> wrapper = null;

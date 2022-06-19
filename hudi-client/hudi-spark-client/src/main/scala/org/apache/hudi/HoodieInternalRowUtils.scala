@@ -19,28 +19,30 @@
 package org.apache.hudi
 
 import java.nio.charset.StandardCharsets
+import java.util.List
 import java.util.concurrent.ConcurrentHashMap
-
 import org.apache.avro.Schema
 import org.apache.avro.generic.IndexedRecord
 import org.apache.hudi.HoodieSparkUtils.sparkAdapter
 import org.apache.hudi.avro.HoodieAvroUtils.{createFullName, toJavaDate}
 import org.apache.hudi.common.model.HoodieRecord.HoodieMetadataField
+import org.apache.hudi.common.util.ReflectionUtils
 import org.apache.hudi.exception.HoodieException
-import org.apache.spark.sql.avro.HoodieAvroDeserializer
-import org.apache.spark.sql.catalyst.expressions.{GenericInternalRow, JoinedRow, MutableProjection, Projection}
+import org.apache.spark.sql.avro.{HoodieAvroDeserializer, HoodieAvroSerializer}
+import org.apache.spark.sql.catalyst.expressions.{GenericInternalRow, JoinedRow, MutableProjection, Projection, UnsafeProjection}
 import org.apache.spark.sql.catalyst.util.{ArrayBasedMapData, ArrayData, GenericArrayData, MapData}
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.types._
-
 import scala.collection.mutable
 
 object HoodieInternalRowUtils {
 
+  val unsafeProjectionMap = new ConcurrentHashMap[(StructType, StructType), UnsafeProjection]
   val projectionMap = new ConcurrentHashMap[(StructType, StructType), MutableProjection]
   val schemaMap = new ConcurrentHashMap[Schema, StructType]
   val schemaPosMap = new ConcurrentHashMap[StructType, Map[String, (StructField, Int)]]
-  val converterMap = new ConcurrentHashMap[Schema, HoodieAvroDeserializer]
+  val rowConverterMap = new ConcurrentHashMap[Schema, HoodieAvroDeserializer]
+  val avroConverterMap = new ConcurrentHashMap[Schema, HoodieAvroSerializer]
 
   /**
    * @see org.apache.hudi.avro.HoodieAvroUtils#stitchRecords(org.apache.avro.generic.GenericRecord, org.apache.avro.generic.GenericRecord, org.apache.avro.Schema)
@@ -68,11 +70,12 @@ object HoodieInternalRowUtils {
       if (oldValue != null) {
         field.dataType match {
           case structType: StructType =>
-            val oldField = StructType(Seq(oldFieldMap(field.name)._1))
-            rewriteRecord(oldValue.asInstanceOf[InternalRow], oldField, structType)
+            val oldType = oldFieldMap(field.name)._1.dataType.asInstanceOf[StructType]
+            val newValue = rewriteRecord(oldValue.asInstanceOf[InternalRow], oldType, structType)
+            newRow.update(pos, newValue)
           case decimalType: DecimalType =>
-            val oldField = oldFieldMap(field.name)._1.asInstanceOf[DecimalType]
-            if (decimalType.scale != oldField.scale || decimalType.precision != oldField.precision) {
+            val oldFieldSchema = oldFieldMap(field.name)._1.dataType.asInstanceOf[DecimalType]
+            if (decimalType.scale != oldFieldSchema.scale || decimalType.precision != oldFieldSchema.precision) {
               newRow.update(pos, Decimal.fromDecimal(oldValue.asInstanceOf[Decimal].toBigDecimal.setScale(newSchema.asInstanceOf[DecimalType].scale))
               )
             } else {
@@ -208,19 +211,38 @@ object HoodieInternalRowUtils {
     schemaMap.get(schema)
   }
 
+  def getProjection(from: Schema, to: Schema): Projection = {
+    getCacheUnsafeProjection(getCacheSchema(from), getCacheSchema(to))
+  }
+
   private def getCacheProjection(from: StructType, to: StructType): Projection = {
     val schemaPair = (from, to)
     if (!projectionMap.contains(schemaPair)) {
       projectionMap.synchronized {
         if (!projectionMap.contains(schemaPair)) {
-          val utilsClazz = Class.forName("org.apache.hudi.HoodieSparkProjectionUtils")
-          val getProjectionMethod = utilsClazz.getMethod("generateMutableProjection", classOf[StructType], classOf[StructType])
+          val utilsClazz = ReflectionUtils.getClass("org.apache.hudi.HoodieSparkProjectionUtils")
+          val getProjectionMethod = utilsClazz.getMethod("getMutableProjection", classOf[StructType], classOf[StructType])
           val projection = getProjectionMethod.invoke(null, from, to).asInstanceOf[MutableProjection]
           projectionMap.put(schemaPair, projection)
         }
       }
     }
     projectionMap.get(schemaPair)
+  }
+
+  private def getCacheUnsafeProjection(from: StructType, to: StructType): Projection = {
+    val schemaPair = (from, to)
+    if (!unsafeProjectionMap.contains(schemaPair)) {
+      unsafeProjectionMap.synchronized {
+        if (!unsafeProjectionMap.contains(schemaPair)) {
+          val utilsClazz = ReflectionUtils.getClass("org.apache.hudi.HoodieSparkProjectionUtils")
+          val getProjectionMethod = utilsClazz.getMethod("getUnsafeProjection", classOf[StructType], classOf[StructType])
+          val projection = getProjectionMethod.invoke(null, from, to).asInstanceOf[UnsafeProjection]
+          unsafeProjectionMap.put(schemaPair, projection)
+        }
+      }
+    }
+    unsafeProjectionMap.get(schemaPair)
   }
 
   def getCacheSchemaPosMap(schema: StructType): Map[String, (StructField, Int)] = {
@@ -235,21 +257,36 @@ object HoodieInternalRowUtils {
     schemaPosMap.get(schema)
   }
 
-  private def getCacheConverter(schema: Schema): HoodieAvroDeserializer = {
-    if (!converterMap.contains(schema)) {
-      converterMap.synchronized {
-        if (!converterMap.contains(schema)) {
-          converterMap.put(schema, sparkAdapter.createAvroDeserializer(schema, getCacheSchema(schema)))
+  private def getCacheRowConverter(schema: Schema): HoodieAvroDeserializer = {
+    if (!rowConverterMap.contains(schema)) {
+      rowConverterMap.synchronized {
+        if (!rowConverterMap.contains(schema)) {
+          rowConverterMap.put(schema, sparkAdapter.createAvroDeserializer(schema, getCacheSchema(schema)))
         }
       }
     }
-    converterMap.get(schema)
+    rowConverterMap.get(schema)
+  }
+
+  private def getCacheAvroConverter(schema: Schema): HoodieAvroSerializer = {
+    if (!avroConverterMap.contains(schema)) {
+      avroConverterMap.synchronized {
+        if (!avroConverterMap.contains(schema)) {
+          avroConverterMap.put(schema, sparkAdapter.createAvroSerializer(getCacheSchema(schema), schema, nullable = false))
+        }
+      }
+    }
+    avroConverterMap.get(schema)
   }
 
   def avro2Row(schema: Schema, record: IndexedRecord): InternalRow = {
-    val converter = getCacheConverter(schema)
+    val converter = getCacheRowConverter(schema)
 
-    converter.deserialize(record).asInstanceOf[InternalRow]
+    converter.deserialize(record).get.asInstanceOf[InternalRow]
+  }
+
+  def row2Avro(schema: Schema, record: InternalRow): IndexedRecord = {
+    getCacheAvroConverter(schema).serialize(record).asInstanceOf[IndexedRecord]
   }
 
   private def rewritePrimaryType(oldValue: Any, oldSchema: DataType, newSchema: DataType): Any = {
@@ -317,5 +354,9 @@ object HoodieInternalRowUtils {
     } else {
       CatalystTypeConverters.convertToCatalyst(value)
     }
+  }
+
+  def removeFields(schema: StructType, fieldsToRemove: List[String]): StructType = {
+    StructType(schema.fields.filter(field => !fieldsToRemove.contains(field.name)))
   }
 }
