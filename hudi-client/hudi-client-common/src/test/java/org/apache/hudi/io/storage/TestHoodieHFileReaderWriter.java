@@ -305,7 +305,7 @@ public class TestHoodieHFileReaderWriter extends TestHoodieReaderWriterBase {
     List<GenericRecord> expectedKey50and1s = allRecords.stream().filter(entry -> (entry.get("_row_key").toString()).contains("key1")
         || (entry.get("_row_key").toString()).contains("key50")).collect(Collectors.toList());
     iterator =
-        hfileReader.getRecordsByKeyPrefixIterator(Arrays.asList("key50", "key1"), avroSchema);
+        hfileReader.getIndexedRecordsByKeyPrefixIterator(Arrays.asList("key50", "key1"), avroSchema);
     recordsByPrefix =
         StreamSupport.stream(Spliterators.spliteratorUnknownSize(iterator, Spliterator.ORDERED), false)
             .map(r -> (GenericRecord)r)
@@ -316,7 +316,7 @@ public class TestHoodieHFileReaderWriter extends TestHoodieReaderWriterBase {
     List<GenericRecord> expectedKey50and0s = allRecords.stream().filter(entry -> (entry.get("_row_key").toString()).contains("key0")
         || (entry.get("_row_key").toString()).contains("key50")).collect(Collectors.toList());
     iterator =
-        hfileReader.getRecordsByKeyPrefixIterator(Arrays.asList("key50", "key0"), avroSchema);
+        hfileReader.getIndexedRecordsByKeyPrefixIterator(Arrays.asList("key50", "key0"), avroSchema);
     recordsByPrefix =
         StreamSupport.stream(Spliterators.spliteratorUnknownSize(iterator, Spliterator.ORDERED), false)
             .map(r -> (GenericRecord)r)
@@ -328,7 +328,7 @@ public class TestHoodieHFileReaderWriter extends TestHoodieReaderWriterBase {
         .filter(entry -> (entry.get("_row_key").toString()).contains("key1") || (entry.get("_row_key").toString()).contains("key0"))
         .collect(Collectors.toList());
     iterator =
-        hfileReader.getRecordsByKeyPrefixIterator(Arrays.asList("key1", "key0"), avroSchema);
+        hfileReader.getIndexedRecordsByKeyPrefixIterator(Arrays.asList("key1", "key0"), avroSchema);
     recordsByPrefix =
         StreamSupport.stream(Spliterators.spliteratorUnknownSize(iterator, Spliterator.ORDERED), false)
             .map(r -> (GenericRecord)r)

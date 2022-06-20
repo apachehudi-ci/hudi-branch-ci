@@ -75,17 +75,17 @@ public class HoodieAvroIndexedRecord extends HoodieRecord<IndexedRecord> {
 
   @Override
   public HoodieRecord newInstance() {
-    throw new UnsupportedOperationException();
+    return new HoodieAvroIndexedRecord(this);
   }
 
   @Override
   public HoodieRecord<IndexedRecord> newInstance(HoodieKey key, HoodieOperation op) {
-    throw new UnsupportedOperationException();
+    return new HoodieAvroIndexedRecord(key, data, op);
   }
 
   @Override
   public HoodieRecord<IndexedRecord> newInstance(HoodieKey key) {
-    throw new UnsupportedOperationException();
+    return new HoodieAvroIndexedRecord(key, data);
   }
 
   @Override
