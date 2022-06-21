@@ -99,7 +99,8 @@ class TestMORDataSource extends HoodieClientTestBase with SparkDatasetMixin {
     val readOpts = if (recordType == HoodieRecordType.SPARK) {
       sparkOpts
     } else {
-      avroOpts    }
+      avroOpts
+    }
 
     // First Operation:
     // Producing parquet files to three default partitions.
