@@ -82,7 +82,11 @@ class TestCallCommandParser extends HoodieSparkSqlTestBase {
   }
 
   test("Test Call Parse Error") {
-    checkParseExceptionContain("CALL cat.system radish kebab")("mismatched input 'CALL' expecting")
+    if (HoodieSparkUtils.gteqSpark3_3_0) {
+      checkParseExceptionContain("CALL cat.system radish kebab")("Syntax error at or near 'CALL'")
+    } else {
+      checkParseExceptionContain("CALL cat.system radish kebab")("mismatched input 'CALL' expecting")
+    }
   }
 
   test("Test Call Produce with semicolon") {
@@ -111,8 +115,11 @@ class TestCallCommandParser extends HoodieSparkSqlTestBase {
       parser.parsePlan(sql)
     } catch {
       case e: Throwable =>
-        assertResult(true)(e.getMessage.contains(errorMsg))
-        hasException = true
+        if (e.getMessage.contains(errorMsg)) {
+          hasException = true
+        } else {
+          fail("Exception should contain: " + errorMsg + ", error message: " + e.getMessage, e)
+        }
     }
     assertResult(true)(hasException)
   }

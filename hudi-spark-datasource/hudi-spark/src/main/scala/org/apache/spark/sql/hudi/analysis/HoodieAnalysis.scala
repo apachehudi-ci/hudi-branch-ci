@@ -74,15 +74,18 @@ object HoodieAnalysis {
       val spark3ResolveReferences: RuleBuilder =
         session => ReflectionUtils.loadClass(spark3ResolveReferencesClass, session).asInstanceOf[Rule[LogicalPlan]]
 
-      val spark32ResolveAlterTableCommandsClass = "org.apache.spark.sql.hudi.ResolveHudiAlterTableCommandSpark32"
-      val spark32ResolveAlterTableCommands: RuleBuilder =
-        session => ReflectionUtils.loadClass(spark32ResolveAlterTableCommandsClass, session).asInstanceOf[Rule[LogicalPlan]]
+      val resolveAlterTableCommandsClass =
+        if (HoodieSparkUtils.gteqSpark3_3_0)
+          "org.apache.spark.sql.hudi.ResolveHudiAlterTableCommandSpark33"
+        else "org.apache.spark.sql.hudi.ResolveHudiAlterTableCommandSpark32"
+      val resolveAlterTableCommands: RuleBuilder =
+        session => ReflectionUtils.loadClass(resolveAlterTableCommandsClass, session).asInstanceOf[Rule[LogicalPlan]]
 
       // NOTE: PLEASE READ CAREFULLY
       //
       // It's critical for this rules to follow in this order, so that DataSource V2 to V1 fallback
       // is performed prior to other rules being evaluated
-      rules ++= Seq(dataSourceV2ToV1Fallback, spark3Analysis, spark3ResolveReferences, spark32ResolveAlterTableCommands)
+      rules ++= Seq(dataSourceV2ToV1Fallback, spark3Analysis, spark3ResolveReferences, resolveAlterTableCommands)
 
     } else if (HoodieSparkUtils.gteqSpark3_1) {
       val spark31ResolveAlterTableCommandsClass = "org.apache.spark.sql.hudi.ResolveHudiAlterTableCommand312"
@@ -423,10 +426,19 @@ case class HoodieResolveReferences(sparkSession: SparkSession) extends Rule[Logi
     // Resolve Delete Table
     case DeleteFromTable(table, condition)
       if sparkAdapter.isHoodieTable(table, sparkSession) && table.resolved =>
-      // Resolve condition
-      val resolvedCondition = condition.map(resolveExpressionFrom(table)(_))
-      // Return the resolved DeleteTable
-      DeleteFromTable(table, resolvedCondition)
+      // SPARK-38626 condition is no longer Option in Spark 3.3
+      // unwrap Option[Expression] to Expression for earlier versions of Spark
+      val unwrappedCondition: Expression = condition match {
+        case option: Option[Expression] => option.getOrElse(null)
+        case expr: Expression => expr
+        case _ => throw new IllegalArgumentException(s"condition has to be either Option[Expression] or Expression")
+      }
+      if (unwrappedCondition == null) {
+        sparkAdapter.getDeleteFromTable(table, None)
+      } else {
+        // Return the resolved DeleteTable
+        sparkAdapter.getDeleteFromTable(table, Option(resolveExpressionFrom(table)(unwrappedCondition)))
+      }
 
     // Append the meta field to the insert query to walk through the validate for the
     // number of insert fields with the number of the target table fields.

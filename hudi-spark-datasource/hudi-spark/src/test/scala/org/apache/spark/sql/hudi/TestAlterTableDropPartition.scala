@@ -211,7 +211,7 @@ class TestAlterTableDropPartition extends HoodieSparkSqlTestBase {
 
     // specify duplicate partition columns
     checkExceptionContain(s"alter table $tableName drop partition (dt='2021-10-01', dt='2021-10-02')")(
-      "Found duplicate keys 'dt'")
+      "Found duplicate keys ")
 
     // drop 2021-10-01 partition
     spark.sql(s"alter table $tableName drop partition (dt='2021-10-01')")

@@ -100,4 +100,9 @@ abstract class BaseSpark3Adapter extends SparkAdapter with Logging {
   override def createInterpretedPredicate(e: Expression): InterpretedPredicate = {
     Predicate.createInterpreted(e)
   }
+
+  override def getQueryParserFromExtendedSqlParser(session: SparkSession, delegate: ParserInterface,
+                                                   sqlText: String): LogicalPlan = {
+    throw new UnsupportedOperationException(s"Unsupported parseQuery method in Spark earlier than Spark 3.3.0")
+  }
 }

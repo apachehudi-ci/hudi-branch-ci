@@ -25,13 +25,13 @@ import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation
 import org.apache.spark.sql.catalyst.catalog.CatalogTable
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.catalyst.expressions.{Expression, InterpretedPredicate}
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression, InterpretedPredicate}
 import org.apache.spark.sql.catalyst.parser.ParserInterface
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, SubqueryAlias}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.execution.datasources.{FilePartition, LogicalRelation, PartitionedFile, SparkParsePartitionUtil}
+import org.apache.spark.sql.execution.datasources.{FilePartition, FileScanRDD, LogicalRelation, PartitionedFile, SparkParsePartitionUtil}
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.DataType
+import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{HoodieCatalystExpressionUtils, HoodieCatalystPlansUtils, Row, SparkSession}
 
 import java.util.Locale
@@ -128,8 +128,8 @@ trait SparkAdapter extends Serializable {
   }
 
   /**
-    * Create instance of [[ParquetFileFormat]]
-    */
+   * Create instance of [[ParquetFileFormat]]
+   */
   def createHoodieParquetFileFormat(appendPartitionValues: Boolean): Option[ParquetFileFormat]
 
   /**
@@ -138,4 +138,24 @@ trait SparkAdapter extends Serializable {
    * TODO move to HoodieCatalystExpressionUtils
    */
   def createInterpretedPredicate(e: Expression): InterpretedPredicate
+
+  /**
+   * Create instance of [[HoodieFileScanRDD]]
+   */
+  def createHoodieFileScanRDD(@transient sparkSession: SparkSession,
+                              readFunction: PartitionedFile => Iterator[InternalRow],
+                              @transient filePartitions: Seq[FilePartition],
+                              readDataSchema: StructType,
+                              metadataColumns: Seq[AttributeReference] = Seq.empty): FileScanRDD
+
+  /**
+   * Get [[DeleteFromTable]]
+   */
+  def getDeleteFromTable(table: LogicalPlan, condition: Option[Expression]): LogicalPlan
+
+  /**
+   * Get parseQuery from ExtendedSqlParser, only Spark 3.3+ use this
+   */
+  def getQueryParserFromExtendedSqlParser(session: SparkSession, delegate: ParserInterface,
+                                          sqlText: String): LogicalPlan
 }

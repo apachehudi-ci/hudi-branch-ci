@@ -57,6 +57,13 @@ class HoodieCommonSqlParser(session: SparkSession, delegate: ParserInterface)
 
   override def parseDataType(sqlText: String): DataType = delegate.parseDataType(sqlText)
 
+  // SPARK-37266 Added parseQuery to ParserInterface in Spark 3.3.0
+  // Don't mark this as override for backward compatibility
+  // Can't use sparkExtendedParser directly here due to the same reason
+  def parseQuery(sqlText: String): LogicalPlan = parse(sqlText) { parser =>
+    sparkAdapter.getQueryParserFromExtendedSqlParser(session, delegate, sqlText)
+  }
+
   def parseRawDataType(sqlText : String) : DataType = {
     throw new UnsupportedOperationException(s"Unsupported parseRawDataType method")
   }
