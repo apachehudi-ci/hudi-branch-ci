@@ -54,14 +54,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.function.Function;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.InflaterInputStream;
 
 import static org.apache.hudi.TypeUtils.unsafeCast;
-import static org.apache.hudi.common.util.MapperUtils.createConverter;
 import static org.apache.hudi.common.util.MapperUtils.createMapper;
 import static org.apache.hudi.common.util.ValidationUtils.checkState;
 
@@ -151,9 +149,9 @@ public class HoodieAvroDataBlock extends HoodieDataBlock {
     checkState(this.readerSchema != null, "Reader's schema has to be non-null");
 
     Schema writerSchema = new Schema.Parser().parse(getLogBlockHeader().get(HeaderMetadataType.SCHEMA));
+    // TODO AvroSparkReader need
     RecordIterator iterator = RecordIterator.getInstance(this, content, internalSchema);
-    Function<IndexedRecord, ?> converter = unsafeCast(createConverter(IndexedRecord.class.getName(), type, iterator.getFinalReadSchema()));
-    Function<IndexedRecord, HoodieRecord<T>> mapper = unsafeCast(createMapper(type, converter, writerSchema));
+    Function<IndexedRecord, HoodieRecord<T>> mapper = unsafeCast(createMapper(type, Function.identity(), writerSchema));
     return new MappingIterator<>(iterator, mapper, iterator.getFinalReadSchema());
   }
 

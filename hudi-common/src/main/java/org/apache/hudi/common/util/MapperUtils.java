@@ -91,32 +91,6 @@ public class MapperUtils {
     }
   }
 
-  /**
-   * To support other type of record. If we read avro block, we should deserialize byte[] to IndexRecord then convert to other type.
-   */
-  public static <T1, T2> Function<T1, T2> createConverter(String dataType, HoodieRecordType recordType, Schema schema) {
-    if (dataType.equals(IndexedRecord.class.getName()) && recordType == HoodieRecordType.AVRO) {
-      return unsafeCast(Function.identity());
-    } else if (dataType.equals(IndexedRecord.class.getName()) && recordType == HoodieRecordType.SPARK) {
-      Class<?> utilsClazz = ReflectionUtils.getClass("org.apache.hudi.HoodieInternalRowUtils");
-      try {
-        Method convertAvro = utilsClazz.getMethod("avro2Row", Schema.class, IndexedRecord.class);
-        return (data) -> {
-          try {
-            return unsafeCast(convertAvro.invoke(null, schema, data));
-          } catch (IllegalAccessException | InvocationTargetException e) {
-            LOG.error("Error convert data with " + recordType);
-            throw new HoodieException(e);
-          }
-        };
-      } catch (NoSuchMethodException e) {
-        throw new HoodieException(e);
-      }
-    } else {
-      throw new UnsupportedOperationException(dataType + " and " + recordType);
-    }
-  }
-
   private static void putIfNotNull(Map<String, Object> map, String name, Object value) {
     if (value != null) {
       map.put(name, value);
