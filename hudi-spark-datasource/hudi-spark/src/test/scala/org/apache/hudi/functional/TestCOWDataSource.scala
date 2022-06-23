@@ -19,7 +19,7 @@ package org.apache.hudi.functional
 
 import org.apache.hadoop.fs.FileSystem
 import org.apache.hudi.HoodieConversionUtils.toJavaOption
-import org.apache.hudi.common.config.HoodieMetadataConfig
+import org.apache.hudi.common.config.{HoodieMetadataConfig, HoodieStorageConfig}
 import org.apache.hudi.common.model.{HoodieAvroRecordCombiningEngine, HoodieRecord}
 import org.apache.hudi.common.table.timeline.HoodieInstant
 import org.apache.hudi.common.table.{HoodieTableConfig, HoodieTableMetaClient, TableSchemaResolver}
@@ -70,11 +70,13 @@ class TestCOWDataSource extends HoodieClientTestBase {
   )
   val sparkOpts = Map(
     DataSourceWriteOptions.COMBINE_ENGINE_CLASS_NAME.key -> classOf[HoodieSparkRecordCombiningEngine].getName,
-    HoodieWriteConfig.RECORD_TYPE.key -> HoodieRecordType.SPARK.name
+    HoodieWriteConfig.RECORD_TYPE.key -> HoodieRecordType.SPARK.name,
+    HoodieStorageConfig.LOGFILE_DATA_BLOCK_FORMAT.key -> "parquet"
   )
   val sparkDefaultOpts = Map(
     DataSourceWriteOptions.COMBINE_ENGINE_CLASS_NAME.key -> classOf[HoodieSparkDefaultRecordCombiningEngine].getName,
-    HoodieWriteConfig.RECORD_TYPE.key -> HoodieRecordType.SPARK.name
+    HoodieWriteConfig.RECORD_TYPE.key -> HoodieRecordType.SPARK.name,
+    HoodieStorageConfig.LOGFILE_DATA_BLOCK_FORMAT.key -> "parquet"
   )
   val avroOpts = Map(
     DataSourceWriteOptions.COMBINE_ENGINE_CLASS_NAME.key -> classOf[HoodieAvroRecordCombiningEngine].getName,

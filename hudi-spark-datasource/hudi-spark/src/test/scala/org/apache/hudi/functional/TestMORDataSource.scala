@@ -19,7 +19,7 @@ package org.apache.hudi.functional
 
 import org.apache.hadoop.fs.Path
 import org.apache.hudi.DataSourceWriteOptions._
-import org.apache.hudi.common.config.HoodieMetadataConfig
+import org.apache.hudi.common.config.{HoodieMetadataConfig, HoodieStorageConfig}
 import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType
 import org.apache.hudi.common.model.{DefaultHoodieRecordPayload, HoodieAvroRecordCombiningEngine, HoodieTableType}
 import org.apache.hudi.common.table.HoodieTableMetaClient
@@ -63,11 +63,13 @@ class TestMORDataSource extends HoodieClientTestBase with SparkDatasetMixin {
   )
   val sparkDefaultOpts = Map(
     DataSourceWriteOptions.COMBINE_ENGINE_CLASS_NAME.key -> classOf[HoodieSparkDefaultRecordCombiningEngine].getName,
-    HoodieWriteConfig.RECORD_TYPE.key -> HoodieRecordType.SPARK.name
+    HoodieWriteConfig.RECORD_TYPE.key -> HoodieRecordType.SPARK.name,
+    HoodieStorageConfig.LOGFILE_DATA_BLOCK_FORMAT.key -> "parquet"
   )
   val avroOpts = Map(
     DataSourceWriteOptions.COMBINE_ENGINE_CLASS_NAME.key -> classOf[HoodieAvroRecordCombiningEngine].getName,
-    HoodieWriteConfig.RECORD_TYPE.key -> HoodieRecordType.AVRO.name
+    HoodieWriteConfig.RECORD_TYPE.key -> HoodieRecordType.AVRO.name,
+    HoodieStorageConfig.LOGFILE_DATA_BLOCK_FORMAT.key -> "parquet"
   )
 
   val verificationCol: String = "driver"
