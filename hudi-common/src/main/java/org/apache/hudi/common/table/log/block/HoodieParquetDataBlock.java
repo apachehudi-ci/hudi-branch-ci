@@ -94,7 +94,7 @@ public class HoodieParquetDataBlock extends HoodieDataBlock {
     try (FSDataOutputStream outputStream = new FSDataOutputStream(baos)) {
       HoodieFileWriter parquetWriter = null;
       HoodieStorageConfig storageConfig =  HoodieStorageConfig.newBuilder().build();
-      storageConfig.setValue("hoodie.datasource.write.record.type", records.iterator().next().getClass().getSimpleName().equals("HoodieSparkRecord") ? "SPARK" : "AVRO");
+      storageConfig.setValue("hoodie.datasource.write.record.type", records.iterator().next().getRecordType().name());
       try {
         parquetWriter = HoodieFileWriterFactory.getFileWriter(
             HoodieFileFormat.PARQUET,

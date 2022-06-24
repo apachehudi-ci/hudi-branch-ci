@@ -132,6 +132,11 @@ public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
   }
 
   @Override
+  public HoodieRecordType getRecordType() {
+    return HoodieRecordType.SPARK;
+  }
+
+  @Override
   public Object getRecordColumnValues(String[] columns, Schema schema, boolean consistentLogicalTimestampEnabled) {
     return HoodieSparkRecordUtils.getRecordColumnValues(this, columns, schema, consistentLogicalTimestampEnabled);
   }

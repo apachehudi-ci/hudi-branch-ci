@@ -94,6 +94,11 @@ public class HoodieAvroIndexedRecord extends HoodieRecord<IndexedRecord> {
   }
 
   @Override
+  public HoodieRecordType getRecordType() {
+    return HoodieRecordType.AVRO;
+  }
+
+  @Override
   public String getRecordKey(String keyFieldName, Schema schema) {
     return Option.ofNullable(data.getSchema().getField(keyFieldName))
         .map(keyField -> data.get(keyField.pos()))

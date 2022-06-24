@@ -95,6 +95,11 @@ public class HoodieAvroRecord<T extends HoodieRecordPayload> extends HoodieRecor
   }
 
   @Override
+  public HoodieRecordType getRecordType() {
+    return HoodieRecordType.AVRO;
+  }
+
+  @Override
   public Object getRecordColumnValues(String[] columns, Schema schema, boolean consistentLogicalTimestampEnabled) {
     return HoodieAvroUtils.getRecordColumnValues(this, columns, schema, consistentLogicalTimestampEnabled);
   }
