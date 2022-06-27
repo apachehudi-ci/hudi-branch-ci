@@ -246,7 +246,7 @@ public class ClusteringOperator extends TableStreamOperator<ClusteringCommitEven
             .withReverseReader(writeConfig.getCompactionReverseLogReadEnabled())
             .withBufferSize(writeConfig.getMaxDFSStreamBufferSize())
             .withSpillableMapBasePath(writeConfig.getSpillableMapBasePath())
-            .withCombiningEngineClassFQN(writeConfig.getCombiningEngineClass())
+            .withCombiningEngineClassFQN(writeConfig.getMergeClass())
             .withRecordType(writeConfig.getRecordType())
             .build();
 

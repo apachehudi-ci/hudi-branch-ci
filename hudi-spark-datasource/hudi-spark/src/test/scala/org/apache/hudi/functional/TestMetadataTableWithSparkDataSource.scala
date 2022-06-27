@@ -20,7 +20,7 @@ package org.apache.hudi.functional
 
 import org.apache.hudi.DataSourceWriteOptions
 import org.apache.hudi.common.config.HoodieMetadataConfig
-import org.apache.hudi.common.model.HoodieAvroRecordCombiningEngine
+import org.apache.hudi.common.model.HoodieAvroRecordMerge
 import org.apache.hudi.common.testutils.HoodieTestDataGenerator
 import org.apache.hudi.common.testutils.RawTripTestPayload.recordsToStrings
 import org.apache.hudi.config.HoodieWriteConfig

@@ -396,7 +396,7 @@ private object HoodieMergeOnReadRDD {
       }
 
       logRecordScannerBuilder.withRecordType(tableState.recordType)
-      logRecordScannerBuilder.withCombiningEngineClassFQN(tableState.combiningEngineClass)
+      logRecordScannerBuilder.withCombiningEngineClassFQN(tableState.mergeClass)
 
       logRecordScannerBuilder.build()
     }

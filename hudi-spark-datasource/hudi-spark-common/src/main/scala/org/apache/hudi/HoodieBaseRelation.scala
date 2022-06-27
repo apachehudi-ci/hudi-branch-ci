@@ -392,12 +392,8 @@ abstract class HoodieBaseRelation(val sqlContext: SQLContext,
 
   protected def getTableState: HoodieTableState = {
     // Get CombiningEngineClass
-    var combiningEngineClass: String = ""
-    if (optParams.contains(HoodieWriteConfig.COMBINE_ENGINE_CLASS_NAME.key())) {
-      combiningEngineClass = optParams(HoodieWriteConfig.COMBINE_ENGINE_CLASS_NAME.key())
-    } else {
-      combiningEngineClass = tableConfig.getCombiningEngineClass
-    }
+    var combiningEngineClass = optParams.getOrElse(HoodieWriteConfig.MERGE_CLASS_NAME.key(),
+      tableConfig.getMergeClass)
     // Subset of the state of table's configuration as of at the time of the query
     HoodieTableState(
       tablePath = basePath,

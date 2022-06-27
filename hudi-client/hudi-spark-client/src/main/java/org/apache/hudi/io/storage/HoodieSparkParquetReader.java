@@ -71,7 +71,7 @@ public class HoodieSparkParquetReader implements HoodieSparkFileReader {
 
   @Override
   public ClosableIterator<InternalRow> getInternalRowIterator(Schema schema) throws IOException {
-    StructType structType = HoodieInternalRowUtils.getCacheSchema(schema);
+    StructType structType = HoodieInternalRowUtils.getCachedSchema(schema);
     conf.set(ParquetReadSupport.SPARK_ROW_REQUESTED_SCHEMA(), structType.json());
     // todo: get it from spark context
     conf.setBoolean(SQLConf.PARQUET_BINARY_AS_STRING().key(),false);

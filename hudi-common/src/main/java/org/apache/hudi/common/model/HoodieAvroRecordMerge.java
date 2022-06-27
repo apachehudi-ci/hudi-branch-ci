@@ -43,9 +43,13 @@ public class HoodieAvroRecordMerge implements HoodieMerge {
   public Option<HoodieRecord> combineAndGetUpdateValue(HoodieRecord older, HoodieRecord newer, Schema schema, Properties props) throws IOException {
     Option<IndexedRecord> previousRecordAvroPayload;
     if (older instanceof HoodieAvroIndexedRecord) {
-      previousRecordAvroPayload = Option.ofNullable(((HoodieAvroIndexedRecord) older).getData());
+      previousRecordAvroPayload = Option.of(((HoodieAvroIndexedRecord) older).getData());
     } else {
-      previousRecordAvroPayload = ((HoodieRecordPayload)older.getData()).getInsertValue(schema, props);
+      if (null == props) {
+        previousRecordAvroPayload = ((HoodieRecordPayload)older.getData()).getInsertValue(schema);
+      } else {
+        previousRecordAvroPayload = ((HoodieRecordPayload)older.getData()).getInsertValue(schema, props);
+      }
     }
     if (!previousRecordAvroPayload.isPresent()) {
       return Option.empty();

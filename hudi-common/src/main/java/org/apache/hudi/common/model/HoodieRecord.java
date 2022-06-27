@@ -208,6 +208,10 @@ public abstract class HoodieRecord<T> implements Serializable {
     return this;
   }
 
+  public void setData(T data) {
+    this.data = data;
+  }
+
   public HoodieRecordLocation getCurrentLocation() {
     return currentLocation;
   }
@@ -288,13 +292,8 @@ public abstract class HoodieRecord<T> implements Serializable {
     }
   }
 
-  //////////////////////////////////////////////////////////////////////////////
+  public abstract Object getRecordColumnValues(String[] columns, Schema schema, boolean consistentLogicalTimestampEnabled);
 
-  //
-  // NOTE: This method duplicates those ones of the HoodieRecordPayload and are placed here
-  //       for the duration of RFC-46 implementation, until migration off `HoodieRecordPayload`
-  //       is complete
-  //
   public abstract HoodieRecord mergeWith(Schema schema, HoodieRecord other, Schema otherSchema, Schema writerSchema) throws IOException;
 
   public abstract HoodieRecord rewriteRecord(Schema recordSchema, Schema targetSchema, TypedProperties props) throws IOException;

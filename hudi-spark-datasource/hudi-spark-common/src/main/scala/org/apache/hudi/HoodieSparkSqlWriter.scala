@@ -800,7 +800,7 @@ object HoodieSparkSqlWriter {
       case HoodieRecord.HoodieRecordType.SPARK =>
         // ut will use AvroKeyGenerator, so we need to cast it in spark record
         val sparkKeyGenerator = keyGenerator.asInstanceOf[SparkKeyGeneratorInterface]
-        val structType = HoodieInternalRowUtils.getCacheSchema(schema)
+        val structType = HoodieInternalRowUtils.getCachedSchema(schema)
         val posList = RowKeyGeneratorHelper.getFieldSchemaInfo(structType, precombineField, false).getKey
         df.queryExecution.toRdd.map(row => {
           val internalRow = row.copy()

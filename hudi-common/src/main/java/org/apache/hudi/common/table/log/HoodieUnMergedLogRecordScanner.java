@@ -19,7 +19,7 @@
 package org.apache.hudi.common.table.log;
 
 import org.apache.hudi.common.model.DeleteRecord;
-import org.apache.hudi.common.model.HoodieAvroRecordCombiningEngine;
+import org.apache.hudi.common.model.HoodieAvroRecordMerge;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
 import org.apache.hudi.common.util.Option;
@@ -160,7 +160,7 @@ public class HoodieUnMergedLogRecordScanner extends AbstractHoodieLogRecordReade
 
       if (HoodieTableMetadata.isMetadataTable(basePath)) {
         recordType = HoodieRecordType.AVRO;
-        combiningEngineClassFQN = HoodieAvroRecordCombiningEngine.class.getName();
+        combiningEngineClassFQN = HoodieAvroRecordMerge.class.getName();
       }
 
       return new HoodieUnMergedLogRecordScanner(fs, basePath, logFilePaths, readerSchema,

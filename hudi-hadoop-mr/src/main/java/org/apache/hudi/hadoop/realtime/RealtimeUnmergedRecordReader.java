@@ -19,7 +19,7 @@
 package org.apache.hudi.hadoop.realtime;
 
 import org.apache.hudi.common.fs.FSUtils;
-import org.apache.hudi.common.model.HoodieAvroRecordCombiningEngine;
+import org.apache.hudi.common.model.HoodieAvroRecordMerge;
 import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
 import org.apache.hudi.common.table.log.HoodieUnMergedLogRecordScanner;
 import org.apache.hudi.common.util.DefaultSizeEstimator;
@@ -98,7 +98,7 @@ class RealtimeUnmergedRecordReader extends AbstractRealtimeRecordReader
           ArrayWritable aWritable = (ArrayWritable) HoodieRealtimeRecordReaderUtils.avroToArrayWritable(rec, getHiveSchema());
           this.executor.getQueue().insertRecord(aWritable);
         })
-        .withCombiningEngineClassFQN(HoodieAvroRecordCombiningEngine.class.getName())
+        .withCombiningEngineClassFQN(HoodieAvroRecordMerge.class.getName())
         .withRecordType(HoodieRecordType.AVRO)
         .build();
     // Start reading and buffering

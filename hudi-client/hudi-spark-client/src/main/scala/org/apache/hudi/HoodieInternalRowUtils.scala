@@ -50,7 +50,7 @@ object HoodieInternalRowUtils {
   def stitchRecords(left: InternalRow, leftSchema: StructType, right: InternalRow, rightSchema: StructType, stitchedSchema: StructType): InternalRow = {
     val mergeSchema = StructType(leftSchema.fields ++ rightSchema.fields)
     val row = new JoinedRow(left, right)
-    val projection = getCacheProjection(mergeSchema, stitchedSchema)
+    val projection = getCachedProjection(mergeSchema, stitchedSchema)
     projection(row)
   }
 
@@ -60,7 +60,7 @@ object HoodieInternalRowUtils {
   def rewriteRecord(oldRecord: InternalRow, oldSchema: StructType, newSchema: StructType): InternalRow = {
     val newRow = new GenericInternalRow(Array.fill(newSchema.fields.length)(null).asInstanceOf[Array[Any]])
 
-    val oldFieldMap = getCacheSchemaPosMap(oldSchema)
+    val oldFieldMap = getCachedSchemaPosMap(oldSchema)
     for ((field, pos) <- newSchema.fields.zipWithIndex) {
       var oldValue: AnyRef = null
       if (oldFieldMap.contains(field.name)) {
@@ -114,7 +114,7 @@ object HoodieInternalRowUtils {
           val oldRow = oldRecord.asInstanceOf[InternalRow]
           val helper = mutable.Map[Integer, Any]()
 
-          val oldSchemaPos = getCacheSchemaPosMap(oldSchema.asInstanceOf[StructType])
+          val oldSchemaPos = getCachedSchemaPosMap(oldSchema.asInstanceOf[StructType])
           targetSchema.fields.zipWithIndex.foreach { case (field, i) =>
             fieldNames.push(field.name)
             if (oldSchemaPos.contains(field.name)) {
@@ -199,7 +199,7 @@ object HoodieInternalRowUtils {
     newRecord
   }
 
-  def getCacheSchema(schema: Schema): StructType = {
+  def getCachedSchema(schema: Schema): StructType = {
     if (!schemaMap.contains(schema)) {
       schemaMap.synchronized {
         if (!schemaMap.contains(schema)) {
@@ -212,10 +212,10 @@ object HoodieInternalRowUtils {
   }
 
   def getProjection(from: Schema, to: Schema): Projection = {
-    getCacheUnsafeProjection(getCacheSchema(from), getCacheSchema(to))
+    getCachedUnsafeProjection(getCachedSchema(from), getCachedSchema(to))
   }
 
-  private def getCacheProjection(from: StructType, to: StructType): Projection = {
+  private def getCachedProjection(from: StructType, to: StructType): Projection = {
     val schemaPair = (from, to)
     if (!projectionMap.contains(schemaPair)) {
       projectionMap.synchronized {
@@ -230,7 +230,7 @@ object HoodieInternalRowUtils {
     projectionMap.get(schemaPair)
   }
 
-  private def getCacheUnsafeProjection(from: StructType, to: StructType): Projection = {
+  private def getCachedUnsafeProjection(from: StructType, to: StructType): Projection = {
     val schemaPair = (from, to)
     if (!unsafeProjectionMap.contains(schemaPair)) {
       unsafeProjectionMap.synchronized {
@@ -245,7 +245,7 @@ object HoodieInternalRowUtils {
     unsafeProjectionMap.get(schemaPair)
   }
 
-  def getCacheSchemaPosMap(schema: StructType): Map[String, (StructField, Int)] = {
+  def getCachedSchemaPosMap(schema: StructType): Map[String, (StructField, Int)] = {
     if (!schemaPosMap.contains(schema)) {
       schemaPosMap.synchronized {
         if (!schemaPosMap.contains(schema)) {
@@ -257,22 +257,22 @@ object HoodieInternalRowUtils {
     schemaPosMap.get(schema)
   }
 
-  private def getCacheRowConverter(schema: Schema): HoodieAvroDeserializer = {
+  private def getCachedRowConverter(schema: Schema): HoodieAvroDeserializer = {
     if (!rowConverterMap.contains(schema)) {
       rowConverterMap.synchronized {
         if (!rowConverterMap.contains(schema)) {
-          rowConverterMap.put(schema, sparkAdapter.createAvroDeserializer(schema, getCacheSchema(schema)))
+          rowConverterMap.put(schema, sparkAdapter.createAvroDeserializer(schema, getCachedSchema(schema)))
         }
       }
     }
     rowConverterMap.get(schema)
   }
 
-  private def getCacheAvroConverter(schema: Schema): HoodieAvroSerializer = {
+  private def getCachedAvroConverter(schema: Schema): HoodieAvroSerializer = {
     if (!avroConverterMap.contains(schema)) {
       avroConverterMap.synchronized {
         if (!avroConverterMap.contains(schema)) {
-          avroConverterMap.put(schema, sparkAdapter.createAvroSerializer(getCacheSchema(schema), schema, nullable = false))
+          avroConverterMap.put(schema, sparkAdapter.createAvroSerializer(getCachedSchema(schema), schema, nullable = false))
         }
       }
     }
@@ -280,13 +280,13 @@ object HoodieInternalRowUtils {
   }
 
   def avro2Row(schema: Schema, record: IndexedRecord): InternalRow = {
-    val converter = getCacheRowConverter(schema)
+    val converter = getCachedRowConverter(schema)
 
     converter.deserialize(record).get.asInstanceOf[InternalRow]
   }
 
   def row2Avro(schema: Schema, record: InternalRow): IndexedRecord = {
-    getCacheAvroConverter(schema).serialize(record).asInstanceOf[IndexedRecord]
+    getCachedAvroConverter(schema).serialize(record).asInstanceOf[IndexedRecord]
   }
 
   private def rewritePrimaryType(oldValue: Any, oldSchema: DataType, newSchema: DataType): Any = {

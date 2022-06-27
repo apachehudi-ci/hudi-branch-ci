@@ -27,7 +27,7 @@ import org.apache.avro.Schema;
 import java.io.IOException;
 import java.util.Properties;
 
-public class HoodieSparkDefaultRecordCombiningEngine extends HoodieSparkRecordCombiningEngine {
+public class HoodieSparkDefaultRecordMerge extends HoodieSparkRecordMerge {
 
   @Override
   public Option<HoodieRecord> combineAndGetUpdateValue(HoodieRecord older, HoodieRecord newer, Schema schema, Properties props) throws IOException {

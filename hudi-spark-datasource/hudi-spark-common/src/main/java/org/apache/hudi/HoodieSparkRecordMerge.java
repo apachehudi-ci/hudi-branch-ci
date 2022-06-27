@@ -16,9 +16,11 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.hudi;
+package org.apache.hudi;
 
 import org.apache.avro.Schema;
+
+import org.apache.hudi.commmon.model.HoodieSparkRecord;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieMerge;
 import org.apache.hudi.common.util.Option;
@@ -30,6 +32,13 @@ public class HoodieSparkRecordMerge implements HoodieMerge {
 
   @Override
   public HoodieRecord preCombine(HoodieRecord older, HoodieRecord newer) {
+    assert older instanceof HoodieSparkRecord;
+    assert newer instanceof HoodieSparkRecord;
+
+    if (newer.getData().equals(HoodieSparkRecord.EMPTY)) {
+      return older;
+    }
+
     if (older.getData() == null) {
       // use natural order for delete record
       return older;
@@ -43,6 +52,13 @@ public class HoodieSparkRecordMerge implements HoodieMerge {
 
   @Override
   public Option<HoodieRecord> combineAndGetUpdateValue(HoodieRecord older, HoodieRecord newer, Schema schema, Properties props) throws IOException {
-    return Option.of(newer);
+    assert older instanceof HoodieSparkRecord;
+    assert newer instanceof HoodieSparkRecord;
+
+    if (newer.getData().equals(HoodieSparkRecord.EMPTY)) {
+      return Option.empty();
+    } else {
+      return Option.of(newer);
+    }
   }
 }

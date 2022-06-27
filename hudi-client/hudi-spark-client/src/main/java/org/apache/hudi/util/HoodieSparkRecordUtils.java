@@ -88,12 +88,12 @@ public class HoodieSparkRecordUtils {
     if (preCombineField == null) {
       return 0;
     }
-    return !HoodieInternalRowUtils.getCacheSchemaPosMap(structType).contains(preCombineField)
+    return !HoodieInternalRowUtils.getCachedSchemaPosMap(structType).contains(preCombineField)
         ? 0 : getValue(structType, preCombineField, data);
   }
 
   private static Object getValue(StructType structType, String fieldName, InternalRow row) {
-    Tuple2<StructField, Object> tuple2 = HoodieInternalRowUtils.getCacheSchemaPosMap(structType).apply(fieldName);
+    Tuple2<StructField, Object> tuple2 = HoodieInternalRowUtils.getCachedSchemaPosMap(structType).apply(fieldName);
     int pos = (Integer) tuple2._2;
     DataType type = tuple2._1.dataType();
     return row.get(pos, type);
@@ -107,7 +107,7 @@ public class HoodieSparkRecordUtils {
    * @return the string form of the field or empty if the schema does not contain the field name or the value is null
    */
   private static Option<String> getNullableValAsString(StructType structType, InternalRow row, String fieldName) {
-    String fieldVal = !HoodieInternalRowUtils.getCacheSchemaPosMap(structType).contains(fieldName)
+    String fieldVal = !HoodieInternalRowUtils.getCachedSchemaPosMap(structType).contains(fieldName)
         ? null : StringUtils.objToString(getValue(structType, fieldName, row));
     return Option.ofNullable(fieldVal);
   }

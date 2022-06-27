@@ -27,7 +27,7 @@ import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hudi.avro.HoodieAvroUtils;
 import org.apache.hudi.common.config.HoodieCommonConfig;
 import org.apache.hudi.common.fs.FSUtils;
-import org.apache.hudi.common.model.HoodieAvroRecordCombiningEngine;
+import org.apache.hudi.common.model.HoodieAvroRecordMerge;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
 import org.apache.hudi.common.table.log.HoodieMergedLogRecordScanner;
@@ -92,7 +92,7 @@ class RealtimeCompactedRecordReader extends AbstractRealtimeRecordReader
         .withBitCaskDiskMapCompressionEnabled(jobConf.getBoolean(HoodieCommonConfig.DISK_MAP_BITCASK_COMPRESSION_ENABLED.key(),
             HoodieCommonConfig.DISK_MAP_BITCASK_COMPRESSION_ENABLED.defaultValue()))
         .withRecordType(HoodieRecordType.AVRO)
-        .withCombiningEngineClassFQN(HoodieAvroRecordCombiningEngine.class.getName())
+        .withCombiningEngineClassFQN(HoodieAvroRecordMerge.class.getName())
         .build();
   }
 

@@ -42,7 +42,7 @@ public interface HoodieSparkFileReader extends HoodieFileReader<InternalRow> {
 
   default ClosableIterator<HoodieRecord<InternalRow>> getRecordIterator(Schema readerSchema) throws IOException {
     ClosableIterator<InternalRow> iterator = getInternalRowIterator(readerSchema);
-    StructType structType = HoodieInternalRowUtils.getCacheSchema(readerSchema);
+    StructType structType = HoodieInternalRowUtils.getCachedSchema(readerSchema);
     return new MappingIterator<>(iterator, data -> unsafeCast(new HoodieSparkRecord(data, structType)));
   }
 

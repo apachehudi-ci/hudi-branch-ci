@@ -185,7 +185,7 @@ public abstract class JavaExecutionStrategy<T>
             .withSpillableMapBasePath(config.getSpillableMapBasePath())
             .withPartition(clusteringOp.getPartitionPath())
             .withRecordType(config.getRecordType())
-            .withCombiningEngineClassFQN(config.getCombiningEngineClass())
+            .withCombiningEngineClassFQN(config.getMergeClass())
             .build();
 
         Option<HoodieFileReader> baseFileReader = StringUtils.isNullOrEmpty(clusteringOp.getDataFilePath())

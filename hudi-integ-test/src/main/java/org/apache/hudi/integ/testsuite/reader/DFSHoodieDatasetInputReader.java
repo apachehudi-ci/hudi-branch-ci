@@ -30,7 +30,6 @@ import org.apache.hudi.common.config.HoodieCommonConfig;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.FileSlice;
-import org.apache.hudi.common.model.HoodieAvroRecordCombiningEngine;
 import org.apache.hudi.common.model.HoodieFileFormat;
 import org.apache.hudi.common.model.HoodieAvroRecord;
 import org.apache.hudi.common.model.HoodieRecord;
@@ -290,7 +289,7 @@ public class DFSHoodieDatasetInputReader extends DFSDeltaInputReader {
           .withDiskMapType(HoodieCommonConfig.SPILLABLE_DISK_MAP_TYPE.defaultValue())
           .withBitCaskDiskMapCompressionEnabled(HoodieCommonConfig.DISK_MAP_BITCASK_COMPRESSION_ENABLED.defaultValue())
           .withRecordType(HoodieRecordType.valueOf(HoodieWriteConfig.RECORD_TYPE.defaultValue()))
-          .withCombiningEngineClassFQN(HoodieCompactionConfig.COMBINE_ENGINE_CLASS_NAME.defaultValue())
+          .withCombiningEngineClassFQN(HoodieCompactionConfig.MERGE_CLASS_NAME.defaultValue())
           .build();
       // readAvro log files
       Iterable<HoodieRecord> iterable = () -> scanner.iterator();

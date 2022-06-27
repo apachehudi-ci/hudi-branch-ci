@@ -225,7 +225,7 @@ public class TestHoodieLogFileCommand extends CLIFunctionalTestHarness {
         .withDiskMapType(HoodieCommonConfig.SPILLABLE_DISK_MAP_TYPE.defaultValue())
         .withBitCaskDiskMapCompressionEnabled(HoodieCommonConfig.DISK_MAP_BITCASK_COMPRESSION_ENABLED.defaultValue())
         .withRecordType(HoodieRecordType.valueOf(HoodieWriteConfig.RECORD_TYPE.defaultValue()))
-        .withCombiningEngineClassFQN(HoodieCompactionConfig.COMBINE_ENGINE_CLASS_NAME.defaultValue())
+        .withCombiningEngineClassFQN(HoodieCompactionConfig.MERGE_CLASS_NAME.defaultValue())
         .build();
 
     Iterator<HoodieRecord> records = scanner.iterator();
