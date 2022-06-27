@@ -762,7 +762,8 @@ public class MergeOnReadInputFormat
         String curKey) throws IOException {
       final HoodieAvroRecord<?> record = (HoodieAvroRecord) scanner.getRecords().get(curKey);
       GenericRecord historyAvroRecord = (GenericRecord) rowDataToAvroConverter.convert(tableSchema, curRow);
-      Option<HoodieRecord> resultRecord = hoodieMerge.combineAndGetUpdateValue(new HoodieAvroIndexedRecord(historyAvroRecord), record, tableSchema, new Properties());
+      // TODO IndexedRecord to HoodieRecord
+      Option<HoodieRecord> resultRecord = hoodieMerge.combineAndGetUpdateValue(new HoodieAvroIndexedRecord(historyAvroRecord), record, tableSchema, null);
       return ((HoodieAvroIndexedRecord) resultRecord.get()).toIndexedRecord();
     }
   }

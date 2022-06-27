@@ -83,7 +83,7 @@ public abstract class BaseWriteHelper<T, I, K, O, R> {
    */
   public I deduplicateRecords(
       I records, HoodieTable<T, I, K, O> table, int parallelism) {
-    HoodieMerge hoodieMerge = HoodieRecordUtils.loadHoodieMerge(table.getConfig().getMergeClass());
+    HoodieMerge hoodieMerge = HoodieRecordUtils.loadHoodieMerge(table.getConfig().getMergeClass(), table.getConfig().getBasePath());
     return deduplicateRecords(records, table.getIndex(), parallelism, hoodieMerge);
   }
 

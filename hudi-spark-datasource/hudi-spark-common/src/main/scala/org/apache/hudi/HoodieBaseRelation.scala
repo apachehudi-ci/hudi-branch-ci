@@ -53,6 +53,8 @@ import org.apache.spark.unsafe.types.UTF8String
 
 import java.net.URI
 import java.util.Locale
+import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType
+import org.apache.hudi.config.HoodieWriteConfig
 import scala.collection.JavaConverters._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
@@ -68,7 +70,8 @@ case class HoodieTableState(tablePath: String,
                             usesVirtualKeys: Boolean,
                             recordPayloadClassName: String,
                             metadataConfig: HoodieMetadataConfig,
-                            mergeClass: String)
+                            mergeClass: String,
+                            recordType: HoodieRecordType)
 
 /**
  * Hoodie BaseRelation which extends [[PrunedFilteredScan]].
@@ -388,6 +391,13 @@ abstract class HoodieBaseRelation(val sqlContext: SQLContext,
   }
 
   protected def getTableState: HoodieTableState = {
+    // Get CombiningEngineClass
+    var combiningEngineClass: String = ""
+    if (optParams.contains(HoodieWriteConfig.COMBINE_ENGINE_CLASS_NAME.key())) {
+      combiningEngineClass = optParams(HoodieWriteConfig.COMBINE_ENGINE_CLASS_NAME.key())
+    } else {
+      combiningEngineClass = tableConfig.getCombiningEngineClass
+    }
     // Subset of the state of table's configuration as of at the time of the query
     HoodieTableState(
       tablePath = basePath,
@@ -397,7 +407,8 @@ abstract class HoodieBaseRelation(val sqlContext: SQLContext,
       usesVirtualKeys = !tableConfig.populateMetaFields(),
       recordPayloadClassName = tableConfig.getPayloadClass,
       metadataConfig = fileIndex.metadataConfig,
-      mergeClass = tableConfig.getMergeClass
+      mergeClass = tableConfig.getMergeClass,
+      recordType = HoodieRecordType.valueOf(optParams.getOrElse(HoodieWriteConfig.RECORD_TYPE.key(), HoodieWriteConfig.RECORD_TYPE.defaultValue()))
     )
   }
 
@@ -551,7 +562,7 @@ object HoodieBaseRelation extends SparkAdapterSupport {
       val requiredAvroSchema = new Schema.Parser().parse(requiredSchema.avroSchemaStr)
       val avroToRowConverter = AvroConversionUtils.createAvroToInternalRowConverter(requiredAvroSchema, requiredRowSchema)
 
-      reader.getRecordIterator(requiredAvroSchema).asScala
+      reader.getIndexedRecordIterator(requiredAvroSchema).asScala
         .map(record => {
           avroToRowConverter.apply(record.asInstanceOf[GenericRecord]).get
         })
