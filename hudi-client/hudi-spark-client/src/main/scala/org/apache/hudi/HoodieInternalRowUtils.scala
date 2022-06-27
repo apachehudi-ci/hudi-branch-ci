@@ -16,36 +16,37 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.hudi
+package org.apache.hudi
 
 import java.nio.charset.StandardCharsets
-import java.util
+import java.util.List
 import java.util.concurrent.ConcurrentHashMap
 import org.apache.avro.Schema
-import org.apache.hudi.AvroConversionUtils
-import org.apache.hudi.avro.HoodieAvroUtils
-import org.apache.hudi.avro.HoodieAvroUtils.{createFullName, fromJavaDate, toJavaDate}
+import org.apache.avro.generic.IndexedRecord
+import org.apache.hudi.HoodieSparkUtils.sparkAdapter
+import org.apache.hudi.avro.HoodieAvroUtils.{createFullName, toJavaDate}
 import org.apache.hudi.common.model.HoodieRecord.HoodieMetadataField
-import org.apache.hudi.common.util.ValidationUtils
+import org.apache.hudi.common.util.ReflectionUtils
 import org.apache.hudi.exception.HoodieException
-import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{GenericInternalRow, JoinedRow, MutableProjection, Projection}
+import org.apache.spark.sql.avro.{HoodieAvroDeserializer, HoodieAvroSerializer}
+import org.apache.spark.sql.catalyst.expressions.{GenericInternalRow, JoinedRow, MutableProjection, Projection, UnsafeProjection}
 import org.apache.spark.sql.catalyst.util.{ArrayBasedMapData, ArrayData, GenericArrayData, MapData}
-import org.apache.spark.sql.hudi.ColumnStatsExpressionUtils.AllowedTransformationExpression.exprUtils.generateMutableProjection
+import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.types._
-
 import scala.collection.mutable
 
-/**
- * Helper class to do common stuff across Spark InternalRow.
- * Provides common methods similar to {@link HoodieAvroUtils}.
- */
 object HoodieInternalRowUtils {
 
+  val unsafeProjectionMap = new ConcurrentHashMap[(StructType, StructType), UnsafeProjection]
   val projectionMap = new ConcurrentHashMap[(StructType, StructType), MutableProjection]
   val schemaMap = new ConcurrentHashMap[Schema, StructType]
-  val SchemaPosMap = new ConcurrentHashMap[StructType, Map[String, (StructField, Int)]]
+  val schemaPosMap = new ConcurrentHashMap[StructType, Map[String, (StructField, Int)]]
+  val rowConverterMap = new ConcurrentHashMap[Schema, HoodieAvroDeserializer]
+  val avroConverterMap = new ConcurrentHashMap[Schema, HoodieAvroSerializer]
 
+  /**
+   * @see org.apache.hudi.avro.HoodieAvroUtils#stitchRecords(org.apache.avro.generic.GenericRecord, org.apache.avro.generic.GenericRecord, org.apache.avro.Schema)
+   */
   def stitchRecords(left: InternalRow, leftSchema: StructType, right: InternalRow, rightSchema: StructType, stitchedSchema: StructType): InternalRow = {
     val mergeSchema = StructType(leftSchema.fields ++ rightSchema.fields)
     val row = new JoinedRow(left, right)
@@ -53,6 +54,9 @@ object HoodieInternalRowUtils {
     projection(row)
   }
 
+  /**
+   * @see org.apache.hudi.avro.HoodieAvroUtils#rewriteRecord(org.apache.avro.generic.GenericRecord, org.apache.avro.Schema)
+   */
   def rewriteRecord(oldRecord: InternalRow, oldSchema: StructType, newSchema: StructType): InternalRow = {
     val newRow = new GenericInternalRow(Array.fill(newSchema.fields.length)(null).asInstanceOf[Array[Any]])
 
@@ -66,11 +70,12 @@ object HoodieInternalRowUtils {
       if (oldValue != null) {
         field.dataType match {
           case structType: StructType =>
-            val oldField = oldFieldMap(field.name)._1.asInstanceOf[StructType]
-            rewriteRecord(oldValue.asInstanceOf[InternalRow], oldField, structType)
+            val oldType = oldFieldMap(field.name)._1.dataType.asInstanceOf[StructType]
+            val newValue = rewriteRecord(oldValue.asInstanceOf[InternalRow], oldType, structType)
+            newRow.update(pos, newValue)
           case decimalType: DecimalType =>
-            val oldField = oldFieldMap(field.name)._1.asInstanceOf[DecimalType]
-            if (decimalType.scale != oldField.scale || decimalType.precision != oldField.precision) {
+            val oldFieldSchema = oldFieldMap(field.name)._1.dataType.asInstanceOf[DecimalType]
+            if (decimalType.scale != oldFieldSchema.scale || decimalType.precision != oldFieldSchema.precision) {
               newRow.update(pos, Decimal.fromDecimal(oldValue.asInstanceOf[Decimal].toBigDecimal.setScale(newSchema.asInstanceOf[DecimalType].scale))
               )
             } else {
@@ -87,17 +92,25 @@ object HoodieInternalRowUtils {
     newRow
   }
 
-  def rewriteRecordWithNewSchema(oldRecord: InternalRow, oldSchema: StructType, newSchema: StructType, renameCols: util.Map[String, String]): InternalRow = {
-    rewriteRecordWithNewSchema(oldRecord, oldSchema, newSchema, renameCols, new util.LinkedList[String]).asInstanceOf[InternalRow]
+  /**
+   * @see org.apache.hudi.avro.HoodieAvroUtils#rewriteRecordWithNewSchema(org.apache.avro.generic.IndexedRecord, org.apache.avro.Schema, java.util.Map)
+   */
+  def rewriteRecordWithNewSchema(oldRecord: InternalRow, oldSchema: StructType, newSchema: StructType, renameCols: java.util.Map[String, String]): InternalRow = {
+    rewriteRecordWithNewSchema(oldRecord, oldSchema, newSchema, renameCols, new java.util.LinkedList[String]).asInstanceOf[InternalRow]
   }
 
-  private def rewriteRecordWithNewSchema(oldRecord: Any, oldSchema: DataType, newSchema: DataType, renameCols: util.Map[String, String], fieldNames: util.Deque[String]): Any = {
+  /**
+   * @see org.apache.hudi.avro.HoodieAvroUtils#rewriteRecordWithNewSchema(java.lang.Object, org.apache.avro.Schema, org.apache.avro.Schema, java.util.Map, java.util.Deque)
+   */
+  private def rewriteRecordWithNewSchema(oldRecord: Any, oldSchema: DataType, newSchema: DataType, renameCols: java.util.Map[String, String], fieldNames: java.util.Deque[String]): Any = {
     if (oldRecord == null) {
       null
     } else {
       newSchema match {
         case targetSchema: StructType =>
-          ValidationUtils.checkArgument(oldRecord.isInstanceOf[InternalRow], "cannot rewrite record with different type")
+          if (!oldRecord.isInstanceOf[InternalRow]) {
+            throw new IllegalArgumentException("cannot rewrite record with different type")
+          }
           val oldRow = oldRecord.asInstanceOf[InternalRow]
           val helper = mutable.Map[Integer, Any]()
 
@@ -132,7 +145,9 @@ object HoodieInternalRowUtils {
 
           newRow
         case targetSchema: ArrayType =>
-          ValidationUtils.checkArgument(oldRecord.isInstanceOf[ArrayData], "cannot rewrite record with different type")
+          if (!oldRecord.isInstanceOf[ArrayData]) {
+            throw new IllegalArgumentException("cannot rewrite record with different type")
+          }
           val oldElementType = oldSchema.asInstanceOf[ArrayType].elementType
           val oldArray = oldRecord.asInstanceOf[ArrayData]
           val newElementType = targetSchema.elementType
@@ -143,7 +158,9 @@ object HoodieInternalRowUtils {
 
           newArray
         case targetSchema: MapType =>
-          ValidationUtils.checkArgument(oldRecord.isInstanceOf[MapData], "cannot rewrite record with different type")
+          if (!oldRecord.isInstanceOf[MapData]) {
+            throw new IllegalArgumentException("cannot rewrite record with different type")
+          }
           val oldValueType = oldSchema.asInstanceOf[MapType].valueType
           val oldKeyType = oldSchema.asInstanceOf[MapType].keyType
           val oldMap = oldRecord.asInstanceOf[MapData]
@@ -162,16 +179,22 @@ object HoodieInternalRowUtils {
     }
   }
 
+  /**
+   * @see org.apache.hudi.avro.HoodieAvroUtils#rewriteRecordWithMetadata(org.apache.avro.generic.GenericRecord, org.apache.avro.Schema, java.lang.String)
+   */
   def rewriteRecordWithMetadata(record: InternalRow, oldSchema: StructType, newSchema: StructType, fileName: String): InternalRow = {
     val newRecord = rewriteRecord(record, oldSchema, newSchema)
-    newRecord.update(HoodieMetadataField.FILENAME_METADATA_FIELD.ordinal, fileName)
+    newRecord.update(HoodieMetadataField.FILENAME_METADATA_FIELD.ordinal, CatalystTypeConverters.convertToCatalyst(fileName))
 
     newRecord
   }
 
+  /**
+   * @see org.apache.hudi.avro.HoodieAvroUtils#rewriteEvolutionRecordWithMetadata(org.apache.avro.generic.GenericRecord, org.apache.avro.Schema, java.lang.String)
+   */
   def rewriteEvolutionRecordWithMetadata(record: InternalRow, oldSchema: StructType, newSchema: StructType, fileName: String): InternalRow = {
-    val newRecord = rewriteRecordWithNewSchema(record, oldSchema, newSchema, new util.HashMap[String, String]())
-    newRecord.update(HoodieMetadataField.FILENAME_METADATA_FIELD.ordinal, fileName)
+    val newRecord = rewriteRecordWithNewSchema(record, oldSchema, newSchema, new java.util.HashMap[String, String]())
+    newRecord.update(HoodieMetadataField.FILENAME_METADATA_FIELD.ordinal, CatalystTypeConverters.convertToCatalyst(fileName))
 
     newRecord
   }
@@ -188,12 +211,18 @@ object HoodieInternalRowUtils {
     schemaMap.get(schema)
   }
 
+  def getProjection(from: Schema, to: Schema): Projection = {
+    getCachedUnsafeProjection(getCachedSchema(from), getCachedSchema(to))
+  }
+
   private def getCachedProjection(from: StructType, to: StructType): Projection = {
     val schemaPair = (from, to)
     if (!projectionMap.contains(schemaPair)) {
       projectionMap.synchronized {
         if (!projectionMap.contains(schemaPair)) {
-          val projection = generateMutableProjection(from, to)
+          val utilsClazz = ReflectionUtils.getClass("org.apache.hudi.HoodieSparkProjectionUtils")
+          val getProjectionMethod = utilsClazz.getMethod("getMutableProjection", classOf[StructType], classOf[StructType])
+          val projection = getProjectionMethod.invoke(null, from, to).asInstanceOf[MutableProjection]
           projectionMap.put(schemaPair, projection)
         }
       }
@@ -201,16 +230,63 @@ object HoodieInternalRowUtils {
     projectionMap.get(schemaPair)
   }
 
-  def getCachedSchemaPosMap(schema: StructType): Map[String, (StructField, Int)] = {
-    if (!SchemaPosMap.contains(schema)) {
-      SchemaPosMap.synchronized {
-        if (!SchemaPosMap.contains(schema)) {
-          val fieldMap = schema.fields.zipWithIndex.map { case (field, i) => (field.name, (field, i)) }.toMap
-          SchemaPosMap.put(schema, fieldMap)
+  private def getCachedUnsafeProjection(from: StructType, to: StructType): Projection = {
+    val schemaPair = (from, to)
+    if (!unsafeProjectionMap.contains(schemaPair)) {
+      unsafeProjectionMap.synchronized {
+        if (!unsafeProjectionMap.contains(schemaPair)) {
+          val utilsClazz = ReflectionUtils.getClass("org.apache.hudi.HoodieSparkProjectionUtils")
+          val getProjectionMethod = utilsClazz.getMethod("getUnsafeProjection", classOf[StructType], classOf[StructType])
+          val projection = getProjectionMethod.invoke(null, from, to).asInstanceOf[UnsafeProjection]
+          unsafeProjectionMap.put(schemaPair, projection)
         }
       }
     }
-    SchemaPosMap.get(schema)
+    unsafeProjectionMap.get(schemaPair)
+  }
+
+  def getCachedSchemaPosMap(schema: StructType): Map[String, (StructField, Int)] = {
+    if (!schemaPosMap.contains(schema)) {
+      schemaPosMap.synchronized {
+        if (!schemaPosMap.contains(schema)) {
+          val fieldMap = schema.fields.zipWithIndex.map { case (field, i) => (field.name, (field, i)) }.toMap
+          schemaPosMap.put(schema, fieldMap)
+        }
+      }
+    }
+    schemaPosMap.get(schema)
+  }
+
+  private def getCachedRowConverter(schema: Schema): HoodieAvroDeserializer = {
+    if (!rowConverterMap.contains(schema)) {
+      rowConverterMap.synchronized {
+        if (!rowConverterMap.contains(schema)) {
+          rowConverterMap.put(schema, sparkAdapter.createAvroDeserializer(schema, getCachedSchema(schema)))
+        }
+      }
+    }
+    rowConverterMap.get(schema)
+  }
+
+  private def getCachedAvroConverter(schema: Schema): HoodieAvroSerializer = {
+    if (!avroConverterMap.contains(schema)) {
+      avroConverterMap.synchronized {
+        if (!avroConverterMap.contains(schema)) {
+          avroConverterMap.put(schema, sparkAdapter.createAvroSerializer(getCachedSchema(schema), schema, nullable = false))
+        }
+      }
+    }
+    avroConverterMap.get(schema)
+  }
+
+  def avro2Row(schema: Schema, record: IndexedRecord): InternalRow = {
+    val converter = getCachedRowConverter(schema)
+
+    converter.deserialize(record).get.asInstanceOf[InternalRow]
+  }
+
+  def row2Avro(schema: Schema, record: InternalRow): IndexedRecord = {
+    getCachedAvroConverter(schema).serialize(record).asInstanceOf[IndexedRecord]
   }
 
   private def rewritePrimaryType(oldValue: Any, oldSchema: DataType, newSchema: DataType): Any = {
@@ -232,35 +308,35 @@ object HoodieInternalRowUtils {
     val value = newSchema match {
       case NullType | BooleanType =>
       case DateType if oldSchema.equals(StringType) =>
-        fromJavaDate(java.sql.Date.valueOf(oldValue.toString))
+        CatalystTypeConverters.convertToCatalyst(java.sql.Date.valueOf(oldValue.toString))
       case LongType =>
         oldSchema match {
-          case IntegerType => oldValue.asInstanceOf[Int].longValue()
+          case IntegerType => CatalystTypeConverters.convertToCatalyst(oldValue.asInstanceOf[Int].longValue())
           case _ =>
         }
       case FloatType =>
         oldSchema match {
-          case IntegerType => oldValue.asInstanceOf[Int].floatValue()
-          case LongType => oldValue.asInstanceOf[Long].floatValue()
+          case IntegerType => CatalystTypeConverters.convertToCatalyst(oldValue.asInstanceOf[Int].floatValue())
+          case LongType => CatalystTypeConverters.convertToCatalyst(oldValue.asInstanceOf[Long].floatValue())
           case _ =>
         }
       case DoubleType =>
         oldSchema match {
-          case IntegerType => oldValue.asInstanceOf[Int].doubleValue()
-          case LongType => oldValue.asInstanceOf[Long].doubleValue()
-          case FloatType => java.lang.Double.valueOf(oldValue.asInstanceOf[Float] + "")
+          case IntegerType => CatalystTypeConverters.convertToCatalyst(oldValue.asInstanceOf[Int].doubleValue())
+          case LongType => CatalystTypeConverters.convertToCatalyst(oldValue.asInstanceOf[Long].doubleValue())
+          case FloatType => CatalystTypeConverters.convertToCatalyst(java.lang.Double.valueOf(oldValue.asInstanceOf[Float] + ""))
           case _ =>
         }
       case BinaryType =>
         oldSchema match {
-          case StringType => oldValue.asInstanceOf[String].getBytes(StandardCharsets.UTF_8)
+          case StringType => CatalystTypeConverters.convertToCatalyst(oldValue.asInstanceOf[String].getBytes(StandardCharsets.UTF_8))
           case _ =>
         }
       case StringType =>
         oldSchema match {
-          case BinaryType => new String(oldValue.asInstanceOf[Array[Byte]])
-          case DateType => toJavaDate(oldValue.asInstanceOf[Integer]).toString
-          case IntegerType | LongType | FloatType | DoubleType | DecimalType() => oldValue.toString
+          case BinaryType => CatalystTypeConverters.convertToCatalyst(new String(oldValue.asInstanceOf[Array[Byte]]))
+          case DateType => CatalystTypeConverters.convertToCatalyst(toJavaDate(oldValue.asInstanceOf[Integer]).toString)
+          case IntegerType | LongType | FloatType | DoubleType | DecimalType() => CatalystTypeConverters.convertToCatalyst(oldValue.toString)
           case _ =>
         }
       case DecimalType() =>
@@ -276,7 +352,11 @@ object HoodieInternalRowUtils {
     if (value == None) {
       throw new HoodieException(String.format("cannot support rewrite value for schema type: %s since the old schema type is: %s", newSchema, oldSchema))
     } else {
-      value
+      CatalystTypeConverters.convertToCatalyst(value)
     }
+  }
+
+  def removeFields(schema: StructType, fieldsToRemove: List[String]): StructType = {
+    StructType(schema.fields.filter(field => !fieldsToRemove.contains(field.name)))
   }
 }

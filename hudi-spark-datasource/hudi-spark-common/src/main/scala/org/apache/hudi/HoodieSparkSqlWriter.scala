@@ -26,6 +26,7 @@ import org.apache.hudi.HoodieConversionUtils.toProperties
 import org.apache.hudi.HoodieWriterUtils._
 import org.apache.hudi.avro.HoodieAvroUtils
 import org.apache.hudi.client.{HoodieWriteResult, SparkRDDWriteClient}
+import org.apache.hudi.commmon.model.HoodieSparkRecord
 import org.apache.hudi.common.config.{HoodieCommonConfig, HoodieConfig, HoodieMetadataConfig, TypedProperties}
 import org.apache.hudi.common.fs.FSUtils
 import org.apache.hudi.common.model._
@@ -42,20 +43,20 @@ import org.apache.hudi.internal.DataSourceInternalWriterHelper
 import org.apache.hudi.internal.schema.InternalSchema
 import org.apache.hudi.internal.schema.utils.{AvroSchemaEvolutionUtils, SerDeHelper}
 import org.apache.hudi.keygen.factory.HoodieSparkKeyGeneratorFactory
-import org.apache.hudi.keygen.{TimestampBasedAvroKeyGenerator, TimestampBasedKeyGenerator}
+import org.apache.hudi.keygen.{RowKeyGeneratorHelper, SparkKeyGeneratorInterface, TimestampBasedAvroKeyGenerator, TimestampBasedKeyGenerator}
 import org.apache.hudi.sync.common.HoodieSyncConfig
 import org.apache.hudi.sync.common.util.SyncUtilHelpers
 import org.apache.hudi.table.BulkInsertPartitioner
 import org.apache.log4j.LogManager
-import org.apache.spark.api.java.JavaSparkContext
+import org.apache.spark.api.java.{JavaRDD, JavaSparkContext}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
 import org.apache.spark.sql.internal.StaticSQLConf
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.{SPARK_VERSION, SparkContext}
-
 import scala.collection.JavaConversions._
 import scala.collection.mutable
+import org.apache.spark.sql.catalyst.InternalRow
 
 object HoodieSparkSqlWriter {
 
@@ -259,32 +260,11 @@ object HoodieSparkSqlWriter {
             log.info(s"Registered avro schema : ${schema.toString(true)}")
 
             // Convert to RDD[HoodieRecord]
-            val genericRecords: RDD[GenericRecord] = HoodieSparkUtils.createRdd(df, structName, nameSpace, reconcileSchema,
-              org.apache.hudi.common.util.Option.of(schema))
-            val shouldCombine = parameters(INSERT_DROP_DUPS.key()).toBoolean ||
-              operation.equals(WriteOperationType.UPSERT) ||
-              parameters.getOrElse(HoodieWriteConfig.COMBINE_BEFORE_INSERT.key(),
-                HoodieWriteConfig.COMBINE_BEFORE_INSERT.defaultValue()).toBoolean
-            val hoodieAllIncomingRecords = genericRecords.map(gr => {
-              val processedRecord = getProcessedRecord(partitionColumns, gr, dropPartitionColumns)
-              val hoodieRecord = if (shouldCombine) {
-                val orderingVal = HoodieAvroUtils.getNestedFieldVal(gr, hoodieConfig.getString(PRECOMBINE_FIELD), false, parameters.getOrElse(
-                  DataSourceWriteOptions.KEYGENERATOR_CONSISTENT_LOGICAL_TIMESTAMP_ENABLED.key(),
-                  DataSourceWriteOptions.KEYGENERATOR_CONSISTENT_LOGICAL_TIMESTAMP_ENABLED.defaultValue()).toBoolean)
-                  .asInstanceOf[Comparable[_]]
-                DataSourceUtils.createHoodieRecord(processedRecord,
-                  orderingVal,
-                  keyGenerator.getKey(gr),
-                  hoodieConfig.getString(PAYLOAD_CLASS_NAME))
-              } else {
-                DataSourceUtils.createHoodieRecord(processedRecord, keyGenerator.getKey(gr), hoodieConfig.getString(PAYLOAD_CLASS_NAME))
-              }
-              hoodieRecord
-            }).toJavaRDD()
 
-            val writeSchema = if (dropPartitionColumns) generateSchemaWithoutPartitionColumns(partitionColumns, schema) else schema
+
+            val writeSchema = if (dropPartitionColumns) generateAvroSchemaWithoutPartitionColumns(partitionColumns, schema) else schema
             // Create a HoodieWriteClient & issue the write.
-
+            val hoodieAllIncomingRecords = createHoodieRecordRdd(df, hoodieConfig, parameters, schema)
             val client = hoodieWriteClient.getOrElse(DataSourceUtils.createHoodieClient(jsc, writeSchema.toString, path,
               tblName, mapAsJavaMap(addSchemaEvolutionParameters(parameters, internalSchemaOpt) - HoodieWriteConfig.AUTO_COMMIT_ENABLE.key)
             )).asInstanceOf[SparkRDDWriteClient[HoodieRecordPayload[Nothing]]]
@@ -319,21 +299,39 @@ object HoodieSparkSqlWriter {
     }
   }
 
-  def generateSchemaWithoutPartitionColumns(partitionParam: String, schema: Schema): Schema = {
+  def generateAvroSchemaWithoutPartitionColumns(partitionParam: String, schema: Schema): Schema = {
     val fieldsToRemove = new java.util.ArrayList[String]()
     partitionParam.split(",").map(partitionField => partitionField.trim)
       .filter(s => !s.isEmpty).map(field => fieldsToRemove.add(field))
     HoodieAvroUtils.removeFields(schema, fieldsToRemove)
   }
 
-  def getProcessedRecord(partitionParam: String, record: GenericRecord,
-                         dropPartitionColumns: Boolean): GenericRecord = {
+  def generateSparkSchemaWithoutPartitionColumns(partitionParam: String, schema: StructType): StructType = {
+    val fieldsToRemove = new java.util.ArrayList[String]()
+    partitionParam.split(",").map(partitionField => partitionField.trim)
+      .filter(s => !s.isEmpty).map(field => fieldsToRemove.add(field))
+    HoodieInternalRowUtils.removeFields(schema, fieldsToRemove)
+  }
+
+  def getAvroProcessedRecord(partitionParam: String, record: GenericRecord,
+                             dropPartitionColumns: Boolean): GenericRecord = {
     var processedRecord = record
     if (dropPartitionColumns) {
-      val writeSchema = generateSchemaWithoutPartitionColumns(partitionParam, record.getSchema)
+      val writeSchema = generateAvroSchemaWithoutPartitionColumns(partitionParam, record.getSchema)
       processedRecord = HoodieAvroUtils.rewriteRecord(record, writeSchema)
     }
     processedRecord
+  }
+
+  def getSparkProcessedRecord(partitionParam: String, record: InternalRow,
+                              dropPartitionColumns: Boolean, schema: StructType): (InternalRow, StructType) = {
+    var processedRecord = record
+    var writeSchema = schema
+    if (dropPartitionColumns) {
+      writeSchema = generateSparkSchemaWithoutPartitionColumns(partitionParam, schema)
+      processedRecord = HoodieInternalRowUtils.rewriteRecord(record, schema, writeSchema)
+    }
+    (processedRecord, writeSchema)
   }
 
   def addSchemaEvolutionParameters(parameters: Map[String, String], internalSchemaOpt: Option[InternalSchema]): Map[String, String] = {
@@ -514,7 +512,7 @@ object HoodieSparkSqlWriter {
         classOf[org.apache.avro.Schema]))
     var schema = AvroConversionUtils.convertStructTypeToAvroSchema(df.schema, structName, nameSpace)
     if (dropPartitionColumns) {
-      schema = generateSchemaWithoutPartitionColumns(partitionColumns, schema)
+      schema = generateAvroSchemaWithoutPartitionColumns(partitionColumns, schema)
     }
     validateSchemaForHoodieIsDeleted(schema)
     sparkContext.getConf.registerAvroSchemas(schema)
@@ -766,4 +764,59 @@ object HoodieSparkSqlWriter {
       Map.empty
     }
   }
+
+  private def createHoodieRecordRdd(df: DataFrame, config: HoodieConfig, parameters: Map[String, String], schema: Schema): JavaRDD[HoodieRecord[_]] = {
+    val reconcileSchema = parameters(DataSourceWriteOptions.RECONCILE_SCHEMA.key()).toBoolean
+    val tblName = config.getString(HoodieWriteConfig.TBL_NAME)
+    val (structName, nameSpace) = AvroConversionUtils.getAvroRecordNameAndNamespace(tblName)
+    val shouldCombine = parameters(INSERT_DROP_DUPS.key()).toBoolean ||
+      WriteOperationType.fromValue(config.getString(OPERATION)).equals(WriteOperationType.UPSERT) ||
+      parameters.getOrElse(HoodieWriteConfig.COMBINE_BEFORE_INSERT.key(),
+        HoodieWriteConfig.COMBINE_BEFORE_INSERT.defaultValue()).toBoolean
+    val precombineField = config.getString(PRECOMBINE_FIELD)
+    val keyGenerator = HoodieSparkKeyGeneratorFactory.createKeyGenerator(new TypedProperties(config.getProps))
+    val partitionCols = HoodieSparkUtils.getPartitionColumns(keyGenerator, toProperties(parameters))
+    val dropPartitionColumns = config.getBoolean(DataSourceWriteOptions.DROP_PARTITION_COLUMNS)
+   HoodieRecord.HoodieRecordType.valueOf(config.getStringOrDefault(HoodieWriteConfig.RECORD_TYPE)) match {
+      case HoodieRecord.HoodieRecordType.AVRO =>
+        val genericRecords: RDD[GenericRecord] = HoodieSparkUtils.createRdd(df, structName, nameSpace, reconcileSchema,
+          org.apache.hudi.common.util.Option.of(schema))
+        genericRecords.map(gr => {
+          val processedRecord = getAvroProcessedRecord(partitionCols, gr, dropPartitionColumns)
+          val hoodieRecord = if (shouldCombine) {
+            val orderingVal = HoodieAvroUtils.getNestedFieldVal(gr, precombineField, false, parameters.getOrElse(
+              DataSourceWriteOptions.KEYGENERATOR_CONSISTENT_LOGICAL_TIMESTAMP_ENABLED.key(),
+              DataSourceWriteOptions.KEYGENERATOR_CONSISTENT_LOGICAL_TIMESTAMP_ENABLED.defaultValue()).toBoolean)
+              .asInstanceOf[Comparable[_]]
+            DataSourceUtils.createHoodieRecord(processedRecord,
+              orderingVal,
+              keyGenerator.getKey(gr),
+              config.getString(PAYLOAD_CLASS_NAME))
+          } else {
+            DataSourceUtils.createHoodieRecord(processedRecord, keyGenerator.getKey(gr), config.getString(PAYLOAD_CLASS_NAME))
+          }
+          hoodieRecord
+        }).toJavaRDD()
+      case HoodieRecord.HoodieRecordType.SPARK =>
+        // ut will use AvroKeyGenerator, so we need to cast it in spark record
+        val sparkKeyGenerator = keyGenerator.asInstanceOf[SparkKeyGeneratorInterface]
+        val structType = HoodieInternalRowUtils.getCachedSchema(schema)
+        val posList = RowKeyGeneratorHelper.getFieldSchemaInfo(structType, precombineField, false).getKey
+        df.queryExecution.toRdd.map(row => {
+          val internalRow = row.copy()
+          val (processedRow, writeSchema) = getSparkProcessedRecord(partitionCols, internalRow, dropPartitionColumns, structType)
+          val recordKey = sparkKeyGenerator.getRecordKey(internalRow, structType)
+          val partitionPath = sparkKeyGenerator.getPartitionPath(internalRow, structType)
+          val key = new HoodieKey(recordKey, partitionPath)
+          val hoodieRecord = if (shouldCombine) {
+            val orderingVal = RowKeyGeneratorHelper.getNestedFieldVal(internalRow, structType, posList, false).asInstanceOf[Comparable[_]]
+            new HoodieSparkRecord(key, processedRow, writeSchema, orderingVal)
+          } else {
+            new HoodieSparkRecord(key, processedRow, writeSchema, 0)
+          }
+          hoodieRecord
+        }).toJavaRDD().asInstanceOf[JavaRDD[HoodieRecord[_]]]
+   }
+  }
+
 }

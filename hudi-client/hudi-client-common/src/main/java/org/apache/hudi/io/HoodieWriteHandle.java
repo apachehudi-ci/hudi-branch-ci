@@ -106,7 +106,7 @@ public abstract class HoodieWriteHandle<T, I, K, O> extends HoodieIOHandle<T, I,
     this.taskContextSupplier = taskContextSupplier;
     this.writeToken = makeWriteToken();
     schemaOnReadEnabled = !isNullOrEmpty(hoodieTable.getConfig().getInternalSchema());
-    hoodieMerge = HoodieRecordUtils.loadHoodieMerge(config.getMergeClass());
+    hoodieMerge = HoodieRecordUtils.loadHoodieMerge(config.getMergeClass(), hoodieTable.getConfig().getBasePath());
   }
 
   /**
@@ -231,6 +231,6 @@ public abstract class HoodieWriteHandle<T, I, K, O> extends HoodieIOHandle<T, I,
 
   protected HoodieFileWriter createNewFileWriter(String instantTime, Path path, HoodieTable<T, I, K, O> hoodieTable,
                                                  HoodieWriteConfig config, Schema schema, TaskContextSupplier taskContextSupplier) throws IOException {
-    return HoodieFileWriterFactory.getFileWriter(instantTime, path, hoodieTable, config, schema, taskContextSupplier);
+    return HoodieFileWriterFactory.getFileWriter(instantTime, path, hoodieTable.getHadoopConf(), config.getStorageConfig(), schema, taskContextSupplier);
   }
 }
