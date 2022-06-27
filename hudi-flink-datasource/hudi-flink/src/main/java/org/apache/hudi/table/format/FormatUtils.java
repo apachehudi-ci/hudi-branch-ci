@@ -21,6 +21,7 @@ package org.apache.hudi.table.format;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieOperation;
 import org.apache.hudi.common.model.HoodieRecord;
+import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
 import org.apache.hudi.common.table.log.HoodieMergedLogRecordScanner;
 import org.apache.hudi.common.table.log.HoodieUnMergedLogRecordScanner;
 import org.apache.hudi.common.util.DefaultSizeEstimator;
@@ -140,6 +141,8 @@ public class FormatUtils {
         .withSpillableMapBasePath(writeConfig.getSpillableMapBasePath())
         .withInstantRange(split.getInstantRange())
         .withOperationField(flinkConf.getBoolean(FlinkOptions.CHANGELOG_ENABLED))
+        .withRecordType(writeConfig.getRecordType())
+        .withCombiningEngineClassFQN(writeConfig.getMergeClass())
         .build();
   }
 
@@ -166,6 +169,10 @@ public class FormatUtils {
                 HoodieRealtimeConfig.DEFAULT_MAX_DFS_STREAM_BUFFER_SIZE))
         .withInstantRange(split.getInstantRange())
         .withLogRecordScannerCallback(callback)
+        .withCombiningEngineClassFQN(flinkConf.getString(FlinkOptions.MERGE_CLASS_NAME,
+            FlinkOptions.MERGE_CLASS_NAME.defaultValue()))
+        // TODO pass from flink options
+        .withRecordType(HoodieRecordType.AVRO)
         .build();
   }
 
@@ -243,6 +250,8 @@ public class FormatUtils {
         .withSpillableMapBasePath(writeConfig.getSpillableMapBasePath())
         .withDiskMapType(writeConfig.getCommonConfig().getSpillableDiskMapType())
         .withBitCaskDiskMapCompressionEnabled(writeConfig.getCommonConfig().isBitCaskDiskMapCompressionEnabled())
+        .withCombiningEngineClassFQN(writeConfig.getMergeClass())
+        .withRecordType(writeConfig.getRecordType())
         .build();
   }
 

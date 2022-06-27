@@ -24,6 +24,7 @@ import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.util.HoodieRecordUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.ValidationUtils;
+import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.keygen.BaseKeyGenerator;
 
 import org.apache.avro.Schema;
@@ -80,6 +81,11 @@ public class HoodieAvroRecord<T extends HoodieRecordPayload> extends HoodieRecor
   }
 
   @Override
+  public Comparable getOrderingValue() {
+    return this.getData().getOrderingValue();
+  }
+
+  @Override
   public String getRecordKey(Option<BaseKeyGenerator> keyGeneratorOpt) {
     return getRecordKey();
   }
@@ -90,8 +96,13 @@ public class HoodieAvroRecord<T extends HoodieRecordPayload> extends HoodieRecor
   }
 
   @Override
-  public Comparable<?> getOrderingValue() {
-    return data.getOrderingValue();
+  public HoodieRecordType getRecordType() {
+    return HoodieRecordType.AVRO;
+  }
+
+  @Override
+  public Object getRecordColumnValues(String[] columns, Schema schema, boolean consistentLogicalTimestampEnabled) {
+    return HoodieAvroUtils.getRecordColumnValues(this, columns, schema, consistentLogicalTimestampEnabled);
   }
 
   @Override
@@ -99,18 +110,12 @@ public class HoodieAvroRecord<T extends HoodieRecordPayload> extends HoodieRecor
     return getData().getInsertValue(schema, prop);
   }
 
-  //////////////////////////////////////////////////////////////////////////////
-
-  //
-  // NOTE: This method duplicates those ones of the HoodieRecordPayload and are placed here
-  //       for the duration of RFC-46 implementation, until migration off `HoodieRecordPayload`
-  //       is complete
   @Override
-  public HoodieRecord mergeWith(HoodieRecord other, Schema readerSchema, Schema writerSchema) throws IOException {
+  public HoodieRecord mergeWith(Schema schema, HoodieRecord other, Schema otherSchema, Schema writerSchema) throws IOException {
     ValidationUtils.checkState(other instanceof HoodieAvroRecord);
     GenericRecord mergedPayload = HoodieAvroUtils.stitchRecords(
-        (GenericRecord) toIndexedRecord(readerSchema, new Properties()).get(),
-        (GenericRecord) other.toIndexedRecord(readerSchema, new Properties()).get(),
+        (GenericRecord) toIndexedRecord(schema, new Properties()).get(),
+        (GenericRecord) other.toIndexedRecord(otherSchema, new Properties()).get(),
         writerSchema);
     return new HoodieAvroRecord(getKey(), instantiateRecordPayloadWrapper(mergedPayload, getOrderingValue()), getOperation());
   }
@@ -154,13 +159,6 @@ public class HoodieAvroRecord<T extends HoodieRecordPayload> extends HoodieRecor
   }
 
   @Override
-  public HoodieRecord rewriteRecordWithNewSchema(Schema recordSchema, Properties prop, Schema newSchema, Map<String, String> renameCols, Mapper mapper) throws IOException {
-    GenericRecord oldRecord = (GenericRecord) getData().getInsertValue(recordSchema, prop).get();
-    GenericRecord rewriteRecord = HoodieAvroUtils.rewriteRecordWithNewSchema(oldRecord, newSchema, renameCols);
-    return mapper.apply(rewriteRecord);
-  }
-
-  @Override
   public HoodieRecord overrideMetadataFieldValue(Schema recordSchema, Properties prop, int pos, String newValue) throws IOException {
     IndexedRecord record = (IndexedRecord) data.getInsertValue(recordSchema, prop).get();
     record.put(pos, newValue);
@@ -180,6 +178,25 @@ public class HoodieAvroRecord<T extends HoodieRecordPayload> extends HoodieRecor
     });
 
     return new HoodieAvroRecord<>(getKey(), new RewriteAvroPayload(avroRecordPayload), getOperation());
+  }
+
+  @Override
+  public HoodieRecord expansion(
+      Schema schema,
+      Properties prop,
+      String payloadClass,
+      String preCombineField,
+      Option<Pair<String, String>> simpleKeyGenFieldsOpt,
+      Boolean withOperation,
+      Option<String> partitionNameOp,
+      Option<Boolean> populateMetaFieldsOp) throws IOException {
+    IndexedRecord value = (IndexedRecord) data.getInsertValue(schema, prop).get();
+    return HoodieAvroUtils.createHoodieRecordFromAvro(value, payloadClass, preCombineField, simpleKeyGenFieldsOpt, withOperation, partitionNameOp, populateMetaFieldsOp);
+  }
+
+  @Override
+  public HoodieRecord transform(Schema schema, Properties prop, boolean useKeygen) {
+    throw new UnsupportedOperationException();
   }
 
   public Option<Map<String, String>> getMetadata() {

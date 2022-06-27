@@ -102,7 +102,6 @@ public class HoodieTableMetaClient implements Serializable {
   //       computations secured by its immutability
   protected SerializablePath basePath;
   protected SerializablePath metaPath;
-
   private transient HoodieWrapperFileSystem fs;
   private boolean loadActiveTimelineOnLoad;
   protected SerializableConfiguration hadoopConf;
@@ -900,9 +899,10 @@ public class HoodieTableMetaClient implements Serializable {
 
     public PropertyBuilder fromMetaClient(HoodieTableMetaClient metaClient) {
       return setTableType(metaClient.getTableType())
-        .setTableName(metaClient.getTableConfig().getTableName())
-        .setArchiveLogFolder(metaClient.getArchivePath())
-        .setPayloadClassName(metaClient.getTableConfig().getPayloadClass());
+          .setTableName(metaClient.getTableConfig().getTableName())
+          .setArchiveLogFolder(metaClient.getArchivePath())
+          .setPayloadClassName(metaClient.getTableConfig().getPayloadClass())
+          .setMergeClassName(metaClient.getTableConfig().getMergeClass());
     }
 
     public PropertyBuilder fromProperties(Properties properties) {

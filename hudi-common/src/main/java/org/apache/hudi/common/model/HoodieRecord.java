@@ -104,7 +104,7 @@ public abstract class HoodieRecord<T> implements Serializable {
   /**
    * Identifies the record across the table.
    */
-  private HoodieKey key;
+  protected HoodieKey key;
 
   /**
    * Actual payload of the record.
@@ -208,6 +208,10 @@ public abstract class HoodieRecord<T> implements Serializable {
     return this;
   }
 
+  public void setData(T data) {
+    this.data = data;
+  }
+
   public HoodieRecordLocation getCurrentLocation() {
     return currentLocation;
   }
@@ -268,6 +272,8 @@ public abstract class HoodieRecord<T> implements Serializable {
     return key.getRecordKey();
   }
 
+  public abstract HoodieRecordType getRecordType();
+
   public abstract String getRecordKey(Option<BaseKeyGenerator> keyGeneratorOpt);
 
   public abstract String getRecordKey(String keyFieldName);
@@ -286,14 +292,9 @@ public abstract class HoodieRecord<T> implements Serializable {
     }
   }
 
-  //////////////////////////////////////////////////////////////////////////////
+  public abstract Object getRecordColumnValues(String[] columns, Schema schema, boolean consistentLogicalTimestampEnabled);
 
-  //
-  // NOTE: This method duplicates those ones of the HoodieRecordPayload and are placed here
-  //       for the duration of RFC-46 implementation, until migration off `HoodieRecordPayload`
-  //       is complete
-  //
-  public abstract HoodieRecord mergeWith(HoodieRecord other, Schema readerSchema, Schema writerSchema) throws IOException;
+  public abstract HoodieRecord mergeWith(Schema schema, HoodieRecord other, Schema otherSchema, Schema writerSchema) throws IOException;
 
   public abstract HoodieRecord rewriteRecord(Schema recordSchema, Schema targetSchema, TypedProperties props) throws IOException;
 
@@ -305,8 +306,6 @@ public abstract class HoodieRecord<T> implements Serializable {
   public abstract HoodieRecord rewriteRecordWithMetadata(Schema recordSchema, Properties prop, boolean schemaOnReadEnabled, Schema writeSchemaWithMetaFields, String fileName) throws IOException;
 
   public abstract HoodieRecord rewriteRecordWithNewSchema(Schema recordSchema, Properties prop, Schema newSchema, Map<String, String> renameCols) throws IOException;
-
-  public abstract HoodieRecord rewriteRecordWithNewSchema(Schema recordSchema, Properties prop, Schema newSchema, Map<String, String> renameCols, Mapper mapper) throws IOException;
 
   public abstract HoodieRecord rewriteRecordWithNewSchema(Schema recordSchema, Properties prop, Schema newSchema) throws IOException;
 
@@ -320,23 +319,30 @@ public abstract class HoodieRecord<T> implements Serializable {
 
   public abstract boolean shouldIgnore(Schema schema, Properties prop) throws IOException;
 
+  /**
+   * This method used to add preCombine field, recordKey etc. And may change the Type of HoodieRecord.
+   */
+  public abstract HoodieRecord expansion(
+      Schema schema,
+      Properties prop,
+      String payloadClass,
+      String preCombineField,
+      Option<Pair<String, String>> simpleKeyGenFieldsOpt,
+      Boolean withOperation,
+      Option<String> partitionNameOp,
+      Option<Boolean> populateMetaFieldsOp) throws IOException;
+
+  /**
+   * This method used in ClusteringExecutionStrategy.
+   */
+  public abstract HoodieRecord transform(Schema schema, Properties prop, boolean useKeyGen);
+
   public abstract Option<IndexedRecord> toIndexedRecord(Schema schema, Properties prop) throws IOException;
 
   //////////////////////////////////////////////////////////////////////////////
 
   public static String generateSequenceId(String instantTime, int partitionId, long recordIndex) {
     return instantTime + "_" + partitionId + "_" + recordIndex;
-  }
-
-  /**
-   * NOTE: This is temporary transition construct to be able to construct
-   *       HoodieRecord instances w/o excessive wiring into a lot of components
-   *       a lot of details that are irrelevant for these
-   * TODO remove
-   */
-  @FunctionalInterface
-  public interface Mapper {
-    HoodieRecord apply(IndexedRecord avroPayload);
   }
 
   /**
@@ -378,5 +384,9 @@ public abstract class HoodieRecord<T> implements Serializable {
     public Object get(String key) {
       return null;
     }
+  }
+
+  public enum HoodieRecordType {
+    AVRO, SPARK
   }
 }

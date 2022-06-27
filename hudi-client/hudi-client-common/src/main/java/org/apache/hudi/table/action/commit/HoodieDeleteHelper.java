@@ -26,6 +26,8 @@ import org.apache.hudi.common.model.EmptyHoodieRecordPayload;
 import org.apache.hudi.common.model.HoodieAvroRecord;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
+import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
+import org.apache.hudi.common.util.ReflectionUtils;
 import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.exception.HoodieUpsertException;
@@ -34,6 +36,7 @@ import org.apache.hudi.table.WorkloadProfile;
 import org.apache.hudi.table.WorkloadStat;
 import org.apache.hudi.table.action.HoodieWriteMetadata;
 
+import java.lang.reflect.Method;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
@@ -84,8 +87,19 @@ public class HoodieDeleteHelper<T, R> extends
         dedupedKeys = keys.repartition(parallelism);
       }
 
-      HoodieData<HoodieRecord<T>> dedupedRecords =
-          dedupedKeys.map(key -> new HoodieAvroRecord(key, new EmptyHoodieRecordPayload()));
+      HoodieData dedupedRecords;
+      if (config.getRecordType() == HoodieRecordType.AVRO) {
+        dedupedRecords =
+            dedupedKeys.map(key -> new HoodieAvroRecord(key, new EmptyHoodieRecordPayload()));
+      } else if (config.getRecordType() == HoodieRecordType.SPARK) {
+        dedupedRecords = dedupedKeys.map(key -> {
+          Class<?> recordClazz = ReflectionUtils.getClass("org.apache.hudi.commmon.model.HoodieSparkRecord");
+          Method method = recordClazz.getMethod("empty", HoodieKey.class);
+          return method.invoke(null, key);
+        });
+      } else {
+        throw new UnsupportedOperationException(config.getRecordType().name());
+      }
       Instant beginTag = Instant.now();
       // perform index loop up to get existing location of records
       HoodieData<HoodieRecord<T>> taggedRecords = table.getIndex().tagLocation(dedupedRecords, context, table);

@@ -18,9 +18,11 @@
 
 package org.apache.hudi.common.util;
 
+import org.apache.hudi.common.model.HoodieAvroRecordMerge;
 import org.apache.hudi.common.model.HoodieMerge;
 import org.apache.hudi.common.model.HoodieRecordPayload;
 import org.apache.hudi.exception.HoodieException;
+import org.apache.hudi.metadata.HoodieTableMetadata;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
@@ -51,6 +53,17 @@ public class HoodieRecordUtils {
       return hoodieMerge;
     } catch (HoodieException e) {
       throw new HoodieException("Unable to instantiate hoodie merge class ", e);
+    }
+  }
+
+  /**
+   * Instantiate a given class with a record merge.
+   */
+  public static HoodieMerge loadHoodieMerge(String mergeClass, String tablePath) {
+    if (HoodieTableMetadata.isMetadataTable(tablePath)) {
+      return loadHoodieMerge(HoodieAvroRecordMerge.class.getName());
+    } else {
+      return loadHoodieMerge(mergeClass);
     }
   }
 
