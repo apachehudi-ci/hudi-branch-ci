@@ -69,7 +69,7 @@ public abstract class HoodieBaseParquetWriter<R> implements AutoCloseable {
   }
 
   public HoodieBaseParquetWriter(FSDataOutputStream outputStream,
-                                 HoodieBaseParquetConfig<? extends WriteSupport<R>> parquetConfig) throws IOException {
+                                 HoodieParquetConfig<? extends WriteSupport<R>> parquetConfig) throws IOException {
     this.writeSupport = parquetConfig.getWriteSupport();
     this.writer = new Builder<R>(new OutputStreamBackedOutputFile(outputStream), writeSupport)
         .withWriteMode(ParquetFileWriter.Mode.CREATE)

@@ -59,9 +59,9 @@ public class HoodieAvroParquetWriter
   }
 
   public HoodieAvroParquetWriter(FSDataOutputStream outputStream,
-                                 HoodieAvroParquetConfig parquetConfig,
+                                 HoodieParquetConfig<HoodieAvroWriteSupport> parquetConfig,
                                  boolean populateMetaFields) throws IOException {
-    super(outputStream, (HoodieBaseParquetConfig) parquetConfig);
+    super(outputStream, (HoodieParquetConfig)parquetConfig);
     this.fileName = null;
     this.instantTime = null;
     this.taskContextSupplier = null;
