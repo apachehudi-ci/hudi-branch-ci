@@ -148,7 +148,8 @@ public class HoodieWriteConfig extends HoodieConfig {
 
   public static final ConfigProperty<String> RECORD_TYPE = ConfigProperty
       .key("hoodie.datasource.write.record.type")
-      .defaultValue(HoodieRecordType.AVRO.toString())
+      .defaultValue(HoodieRecordType.AVRO.name())
+      .withValidValues(HoodieRecordType.AVRO.name(), HoodieRecordType.SPARK.name())
       .withDocumentation("test");
 
   public static final ConfigProperty<String> ROLLBACK_USING_MARKERS_ENABLE = ConfigProperty
@@ -512,6 +513,7 @@ public class HoodieWriteConfig extends HoodieConfig {
   private HoodieCommonConfig commonConfig;
   private HoodieStorageConfig storageConfig;
   private EngineType engineType;
+  private HoodieRecordType recordType;
 
   /**
    * @deprecated Use {@link #TBL_NAME} and its methods instead
@@ -888,6 +890,7 @@ public class HoodieWriteConfig extends HoodieConfig {
     super();
     this.engineType = EngineType.SPARK;
     this.clientSpecifiedViewStorageConfig = null;
+    this.recordType = generateRecordType();
   }
 
   protected HoodieWriteConfig(EngineType engineType, Properties props) {
@@ -895,6 +898,7 @@ public class HoodieWriteConfig extends HoodieConfig {
     Properties newProps = new Properties();
     newProps.putAll(props);
     this.engineType = engineType;
+    this.recordType = generateRecordType();
     this.consistencyGuardConfig = ConsistencyGuardConfig.newBuilder().fromProperties(newProps).build();
     this.fileSystemRetryConfig = FileSystemRetryConfig.newBuilder().fromProperties(newProps).build();
     this.clientSpecifiedViewStorageConfig = FileSystemViewStorageConfig.newBuilder().fromProperties(newProps).build();
@@ -904,6 +908,16 @@ public class HoodieWriteConfig extends HoodieConfig {
     this.metastoreConfig = HoodieMetastoreConfig.newBuilder().fromProperties(props).build();
     this.commonConfig = HoodieCommonConfig.newBuilder().fromProperties(props).build();
     this.storageConfig = HoodieStorageConfig.newBuilder().fromProperties(props).build();
+  }
+
+  private HoodieRecordType generateRecordType() {
+    HoodieRecordType recordType = HoodieRecord.HoodieRecordType.valueOf(getString(RECORD_TYPE));
+    String basePath = getString(BASE_PATH);
+    boolean metadataTable = HoodieTableMetadata.isMetadataTable(basePath);
+    if (metadataTable) {
+      recordType = HoodieRecordType.AVRO;
+    }
+    return recordType;
   }
 
   public static HoodieWriteConfig.Builder newBuilder() {
@@ -989,12 +1003,6 @@ public class HoodieWriteConfig extends HoodieConfig {
   }
 
   public HoodieRecord.HoodieRecordType getRecordType() {
-    HoodieRecordType recordType = HoodieRecord.HoodieRecordType.valueOf(getString(RECORD_TYPE));
-    String basePath = getString(BASE_PATH);
-    boolean metadataTable = HoodieTableMetadata.isMetadataTable(basePath);
-    if (metadataTable) {
-      recordType = HoodieRecordType.AVRO;
-    }
     return recordType;
   }
 
