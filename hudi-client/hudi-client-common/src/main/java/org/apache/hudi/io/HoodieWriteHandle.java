@@ -231,6 +231,6 @@ public abstract class HoodieWriteHandle<T, I, K, O> extends HoodieIOHandle<T, I,
 
   protected HoodieFileWriter createNewFileWriter(String instantTime, Path path, HoodieTable<T, I, K, O> hoodieTable,
                                                  HoodieWriteConfig config, Schema schema, TaskContextSupplier taskContextSupplier) throws IOException {
-    return HoodieFileWriterFactory.getFileWriter(instantTime, path, hoodieTable.getHadoopConf(), config.getStorageConfig(), schema, taskContextSupplier);
+    return HoodieFileWriterFactory.getFileWriter(instantTime, path, hoodieTable.getHadoopConf(), config.getStorageConfig(), schema, taskContextSupplier, config.getRecordType());
   }
 }
