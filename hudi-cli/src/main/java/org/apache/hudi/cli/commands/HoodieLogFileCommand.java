@@ -223,7 +223,7 @@ public class HoodieLogFileCommand implements CommandMarker {
               .withDiskMapType(HoodieCommonConfig.SPILLABLE_DISK_MAP_TYPE.defaultValue())
               .withBitCaskDiskMapCompressionEnabled(HoodieCommonConfig.DISK_MAP_BITCASK_COMPRESSION_ENABLED.defaultValue())
               .withRecordType(HoodieRecordType.AVRO)
-              .withCombiningEngineClassFQN(HoodieAvroRecordMerge.class.getName())
+              .withMergeClass(HoodieAvroRecordMerge.class.getName())
               .build();
       for (HoodieRecord hoodieRecord : scanner) {
         Option<IndexedRecord> record = hoodieRecord.toIndexedRecord(readerSchema, new Properties());

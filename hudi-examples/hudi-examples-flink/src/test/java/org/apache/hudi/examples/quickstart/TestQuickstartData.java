@@ -362,7 +362,7 @@ public class TestQuickstartData {
         .withSpillableMapBasePath("/tmp/")
         .withDiskMapType(HoodieCommonConfig.SPILLABLE_DISK_MAP_TYPE.defaultValue())
         .withBitCaskDiskMapCompressionEnabled(HoodieCommonConfig.DISK_MAP_BITCASK_COMPRESSION_ENABLED.defaultValue())
-        .withCombiningEngineClassFQN(HoodieAvroRecordMerge.class.getName())
+        .withMergeClass(HoodieAvroRecordMerge.class.getName())
         .withRecordType(HoodieRecordType.AVRO)
         .build();
   }

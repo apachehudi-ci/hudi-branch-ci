@@ -39,8 +39,8 @@ public class HoodieUnMergedLogRecordScanner extends AbstractHoodieLogRecordReade
 
   private HoodieUnMergedLogRecordScanner(FileSystem fs, String basePath, List<String> logFilePaths, Schema readerSchema,
                                          String latestInstantTime, boolean readBlocksLazily, boolean reverseReader, int bufferSize,
-                                         LogRecordScannerCallback callback, Option<InstantRange> instantRange, HoodieRecordType recordType, String combiningEngineClassFQN) {
-    super(fs, basePath, logFilePaths, readerSchema, latestInstantTime, readBlocksLazily, reverseReader, bufferSize, instantRange, false, recordType, combiningEngineClassFQN);
+                                         LogRecordScannerCallback callback, Option<InstantRange> instantRange, HoodieRecordType recordType, String mergeClass) {
+    super(fs, basePath, logFilePaths, readerSchema, latestInstantTime, readBlocksLazily, reverseReader, bufferSize, instantRange, false, recordType, mergeClass);
     this.callback = callback;
   }
 
@@ -88,8 +88,8 @@ public class HoodieUnMergedLogRecordScanner extends AbstractHoodieLogRecordReade
     private LogRecordScannerCallback callback;
     // Record type read from log block
     private HoodieRecordType recordType;
-    // Combine engine class name
-    private String combiningEngineClassFQN;
+    // Merge class name
+    private String mergeClass;
 
     public Builder withFileSystem(FileSystem fs) {
       this.fs = fs;
@@ -148,23 +148,23 @@ public class HoodieUnMergedLogRecordScanner extends AbstractHoodieLogRecordReade
     }
 
     @Override
-    public Builder withCombiningEngineClassFQN(String combiningEngineClassFQN) {
-      this.combiningEngineClassFQN = combiningEngineClassFQN;
+    public Builder withMergeClass(String mergeClass) {
+      this.mergeClass = mergeClass;
       return this;
     }
 
     @Override
     public HoodieUnMergedLogRecordScanner build() {
       assert recordType != null;
-      assert combiningEngineClassFQN != null;
+      assert mergeClass != null;
 
       if (HoodieTableMetadata.isMetadataTable(basePath)) {
         recordType = HoodieRecordType.AVRO;
-        combiningEngineClassFQN = HoodieAvroRecordMerge.class.getName();
+        mergeClass = HoodieAvroRecordMerge.class.getName();
       }
 
       return new HoodieUnMergedLogRecordScanner(fs, basePath, logFilePaths, readerSchema,
-          latestInstantTime, readBlocksLazily, reverseReader, bufferSize, callback, instantRange, recordType, combiningEngineClassFQN);
+          latestInstantTime, readBlocksLazily, reverseReader, bufferSize, callback, instantRange, recordType, mergeClass);
     }
   }
 }

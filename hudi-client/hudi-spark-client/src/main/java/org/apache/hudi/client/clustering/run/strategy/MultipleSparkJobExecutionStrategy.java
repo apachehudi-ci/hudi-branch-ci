@@ -215,7 +215,7 @@ public abstract class MultipleSparkJobExecutionStrategy<T>
               .withSpillableMapBasePath(config.getSpillableMapBasePath())
               .withPartition(clusteringOp.getPartitionPath())
               .withRecordType(config.getRecordType())
-              .withCombiningEngineClassFQN(config.getMergeClass())
+              .withMergeClass(config.getMergeClass())
               .build();
 
           Option<HoodieFileReader> baseFileReader = StringUtils.isNullOrEmpty(clusteringOp.getDataFilePath())
