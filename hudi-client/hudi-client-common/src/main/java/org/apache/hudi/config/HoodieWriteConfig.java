@@ -912,7 +912,7 @@ public class HoodieWriteConfig extends HoodieConfig {
   }
 
   private HoodieRecordType generateRecordType() {
-    HoodieRecordType recordType = HoodieRecord.HoodieRecordType.valueOf(getString(RECORD_TYPE));
+    HoodieRecordType recordType = HoodieRecord.HoodieRecordType.valueOf(getStringOrDefault(RECORD_TYPE));
     String basePath = getString(BASE_PATH);
     boolean metadataTable = HoodieTableMetadata.isMetadataTable(basePath);
     if (metadataTable) {

@@ -29,7 +29,7 @@ import org.apache.hudi.common.config.{HoodieCommonConfig, HoodieMetadataConfig}
 import org.apache.hudi.common.engine.HoodieLocalEngineContext
 import org.apache.hudi.common.fs.FSUtils
 import org.apache.hudi.common.fs.FSUtils.getRelativePartitionPath
-import org.apache.hudi.common.model.{HoodieAvroIndexedRecord, HoodieLogFile, HoodiePayloadProps, HoodieRecord, OverwriteWithLatestAvroPayload}
+import org.apache.hudi.common.model.{HoodieAvroIndexedRecord, HoodieEmptyRecord, HoodieLogFile, HoodiePayloadProps, HoodieRecord, OverwriteWithLatestAvroPayload}
 import org.apache.hudi.common.table.log.HoodieMergedLogRecordScanner
 import org.apache.hudi.common.util.HoodieRecordUtils
 import org.apache.hudi.common.util.ValidationUtils.checkState
@@ -179,12 +179,8 @@ class HoodieMergeOnReadRDD(@transient sc: SparkContext,
     // NOTE: This have to stay lazy to make sure it's initialized only at the point where it's
     //       going to be used, since we modify `logRecords` before that and therefore can't do it any earlier
     protected lazy val logRecordsIterator: Iterator[Any] = logRecords.iterator.map {
-      case (_, record: HoodieSparkRecord) =>
-        if (record.getData == HoodieSparkRecord.EMPTY) {
-          Option.empty
-        } else {
-          record
-        }
+      case (_, record: HoodieSparkRecord) => record
+      case (_, _: HoodieEmptyRecord[_]) => Option.empty
       case (_, record) =>
         val avroRecordOpt = toScalaOption(record.toIndexedRecord(logFileReaderAvroSchema, payloadProps))
         avroRecordOpt.map {
