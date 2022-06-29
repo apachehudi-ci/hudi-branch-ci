@@ -325,7 +325,7 @@ class HoodieMergeOnReadRDD(@transient sc: SparkContext,
 
           toScalaOption(hoodieMerge.combineAndGetUpdateValue(curRecord, newRecord, logFileReaderAvroSchema, payloadProps))
             .map(r => {
-              // TODO sparkCombiningEngine always return newer one, so we can do this
+              // TODO SparkRecordMergeClass always return newer one, so we can do this
               val projection = HoodieInternalRowUtils.getProjection(logFileReaderAvroSchema, requiredAvroSchema)
               projection.apply(r.getData.asInstanceOf[InternalRow])
             })
@@ -401,7 +401,7 @@ private object HoodieMergeOnReadRDD {
       }
 
       logRecordScannerBuilder.withRecordType(tableState.recordType)
-      logRecordScannerBuilder.withCombiningEngineClassFQN(tableState.mergeClass)
+      logRecordScannerBuilder.withMergeClass(tableState.mergeClass)
 
       logRecordScannerBuilder.build()
     }

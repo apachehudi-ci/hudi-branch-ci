@@ -98,7 +98,7 @@ class RealtimeUnmergedRecordReader extends AbstractRealtimeRecordReader
           ArrayWritable aWritable = (ArrayWritable) HoodieRealtimeRecordReaderUtils.avroToArrayWritable(rec, getHiveSchema());
           this.executor.getQueue().insertRecord(aWritable);
         })
-        .withCombiningEngineClassFQN(HoodieAvroRecordMerge.class.getName())
+        .withMergeClass(HoodieAvroRecordMerge.class.getName())
         .withRecordType(HoodieRecordType.AVRO)
         .build();
     // Start reading and buffering

@@ -273,7 +273,7 @@ public class ClusteringOperator extends TableStreamOperator<ClusteringCommitEven
             .withSpillableMapBasePath(writeConfig.getSpillableMapBasePath())
             .withDiskMapType(writeConfig.getCommonConfig().getSpillableDiskMapType())
             .withBitCaskDiskMapCompressionEnabled(writeConfig.getCommonConfig().isBitCaskDiskMapCompressionEnabled())
-            .withCombiningEngineClassFQN(writeConfig.getMergeClass())
+            .withMergeClass(writeConfig.getMergeClass())
             .withRecordType(writeConfig.getRecordType())
             .build();
 
