@@ -20,10 +20,10 @@ package org.apache.hudi;
 
 import org.apache.avro.Schema;
 
-import org.apache.hudi.commmon.model.HoodieSparkRecord;
 import org.apache.hudi.common.model.HoodieEmptyRecord;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieMerge;
+import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
 import org.apache.hudi.common.util.Option;
 
 import java.io.IOException;
@@ -33,8 +33,8 @@ public class HoodieSparkRecordMerge implements HoodieMerge {
 
   @Override
   public HoodieRecord preCombine(HoodieRecord older, HoodieRecord newer) {
-    assert older instanceof HoodieSparkRecord || older instanceof HoodieEmptyRecord;
-    assert newer instanceof HoodieSparkRecord || newer instanceof HoodieEmptyRecord;
+    assert older.getRecordType() == HoodieRecordType.SPARK;
+    assert newer.getRecordType() == HoodieRecordType.SPARK;
 
     if (newer instanceof HoodieEmptyRecord) {
       return older;
@@ -53,8 +53,8 @@ public class HoodieSparkRecordMerge implements HoodieMerge {
 
   @Override
   public Option<HoodieRecord> combineAndGetUpdateValue(HoodieRecord older, HoodieRecord newer, Schema schema, Properties props) throws IOException {
-    assert older instanceof HoodieSparkRecord || older instanceof HoodieEmptyRecord;
-    assert newer instanceof HoodieSparkRecord || newer instanceof HoodieEmptyRecord;
+    assert older.getRecordType() == HoodieRecordType.SPARK;
+    assert newer.getRecordType() == HoodieRecordType.SPARK;
 
     if (newer instanceof HoodieEmptyRecord) {
       return Option.empty();

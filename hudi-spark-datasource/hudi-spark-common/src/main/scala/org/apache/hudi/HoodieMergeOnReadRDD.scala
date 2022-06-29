@@ -50,6 +50,7 @@ import org.apache.spark.{Partition, SerializableWritable, SparkContext, TaskCont
 import java.io.Closeable
 import java.util.Properties
 import org.apache.hudi.commmon.model.HoodieSparkRecord
+import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType
 import org.apache.hudi.keygen.RowKeyGeneratorHelper
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
@@ -308,8 +309,8 @@ class HoodieMergeOnReadRDD(@transient sc: SparkContext,
     private def merge(curRow: InternalRow, newRecord: HoodieRecord[_]): Option[InternalRow] = {
       // NOTE: We have to pass in Avro Schema used to read from Delta Log file since we invoke combining API
       //       on the record from the Delta Log
-      newRecord match {
-        case _: HoodieSparkRecord =>
+      newRecord.getRecordType match {
+        case HoodieRecordType.SPARK =>
           // Get ordering value in curAvroRecord
           var curRecord = new HoodieSparkRecord(curRow, baseFileReaderSchema.structTypeSchema)
           val orderField = payloadProps.getProperty(HoodiePayloadProps.PAYLOAD_ORDERING_FIELD_PROP_KEY)

@@ -20,6 +20,8 @@ package org.apache.hudi.common.model;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.IndexedRecord;
+
+import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.metadata.HoodieMetadataPayload;
 
@@ -31,6 +33,8 @@ import static org.apache.hudi.TypeUtils.unsafeCast;
 public class HoodieAvroRecordMerge implements HoodieMerge {
   @Override
   public HoodieRecord preCombine(HoodieRecord older, HoodieRecord newer) {
+    assert older.getRecordType() == HoodieRecordType.AVRO;
+    assert newer.getRecordType() == HoodieRecordType.AVRO;
     HoodieRecordPayload picked = unsafeCast(((HoodieAvroRecord) newer).getData().preCombine(((HoodieAvroRecord) older).getData()));
     if (picked instanceof HoodieMetadataPayload) {
       // NOTE: HoodieMetadataPayload return a new payload
@@ -41,15 +45,13 @@ public class HoodieAvroRecordMerge implements HoodieMerge {
 
   @Override
   public Option<HoodieRecord> combineAndGetUpdateValue(HoodieRecord older, HoodieRecord newer, Schema schema, Properties props) throws IOException {
+    assert older.getRecordType() == HoodieRecordType.AVRO;
+    assert newer.getRecordType() == HoodieRecordType.AVRO;
     Option<IndexedRecord> previousRecordAvroPayload;
     if (older instanceof HoodieAvroIndexedRecord) {
       previousRecordAvroPayload = Option.of(((HoodieAvroIndexedRecord) older).getData());
     } else {
-      if (null == props) {
-        previousRecordAvroPayload = ((HoodieRecordPayload)older.getData()).getInsertValue(schema);
-      } else {
-        previousRecordAvroPayload = ((HoodieRecordPayload)older.getData()).getInsertValue(schema, props);
-      }
+      previousRecordAvroPayload = ((HoodieRecordPayload)older.getData()).getInsertValue(schema, props);
     }
     if (!previousRecordAvroPayload.isPresent()) {
       return Option.empty();

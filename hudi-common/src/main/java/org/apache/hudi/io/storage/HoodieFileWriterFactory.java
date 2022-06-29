@@ -134,7 +134,7 @@ public class HoodieFileWriterFactory {
     if (compressionCodecName.isEmpty()) {
       compressionCodecName = null;
     }
-    HoodieAvroParquetConfig parquetConfig = new HoodieAvroParquetConfig(writeSupport,
+    HoodieParquetConfig<HoodieAvroWriteSupport> parquetConfig = new HoodieParquetConfig(writeSupport,
         CompressionCodecName.fromConf(compressionCodecName),
         config.getIntOrDefault(HoodieStorageConfig.PARQUET_BLOCK_SIZE),
         config.getIntOrDefault(HoodieStorageConfig.PARQUET_PAGE_SIZE),
@@ -150,7 +150,7 @@ public class HoodieFileWriterFactory {
     boolean enableBloomFilter = false;
     Option<BloomFilter> filter = enableBloomFilter ? Option.of(createBloomFilter(config)) : Option.empty();
     HoodieAvroWriteSupport writeSupport = new HoodieAvroWriteSupport(new AvroSchemaConverter(conf).convert(schema), schema, filter);
-    HoodieAvroParquetConfig parquetConfig = new HoodieAvroParquetConfig(writeSupport,
+    HoodieParquetConfig<HoodieAvroWriteSupport> parquetConfig = new HoodieParquetConfig<>(writeSupport,
         CompressionCodecName.fromConf(config.getString(HoodieStorageConfig.PARQUET_COMPRESSION_CODEC_NAME)),
         config.getInt(HoodieStorageConfig.PARQUET_BLOCK_SIZE),
         config.getInt(HoodieStorageConfig.PARQUET_PAGE_SIZE),
