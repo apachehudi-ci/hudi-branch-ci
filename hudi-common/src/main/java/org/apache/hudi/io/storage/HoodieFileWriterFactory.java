@@ -30,8 +30,8 @@ import org.apache.hudi.common.engine.TaskContextSupplier;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieFileFormat;
 import org.apache.hudi.common.model.HoodieRecord;
+import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
 import org.apache.hudi.common.table.HoodieTableConfig;
-import org.apache.hudi.common.util.ConfigUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.ReflectionUtils;
 import org.apache.hudi.exception.HoodieException;
@@ -85,15 +85,15 @@ public class HoodieFileWriterFactory {
 
   public static <T, I, K, O> HoodieFileWriter getFileWriter(
       String instantTime, Path path, Configuration conf, HoodieConfig config, Schema schema,
-      TaskContextSupplier taskContextSupplier) throws IOException {
+      TaskContextSupplier taskContextSupplier, HoodieRecordType recordType) throws IOException {
     final String extension = FSUtils.getFileExtension(path.getName());
-    HoodieFileWriterFactory factory = getWriterFactory(ConfigUtils.getRecordTypeFromConfig(config));
+    HoodieFileWriterFactory factory = getWriterFactory(recordType);
     return factory.getFileWriterByFormat(extension, instantTime, path, conf, config, schema, taskContextSupplier);
   }
 
   public static <T, I, K, O> HoodieFileWriter getFileWriter(HoodieFileFormat format,
-      FSDataOutputStream outputStream, Configuration conf, HoodieConfig config, Schema schema) throws IOException {
-    HoodieFileWriterFactory factory = getWriterFactory(ConfigUtils.getRecordTypeFromConfig(config));
+      FSDataOutputStream outputStream, Configuration conf, HoodieConfig config, Schema schema, HoodieRecordType recordType) throws IOException {
+    HoodieFileWriterFactory factory = getWriterFactory(recordType);
     return factory.getFileWriterByFormat(format, outputStream, conf, config, schema);
   }
 

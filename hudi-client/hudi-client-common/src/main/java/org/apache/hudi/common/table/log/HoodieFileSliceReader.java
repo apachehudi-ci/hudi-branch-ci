@@ -47,7 +47,7 @@ public class HoodieFileSliceReader<T> implements Iterator<HoodieRecord<T>> {
       Iterator<HoodieRecord> baseIterator = baseFileReader.get().getRecordIterator(schema);
       while (baseIterator.hasNext()) {
         scanner.processNextRecord(baseIterator.next().expansion(schema, new Properties(), payloadClass, preCombineField, simpleKeyGenFieldsOpt,
-            scanner.isWithOperationField(), Option.of(scanner.getPartitionName()), Option.empty()));
+            scanner.isWithOperationField(), scanner.getPartitionName(), Option.empty()));
       }
       return new HoodieFileSliceReader(scanner.iterator());
     } else {
@@ -57,7 +57,7 @@ public class HoodieFileSliceReader<T> implements Iterator<HoodieRecord<T>> {
           .map(e -> {
             try {
               return e.expansion(schema, payloadConfig.getProps(), payloadClass, preCombineField, simpleKeyGenFieldsOpt,
-                  scanner.isWithOperationField(), Option.of(scanner.getPartitionName()), Option.empty());
+                  scanner.isWithOperationField(), scanner.getPartitionName(), Option.empty());
             } catch (IOException io) {
               throw new HoodieIOException("Error while creating reader for file slice with no base file.", io);
             }
