@@ -24,25 +24,22 @@ import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieOperation;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.util.Option;
-import org.apache.hudi.common.util.ReflectionUtils;
 import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.keygen.BaseKeyGenerator;
 import org.apache.hudi.keygen.SparkKeyGeneratorInterface;
+import org.apache.hudi.keygen.factory.HoodieSparkKeyGeneratorFactory;
 import org.apache.hudi.util.HoodieSparkRecordUtils;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.IndexedRecord;
 import org.apache.spark.sql.catalyst.CatalystTypeConverters;
 import org.apache.spark.sql.catalyst.InternalRow;
-import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -58,9 +55,6 @@ import static org.apache.spark.sql.types.DataTypes.StringType;
  * Spark Engine-specific Implementations of `HoodieRecord`.
  */
 public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
-
-  // This is the same as EmptyHoodieRecordPayload
-  public static final InternalRow EMPTY = new GenericInternalRow(new Object[0]);
 
   // IndexedRecord hold its schema, InternalRow should also hold its schema
   private final StructType structType;
@@ -228,10 +222,8 @@ public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
     Option<SparkKeyGeneratorInterface> keyGeneratorOpt = Option.empty();
     if (useKeygen && !Boolean.parseBoolean(prop.getOrDefault(POPULATE_META_FIELDS.key(), POPULATE_META_FIELDS.defaultValue().toString()).toString())) {
       try {
-        Class<?> clazz = ReflectionUtils.getClass("org.apache.hudi.keygen.factory.HoodieSparkKeyGeneratorFactory");
-        Method createKeyGenerator = clazz.getMethod("createKeyGenerator", TypedProperties.class);
-        keyGeneratorOpt = Option.of((SparkKeyGeneratorInterface) createKeyGenerator.invoke(null, new TypedProperties(prop)));
-      } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+        keyGeneratorOpt = Option.of((SparkKeyGeneratorInterface) HoodieSparkKeyGeneratorFactory.createKeyGenerator(new TypedProperties(prop)));
+      } catch (IOException e) {
         throw new HoodieException("Only SparkKeyGeneratorInterface are supported when meta columns are disabled ", e);
       }
     }
@@ -257,9 +249,6 @@ public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
     if (schema.getField(HoodieRecord.HOODIE_IS_DELETED_FIELD) == null) {
       return true;
     }
-    if (data.equals(EMPTY)) {
-      return false;
-    }
     Object deleteMarker = data.get(schema.getField(HoodieRecord.HOODIE_IS_DELETED_FIELD).pos(), BooleanType);
     return !(deleteMarker instanceof Boolean && (boolean) deleteMarker);
   }
@@ -277,13 +266,5 @@ public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
   @Override
   public Option<IndexedRecord> toIndexedRecord(Schema schema, Properties prop) throws IOException {
     return Option.of(HoodieInternalRowUtils.row2Avro(schema, data));
-  }
-
-  public static HoodieSparkRecord empty(HoodieKey key, Comparable<?> orderingVal) {
-    return new HoodieSparkRecord(key, EMPTY, null, orderingVal);
-  }
-
-  public static HoodieSparkRecord empty(HoodieKey key) {
-    return new HoodieSparkRecord(key, EMPTY, null);
   }
 }

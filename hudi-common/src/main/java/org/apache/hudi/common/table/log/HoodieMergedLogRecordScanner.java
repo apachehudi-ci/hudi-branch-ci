@@ -21,6 +21,7 @@ package org.apache.hudi.common.table.log;
 import org.apache.hudi.common.config.HoodieCommonConfig;
 import org.apache.hudi.common.model.DeleteRecord;
 import org.apache.hudi.common.model.HoodieAvroRecordMerge;
+import org.apache.hudi.common.model.HoodieEmptyRecord;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieMerge;
 import org.apache.hudi.common.model.HoodieRecord;
@@ -35,19 +36,16 @@ import org.apache.hudi.common.util.ReflectionUtils;
 import org.apache.hudi.common.util.SpillableMapUtils;
 import org.apache.hudi.common.util.collection.ExternalSpillableMap;
 import org.apache.hudi.exception.HoodieIOException;
-
-import org.apache.avro.Schema;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hudi.internal.schema.InternalSchema;
 import org.apache.hudi.metadata.HoodieTableMetadata;
 
+import org.apache.avro.Schema;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -193,14 +191,9 @@ public class HoodieMergedLogRecordScanner extends AbstractHoodieLogRecordReader
     if (recordType == HoodieRecordType.AVRO) {
       records.put(key, SpillableMapUtils.generateEmptyPayload(key,
           deleteRecord.getPartitionPath(), deleteRecord.getOrderingValue(), getPayloadClassFQN()));
-    } else if (recordType == HoodieRecordType.SPARK) {
-      try {
-        Class<?> recordClazz = ReflectionUtils.getClass("org.apache.hudi.commmon.model.HoodieSparkRecord");
-        Method method = recordClazz.getMethod("empty", HoodieKey.class, Comparable.class);
-        records.put(key, (HoodieRecord) method.invoke(null, new HoodieKey(key, deleteRecord.getPartitionPath()), deleteRecord.getOrderingValue()));
-      } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
-        LOG.error("Unable to init empty HoodieSparkRecord", e);
-      }
+    } else {
+      HoodieEmptyRecord record = new HoodieEmptyRecord<>(new HoodieKey(key, deleteRecord.getPartitionPath()), deleteRecord.getOrderingValue(), recordType);
+      records.put(key, record);
     }
   }
 
