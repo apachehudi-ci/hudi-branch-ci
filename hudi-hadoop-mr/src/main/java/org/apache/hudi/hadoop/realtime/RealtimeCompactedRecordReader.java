@@ -92,7 +92,7 @@ class RealtimeCompactedRecordReader extends AbstractRealtimeRecordReader
         .withBitCaskDiskMapCompressionEnabled(jobConf.getBoolean(HoodieCommonConfig.DISK_MAP_BITCASK_COMPRESSION_ENABLED.key(),
             HoodieCommonConfig.DISK_MAP_BITCASK_COMPRESSION_ENABLED.defaultValue()))
         .withRecordType(HoodieRecordType.AVRO)
-        .withCombiningEngineClassFQN(HoodieAvroRecordMerge.class.getName())
+        .withMergeClass(HoodieAvroRecordMerge.class.getName())
         .build();
   }
 

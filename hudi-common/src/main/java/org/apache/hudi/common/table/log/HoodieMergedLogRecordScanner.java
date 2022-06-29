@@ -92,15 +92,15 @@ public class HoodieMergedLogRecordScanner extends AbstractHoodieLogRecordReader
                                          ExternalSpillableMap.DiskMapType diskMapType,
                                          boolean isBitCaskDiskMapCompressionEnabled,
                                          boolean withOperationField, boolean forceFullScan,
-                                         Option<String> partitionName, InternalSchema internalSchema, HoodieRecordType recordType, String combiningEngineClassFQN) {
+                                         Option<String> partitionName, InternalSchema internalSchema, HoodieRecordType recordType, String mergeClass) {
     super(fs, basePath, logFilePaths, readerSchema, latestInstantTime, readBlocksLazily, reverseReader, bufferSize,
-        instantRange, withOperationField, forceFullScan, partitionName, internalSchema, recordType, combiningEngineClassFQN);
+        instantRange, withOperationField, forceFullScan, partitionName, internalSchema, recordType, mergeClass);
     try {
       // Store merged records for all versions for this log file, set the in-memory footprint to maxInMemoryMapSize
       this.records = new ExternalSpillableMap<>(maxMemorySizeInBytes, spillableMapBasePath, new DefaultSizeEstimator(),
           new HoodieRecordSizeEstimator(readerSchema), diskMapType, isBitCaskDiskMapCompressionEnabled);
       this.maxMemorySizeInBytes = maxMemorySizeInBytes;
-      this.hoodieMerge = HoodieRecordUtils.loadHoodieMerge(getMergeClassFQN(), basePath);
+      this.hoodieMerge = HoodieRecordUtils.loadHoodieMerge(getMergeClass(), basePath);
     } catch (IOException e) {
       throw new HoodieIOException("IOException when creating ExternalSpillableMap at " + spillableMapBasePath, e);
     }
@@ -240,7 +240,7 @@ public class HoodieMergedLogRecordScanner extends AbstractHoodieLogRecordReader
     // Record type read from log block
     private HoodieRecordType recordType;
     // Combine engine class name
-    private String combiningEngineClassFQN;
+    private String mergeClass;
 
     @Override
     public Builder withFileSystem(FileSystem fs) {
@@ -339,8 +339,8 @@ public class HoodieMergedLogRecordScanner extends AbstractHoodieLogRecordReader
     }
 
     @Override
-    public Builder withCombiningEngineClassFQN(String combiningEngineClassFQN) {
-      this.combiningEngineClassFQN = combiningEngineClassFQN;
+    public Builder withMergeClass(String mergeClass) {
+      this.mergeClass = mergeClass;
       return this;
     }
 
@@ -350,18 +350,18 @@ public class HoodieMergedLogRecordScanner extends AbstractHoodieLogRecordReader
         this.partitionName = getRelativePartitionPath(new Path(basePath), new Path(this.logFilePaths.get(0)).getParent());
       }
       assert recordType != null;
-      assert combiningEngineClassFQN != null;
+      assert mergeClass != null;
 
       if (HoodieTableMetadata.isMetadataTable(basePath)) {
         recordType = HoodieRecordType.AVRO;
-        combiningEngineClassFQN = HoodieAvroRecordMerge.class.getName();
+        mergeClass = HoodieAvroRecordMerge.class.getName();
       }
 
       return new HoodieMergedLogRecordScanner(fs, basePath, logFilePaths, readerSchema,
           latestInstantTime, maxMemorySizeInBytes, readBlocksLazily, reverseReader,
           bufferSize, spillableMapBasePath, instantRange,
           diskMapType, isBitCaskDiskMapCompressionEnabled, withOperationField, true,
-          Option.ofNullable(partitionName), internalSchema, recordType, combiningEngineClassFQN);
+          Option.ofNullable(partitionName), internalSchema, recordType, mergeClass);
     }
   }
 }

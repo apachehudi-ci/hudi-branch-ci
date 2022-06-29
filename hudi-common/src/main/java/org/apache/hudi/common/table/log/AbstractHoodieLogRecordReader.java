@@ -93,7 +93,7 @@ public abstract class AbstractHoodieLogRecordReader {
   // preCombine field
   private final String preCombineField;
   // Stateless component for merging records
-  private final String mergeClassFQN;
+  private final String mergeClass;
   // simple key gen fields
   private Option<Pair<String, String>> simpleKeyGenFields = Option.empty();
   // Log File Paths
@@ -143,16 +143,16 @@ public abstract class AbstractHoodieLogRecordReader {
                                           Schema readerSchema,
                                           String latestInstantTime, boolean readBlocksLazily, boolean reverseReader,
                                           int bufferSize, Option<InstantRange> instantRange,
-                                          boolean withOperationField, HoodieRecordType recordType, String combiningEngineClassFQN) {
+                                          boolean withOperationField, HoodieRecordType recordType, String mergeClass) {
     this(fs, basePath, logFilePaths, readerSchema, latestInstantTime, readBlocksLazily, reverseReader, bufferSize,
-        instantRange, withOperationField, true, Option.empty(), InternalSchema.getEmptyInternalSchema(), recordType, combiningEngineClassFQN);
+        instantRange, withOperationField, true, Option.empty(), InternalSchema.getEmptyInternalSchema(), recordType, mergeClass);
   }
 
   protected AbstractHoodieLogRecordReader(FileSystem fs, String basePath, List<String> logFilePaths,
                                           Schema readerSchema, String latestInstantTime, boolean readBlocksLazily,
                                           boolean reverseReader, int bufferSize, Option<InstantRange> instantRange,
                                           boolean withOperationField, boolean forceFullScan,
-                                          Option<String> partitionName, InternalSchema internalSchema, HoodieRecordType recordType, String combiningEngineClassFQN) {
+                                          Option<String> partitionName, InternalSchema internalSchema, HoodieRecordType recordType, String mergeClass) {
     this.readerSchema = readerSchema;
     this.latestInstantTime = latestInstantTime;
     this.hoodieTableMetaClient = HoodieTableMetaClient.builder().setConf(fs.getConf()).setBasePath(basePath).build();
@@ -160,7 +160,7 @@ public abstract class AbstractHoodieLogRecordReader {
     HoodieTableConfig tableConfig = this.hoodieTableMetaClient.getTableConfig();
     this.payloadClassFQN = tableConfig.getPayloadClass();
     this.preCombineField = tableConfig.getPreCombineField();
-    this.mergeClassFQN = combiningEngineClassFQN;
+    this.mergeClass = mergeClass;
     this.totalLogFiles.addAndGet(logFilePaths.size());
     this.logFilePaths = logFilePaths;
     this.reverseReader = reverseReader;
@@ -498,8 +498,8 @@ public abstract class AbstractHoodieLogRecordReader {
     return payloadClassFQN;
   }
 
-  protected String getMergeClassFQN() {
-    return mergeClassFQN;
+  protected String getMergeClass() {
+    return mergeClass;
   }
 
   public Option<String> getPartitionName() {
@@ -565,7 +565,7 @@ public abstract class AbstractHoodieLogRecordReader {
       throw new UnsupportedOperationException();
     }
 
-    public Builder withCombiningEngineClassFQN(String combiningEngineClassFQN) {
+    public Builder withMergeClass(String mergeClass) {
       throw new UnsupportedOperationException();
     }
 
