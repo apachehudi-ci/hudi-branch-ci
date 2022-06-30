@@ -91,6 +91,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -128,9 +129,21 @@ public class HoodieWriteConfig extends HoodieConfig {
       .withDocumentation("Payload class used. Override this, if you like to roll your own merge logic, when upserting/inserting. "
           + "This will render any value set for PRECOMBINE_FIELD_OPT_VAL in-effective");
 
+  // Detect HoodieMerge type with HoodieRecordType.
+  public static final Function<HoodieConfig, Option<String>> MERGE_CLASS_INFER_FUNCTION = cfg -> {
+    if (cfg.getStringOrDefault(HoodieWriteConfig.RECORD_TYPE).equals(HoodieRecordType.AVRO.name())) {
+      return Option.of(HoodieAvroRecordMerge.class.getName());
+    } else if (cfg.getStringOrDefault(HoodieWriteConfig.RECORD_TYPE).equals(HoodieRecordType.SPARK.name())) {
+      return Option.of("org.apache.hudi.HoodieSparkRecordMerge");
+    } else {
+      return Option.empty();
+    }
+  };
+
   public static final ConfigProperty<String> MERGE_CLASS_NAME = ConfigProperty
       .key("hoodie.datasource.write.merge.class")
       .defaultValue(HoodieAvroRecordMerge.class.getName())
+      .withInferFunction(MERGE_CLASS_INFER_FUNCTION)
       .withDocumentation("Merge class provide stateless component interface for merging records, and support various HoodieRecord "
           + "types, such as Spark records or Flink records.");
 
