@@ -79,7 +79,6 @@ class TestCOWDataSource extends HoodieClientTestBase {
     HoodieStorageConfig.LOGFILE_DATA_BLOCK_FORMAT.key -> "parquet"
   )
   val avroOpts = Map(
-    DataSourceWriteOptions.MERGE_CLASS_NAME.key -> classOf[HoodieAvroRecordMerge].getName,
     HoodieWriteConfig.RECORD_TYPE.key -> HoodieRecordType.AVRO.name
   )
 
