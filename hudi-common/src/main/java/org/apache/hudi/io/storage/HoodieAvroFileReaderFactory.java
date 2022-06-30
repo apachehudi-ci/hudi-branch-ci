@@ -27,14 +27,14 @@ import java.io.IOException;
 public class HoodieAvroFileReaderFactory extends HoodieFileReaderFactory {
 
   private static class SingletonHolder {
-    private static HoodieAvroFileReaderFactory instance = new HoodieAvroFileReaderFactory();
+    private static final HoodieAvroFileReaderFactory INSTANCE = new HoodieAvroFileReaderFactory();
   }
 
   private HoodieAvroFileReaderFactory() {
   }
 
   public static HoodieFileReaderFactory getFileReaderFactory() {
-    return SingletonHolder.instance;
+    return SingletonHolder.INSTANCE;
   }
 
   protected HoodieFileReader newParquetFileReader(Configuration conf, Path path) {

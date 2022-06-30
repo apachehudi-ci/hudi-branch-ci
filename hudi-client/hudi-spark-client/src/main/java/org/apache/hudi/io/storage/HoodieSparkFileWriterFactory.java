@@ -18,10 +18,6 @@
 
 package org.apache.hudi.io.storage;
 
-import org.apache.avro.Schema;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.Path;
 import org.apache.hudi.HoodieInternalRowUtils;
 import org.apache.hudi.common.bloom.BloomFilter;
 import org.apache.hudi.common.config.HoodieConfig;
@@ -32,19 +28,24 @@ import org.apache.hudi.common.util.Option;
 import org.apache.hudi.exception.HoodieIOException;
 import org.apache.hudi.io.storage.row.HoodieRowParquetConfig;
 import org.apache.hudi.io.storage.row.HoodieRowParquetWriteSupport;
+
+import org.apache.avro.Schema;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 
 import java.io.IOException;
 
 public class HoodieSparkFileWriterFactory extends HoodieFileWriterFactory {
 
-  private static HoodieFileWriterFactory writerFactory;
+  private static class SingletonHolder {
+
+    private static final HoodieSparkFileWriterFactory INSTANCE = new HoodieSparkFileWriterFactory();
+  }
 
   public static HoodieFileWriterFactory getFileWriterFactory() {
-    if (writerFactory == null) {
-      writerFactory = new HoodieSparkFileWriterFactory();
-    }
-    return writerFactory;
+    return HoodieSparkFileWriterFactory.SingletonHolder.INSTANCE;
   }
 
   @Override
@@ -100,14 +101,14 @@ public class HoodieSparkFileWriterFactory extends HoodieFileWriterFactory {
   }
 
   @Override
-  protected HoodieFileWriter newHFileFileWriter(String instantTime, Path path,Configuration conf, HoodieConfig config, Schema schema,
+  protected HoodieFileWriter newHFileFileWriter(String instantTime, Path path, Configuration conf, HoodieConfig config, Schema schema,
       TaskContextSupplier taskContextSupplier) throws IOException {
     throw new HoodieIOException("Not support write to HFile");
   }
 
   @Override
   protected HoodieFileWriter newOrcFileWriter(String instantTime, Path path, Configuration conf, HoodieConfig config, Schema schema,
-       TaskContextSupplier taskContextSupplier) throws IOException {
+      TaskContextSupplier taskContextSupplier) throws IOException {
     throw new HoodieIOException("Not support write to Orc file");
   }
 }
