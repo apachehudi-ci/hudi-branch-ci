@@ -143,6 +143,10 @@ public class HoodieWriteClientExample {
       if (HoodieTableType.valueOf(tableType) == HoodieTableType.MERGE_ON_READ) {
         Option<String> instant = client.scheduleCompaction(Option.empty());
         HoodieWriteMetadata<JavaRDD<WriteStatus>> compactionMetadata = client.compact(instant.get());
+        if (compactionMetadata.isSkipped()) {
+          LOG.warn("Compaction delegate to table management service, do not compact for client!");
+          return;
+        }
         client.commitCompaction(instant.get(), compactionMetadata.getCommitMetadata().get(), Option.empty());
       }
 

@@ -27,6 +27,8 @@ import org.apache.hudi.common.model.HoodieWriteStat;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.table.action.HoodieWriteMetadata;
+
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaRDD;
@@ -51,7 +53,12 @@ public class HoodieSparkClusteringClient<T extends HoodieRecordPayload> extends
   public void cluster(HoodieInstant instant) throws IOException {
     LOG.info("Executing clustering instance " + instant);
     SparkRDDWriteClient<T> writeClient = (SparkRDDWriteClient<T>) clusteringClient;
-    Option<HoodieCommitMetadata> commitMetadata = writeClient.cluster(instant.getTimestamp(), true).getCommitMetadata();
+    HoodieWriteMetadata<JavaRDD<WriteStatus>> clusteringMetadata = writeClient.cluster(instant.getTimestamp());
+    if (clusteringMetadata.isSkipped()) {
+      LOG.warn("Compaction delegate to table management service, do not compact for client!");
+      return;
+    }
+    Option<HoodieCommitMetadata> commitMetadata = clusteringMetadata.getCommitMetadata();
     Stream<HoodieWriteStat> hoodieWriteStatStream = commitMetadata.get().getPartitionToWriteStats().entrySet().stream().flatMap(e ->
             e.getValue().stream());
     long errorsCount = hoodieWriteStatStream.mapToLong(HoodieWriteStat::getTotalWriteErrors).sum();

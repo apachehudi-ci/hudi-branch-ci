@@ -21,7 +21,9 @@ package org.apache.hudi.table.action.clean;
 import org.apache.hudi.avro.model.HoodieActionInstant;
 import org.apache.hudi.avro.model.HoodieCleanFileInfo;
 import org.apache.hudi.avro.model.HoodieCleanerPlan;
+import org.apache.hudi.client.table.manager.HoodieTableManagerClient;
 import org.apache.hudi.common.engine.HoodieEngineContext;
+import org.apache.hudi.common.model.ActionType;
 import org.apache.hudi.common.model.CleanFileInfo;
 import org.apache.hudi.common.model.HoodieCleaningPolicy;
 import org.apache.hudi.common.model.HoodieRecordPayload;
@@ -139,6 +141,7 @@ public class CleanPlanActionExecutor<T extends HoodieRecordPayload, I, K, O> ext
    */
   protected Option<HoodieCleanerPlan> requestClean(String startCleanTime) {
     final HoodieCleanerPlan cleanerPlan = requestClean(context);
+    Option<HoodieCleanerPlan> option = Option.empty();
     if ((cleanerPlan.getFilePathsToBeDeletedPerPartition() != null)
         && !cleanerPlan.getFilePathsToBeDeletedPerPartition().isEmpty()
         && cleanerPlan.getFilePathsToBeDeletedPerPartition().values().stream().mapToInt(List::size).sum() > 0) {
@@ -152,9 +155,19 @@ public class CleanPlanActionExecutor<T extends HoodieRecordPayload, I, K, O> ext
         LOG.error("Got exception when saving cleaner requested file", e);
         throw new HoodieIOException(e.getMessage(), e);
       }
-      return Option.of(cleanerPlan);
+      option = Option.of(cleanerPlan);
     }
-    return Option.empty();
+
+    if (config.isTableManagerIncludeAction(ActionType.clean)) {
+      submitCleanToService();
+    }
+
+    return option;
+  }
+
+  private void submitCleanToService() {
+    HoodieTableManagerClient tableManagerClient = new HoodieTableManagerClient(table.getMetaClient(), config.getTableManagerConfig());
+    tableManagerClient.submitClean();
   }
 
   @Override

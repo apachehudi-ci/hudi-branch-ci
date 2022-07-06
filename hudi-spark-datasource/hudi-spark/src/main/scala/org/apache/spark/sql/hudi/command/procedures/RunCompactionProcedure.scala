@@ -111,8 +111,12 @@ class RunCompactionProcedure extends BaseProcedure with ProcedureBuilder with Sp
           timer.startTimer()
           willCompactionInstants.foreach { compactionInstant =>
             val writeResponse = client.compact(compactionInstant)
-            handleResponse(writeResponse.getCommitMetadata.get())
-            client.commitCompaction(compactionInstant, writeResponse.getCommitMetadata.get(), HOption.empty())
+            if (!writeResponse.isSkipped) {
+              logWarning("Compaction delegate to table management service, do not compact for client!")
+            } else {
+              handleResponse(writeResponse.getCommitMetadata.get())
+              client.commitCompaction(compactionInstant, writeResponse.getCommitMetadata.get(), HOption.empty())
+            }
           }
           logInfo(s"Finish Run compaction at instants: [${willCompactionInstants.mkString(",")}]," +
             s" spend: ${timer.endTimer()}ms")

@@ -24,6 +24,7 @@ import org.apache.hudi.common.config.HoodieConfig;
 import org.apache.hudi.common.model.HoodieCleaningPolicy;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.OverwriteWithLatestAvroPayload;
+import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.exception.HoodieException;
@@ -233,6 +234,12 @@ public class FlinkOptions extends HoodieConfig {
   // ------------------------------------------------------------------------
   //  Write Options
   // ------------------------------------------------------------------------
+  public static final ConfigOption<String> DATABASE_NAME = ConfigOptions
+      .key(HoodieTableConfig.DATABASE_NAME.key())
+      .stringType()
+      .noDefaultValue()
+      .withDescription("Database name to register to Hive metastore");
+
   public static final ConfigOption<String> TABLE_NAME = ConfigOptions
       .key(HoodieWriteConfig.TBL_NAME.key())
       .stringType()

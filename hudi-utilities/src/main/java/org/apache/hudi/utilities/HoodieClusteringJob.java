@@ -19,8 +19,8 @@
 package org.apache.hudi.utilities;
 
 import org.apache.hudi.client.SparkRDDWriteClient;
+import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.common.config.TypedProperties;
-import org.apache.hudi.common.model.HoodieCommitMetadata;
 import org.apache.hudi.common.model.HoodieRecordPayload;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
@@ -30,12 +30,14 @@ import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.StringUtils;
 import org.apache.hudi.exception.HoodieClusteringException;
 import org.apache.hudi.table.HoodieSparkTable;
+import org.apache.hudi.table.action.HoodieWriteMetadata;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import org.apache.hadoop.fs.Path;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
+import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.jetbrains.annotations.TestOnly;
 
@@ -196,9 +198,12 @@ public class HoodieClusteringJob {
           throw new HoodieClusteringException("There is no scheduled clustering in the table.");
         }
       }
-      Option<HoodieCommitMetadata> commitMetadata = client.cluster(cfg.clusteringInstantTime, true).getCommitMetadata();
-
-      return UtilHelpers.handleErrors(commitMetadata.get(), cfg.clusteringInstantTime);
+      HoodieWriteMetadata<JavaRDD<WriteStatus>> clusteringMetadata = client.cluster(cfg.clusteringInstantTime);
+      if (clusteringMetadata.isSkipped()) {
+        LOG.warn("Compaction delegate to table management service, do not compact for client!");
+        return 0;
+      }
+      return UtilHelpers.handleErrors(clusteringMetadata.getCommitMetadata().get(), cfg.clusteringInstantTime);
     }
   }
 
@@ -252,8 +257,13 @@ public class HoodieClusteringJob {
 
       LOG.info("The schedule instant time is " + instantTime.get());
       LOG.info("Step 2: Do cluster");
-      Option<HoodieCommitMetadata> metadata = client.cluster(instantTime.get(), true).getCommitMetadata();
-      return UtilHelpers.handleErrors(metadata.get(), instantTime.get());
+
+      HoodieWriteMetadata<JavaRDD<WriteStatus>> clusteringMetadata = client.cluster(instantTime.get());
+      if (clusteringMetadata.isSkipped()) {
+        LOG.warn("Compaction delegate to table management service, do not compact for client!");
+        return 0;
+      }
+      return UtilHelpers.handleErrors(clusteringMetadata.getCommitMetadata().get(), instantTime.get());
     }
   }
 }

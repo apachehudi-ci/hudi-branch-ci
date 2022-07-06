@@ -37,6 +37,8 @@ public class HoodieWriteMetadata<O> {
 
   // Will be set when auto-commit happens
   private boolean isCommitted;
+  // Will be set when table management service enable
+  private boolean isSkipped;
   private Option<HoodieCommitMetadata> commitMetadata = Option.empty();
   private Option<List<HoodieWriteStat>> writeStats = Option.empty();
   private Option<Duration> indexUpdateDuration = Option.empty();
@@ -44,6 +46,10 @@ public class HoodieWriteMetadata<O> {
   private Option<Map<String, List<String>>> partitionToReplaceFileIds = Option.empty();
 
   public HoodieWriteMetadata() {
+  }
+
+  public HoodieWriteMetadata(boolean isSkipped) {
+    this.isSkipped = isSkipped;
   }
 
   /**
@@ -60,6 +66,7 @@ public class HoodieWriteMetadata<O> {
       newMetadataInstance.setIndexLookupDuration(indexLookupDuration.get());
     }
     newMetadataInstance.setCommitted(isCommitted);
+    newMetadataInstance.setSkipped(isSkipped);
     newMetadataInstance.setCommitMetadata(commitMetadata);
     if (writeStats.isPresent()) {
       newMetadataInstance.setWriteStats(writeStats.get());
@@ -114,6 +121,14 @@ public class HoodieWriteMetadata<O> {
 
   public void setCommitted(boolean committed) {
     isCommitted = committed;
+  }
+
+  public boolean isSkipped() {
+    return isSkipped;
+  }
+
+  public void setSkipped(boolean isSkipped) {
+    this.isSkipped = isSkipped;
   }
 
   public Option<List<HoodieWriteStat>> getWriteStats() {

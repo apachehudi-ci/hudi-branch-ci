@@ -326,7 +326,7 @@ public class DeltaSync implements Serializable {
       if (cfg.retryLastPendingInlineClusteringJob && getHoodieClientConfig(this.schemaProvider).inlineClusteringEnabled()) {
         Option<String> pendingClusteringInstant = getLastPendingClusteringInstant(allCommitsTimelineOpt);
         if (pendingClusteringInstant.isPresent()) {
-          writeClient.cluster(pendingClusteringInstant.get(), true);
+          writeClient.cluster(pendingClusteringInstant.get());
         }
       }
 

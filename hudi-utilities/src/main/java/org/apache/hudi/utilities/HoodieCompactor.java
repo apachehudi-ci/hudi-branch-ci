@@ -270,6 +270,10 @@ public class HoodieCompactor {
         }
       }
       HoodieWriteMetadata<JavaRDD<WriteStatus>> compactionMetadata = client.compact(cfg.compactionInstantTime);
+      if (compactionMetadata.isSkipped()) {
+        LOG.warn("Compaction delegate to table management service, do not compact for client!");
+        return 0;
+      }
       return UtilHelpers.handleErrors(compactionMetadata.getCommitMetadata().get(), cfg.compactionInstantTime);
     }
   }

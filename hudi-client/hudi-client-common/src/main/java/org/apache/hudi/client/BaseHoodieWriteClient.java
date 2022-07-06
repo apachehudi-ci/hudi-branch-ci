@@ -40,6 +40,7 @@ import org.apache.hudi.client.transaction.TransactionManager;
 import org.apache.hudi.client.utils.TransactionUtils;
 import org.apache.hudi.common.HoodiePendingRollbackInfo;
 import org.apache.hudi.common.engine.HoodieEngineContext;
+import org.apache.hudi.common.model.ActionType;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
 import org.apache.hudi.common.model.HoodieFailedWritesCleaningPolicy;
 import org.apache.hudi.common.model.HoodieKey;
@@ -582,6 +583,9 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
   }
 
   protected void runAnyPendingCompactions(HoodieTable table) {
+    if (!delegateToTableManagerService(config, ActionType.compaction)) {
+      return;
+    }
     table.getActiveTimeline().getWriteTimeline().filterPendingCompactionTimeline().getInstants()
         .forEach(instant -> {
           LOG.info("Running previously failed inflight compaction at instant " + instant);
@@ -590,6 +594,9 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
   }
 
   protected void runAnyPendingClustering(HoodieTable table) {
+    if (!delegateToTableManagerService(config, ActionType.replacecommit)) {
+      return;
+    }
     table.getActiveTimeline().filterPendingReplaceTimeline().getInstants().forEach(instant -> {
       Option<Pair<HoodieInstant, HoodieClusteringPlan>> instantPlan = ClusteringUtils.getClusteringPlan(table.getMetaClient(), instant);
       if (instantPlan.isPresent()) {
@@ -865,6 +872,9 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
         table.getMetaClient().reloadActiveTimeline();
       }
 
+      if (delegateToTableManagerService(config, ActionType.clean)) {
+        return null;
+      }
       metadata = table.clean(context, cleanInstantTime, skipLocking);
       if (timerContext != null && metadata != null) {
         long durationMs = metrics.getDurationInMs(timerContext.stop());
@@ -1052,13 +1062,29 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
   }
 
   /**
+   * Performs Clustering for the workload stored in instant-time.
+   *
+   * @param clusteringInstantTime Clustering Instant Time
+   * @return Collection of WriteStatus to inspect errors and counts
+   */
+  public HoodieWriteMetadata<O> cluster(String clusteringInstantTime) {
+    if (!delegateToTableManagerService(config, ActionType.replacecommit)) {
+      return cluster(clusteringInstantTime, true);
+    }
+    return new HoodieWriteMetadata<>(true);
+  }
+
+  /**
    * Performs Compaction for the workload stored in instant-time.
    *
    * @param compactionInstantTime Compaction Instant Time
    * @return Collection of WriteStatus to inspect errors and counts
    */
   public HoodieWriteMetadata<O> compact(String compactionInstantTime) {
-    return compact(compactionInstantTime, config.shouldAutoCommit());
+    if (!delegateToTableManagerService(config, ActionType.compaction)) {
+      return compact(compactionInstantTime, config.shouldAutoCommit());
+    }
+    return new HoodieWriteMetadata<>(true);
   }
 
   /**
@@ -1238,7 +1264,9 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
     Option<String> compactionInstantTimeOpt = inlineScheduleCompaction(extraMetadata);
     compactionInstantTimeOpt.ifPresent(compactInstantTime -> {
       // inline compaction should auto commit as the user is never given control
-      compact(compactInstantTime, true);
+      if (!delegateToTableManagerService(config, ActionType.compaction)) {
+        compact(compactInstantTime, true);
+      }
     });
     return compactionInstantTimeOpt;
   }
@@ -1365,7 +1393,9 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
     Option<String> clusteringInstantOpt = inlineScheduleClustering(extraMetadata);
     clusteringInstantOpt.ifPresent(clusteringInstant -> {
       // inline cluster should auto commit as the user is never given control
-      cluster(clusteringInstant, true);
+      if (!delegateToTableManagerService(config, ActionType.replacecommit)) {
+        cluster(clusteringInstant, true);
+      }
     });
     return clusteringInstantOpt;
   }
