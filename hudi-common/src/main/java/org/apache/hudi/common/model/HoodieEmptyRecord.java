@@ -58,6 +58,11 @@ public class HoodieEmptyRecord<T> extends HoodieRecord<T> {
   }
 
   @Override
+  public T getData() {
+    return null;
+  }
+
+  @Override
   public HoodieRecord<T> newInstance() {
     return this;
   }

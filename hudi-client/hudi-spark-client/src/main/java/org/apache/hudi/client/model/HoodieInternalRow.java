@@ -27,6 +27,8 @@ import org.apache.spark.sql.types.Decimal;
 import org.apache.spark.unsafe.types.CalendarInterval;
 import org.apache.spark.unsafe.types.UTF8String;
 
+import java.util.List;
+
 /**
  * Internal Row implementation for Hoodie Row. It wraps an {@link InternalRow} and keeps meta columns locally. But the {@link InternalRow}
  * does include the meta columns as well just that {@link HoodieInternalRow} will intercept queries for meta columns and serve from its
@@ -39,7 +41,10 @@ public class HoodieInternalRow extends InternalRow {
   private String recordKey;
   private String partitionPath;
   private String fileName;
-  private InternalRow row;
+  private String operation = null;
+
+  protected List<String> currentMetaColumn;
+  protected InternalRow row;
 
   public HoodieInternalRow(String commitTime, String commitSeqNumber, String recordKey, String partitionPath,
       String fileName, InternalRow row) {
@@ -48,6 +53,34 @@ public class HoodieInternalRow extends InternalRow {
     this.recordKey = recordKey;
     this.partitionPath = partitionPath;
     this.fileName = fileName;
+    this.row = row;
+    this.currentMetaColumn = HoodieRecord.HOODIE_META_COLUMNS;
+  }
+
+  public HoodieInternalRow(String commitTime, String commitSeqNumber, String recordKey, String partitionPath,
+      String fileName, String operation, InternalRow row) {
+    this.commitTime = commitTime;
+    this.commitSeqNumber = commitSeqNumber;
+    this.recordKey = recordKey;
+    this.partitionPath = partitionPath;
+    this.fileName = fileName;
+    this.row = row;
+    this.operation = operation;
+    this.currentMetaColumn = HoodieRecord.HOODIE_META_COLUMNS_WITH_OPERATION;
+  }
+
+  public HoodieInternalRow(InternalRow row, boolean hasOperation) {
+    this.commitTime = getMetaColumnOrNull(row, HoodieRecord.COMMIT_TIME_METADATA_FIELD);
+    this.commitSeqNumber = getMetaColumnOrNull(row, HoodieRecord.COMMIT_SEQNO_METADATA_FIELD);
+    this.recordKey = getMetaColumnOrNull(row, HoodieRecord.RECORD_KEY_METADATA_FIELD);
+    this.partitionPath = getMetaColumnOrNull(row, HoodieRecord.PARTITION_PATH_METADATA_FIELD);
+    this.fileName = getMetaColumnOrNull(row, HoodieRecord.FILENAME_METADATA_FIELD);
+    if (hasOperation) {
+      this.currentMetaColumn = HoodieRecord.HOODIE_META_COLUMNS_WITH_OPERATION;
+      this.operation = getMetaColumnOrNull(row, HoodieRecord.OPERATION_METADATA_FIELD);
+    } else {
+      this.currentMetaColumn = HoodieRecord.HOODIE_META_COLUMNS;
+    }
     this.row = row;
   }
 
@@ -58,7 +91,7 @@ public class HoodieInternalRow extends InternalRow {
 
   @Override
   public void setNullAt(int i) {
-    if (i < HoodieRecord.HOODIE_META_COLUMNS.size()) {
+    if (i < currentMetaColumn.size()) {
       switch (i) {
         case 0: {
           this.commitTime = null;
@@ -80,6 +113,10 @@ public class HoodieInternalRow extends InternalRow {
           this.fileName = null;
           break;
         }
+        case 5: {
+          this.operation = null;
+          break;
+        }
         default: throw new IllegalArgumentException("Not expected");
       }
     } else {
@@ -89,7 +126,7 @@ public class HoodieInternalRow extends InternalRow {
 
   @Override
   public void update(int i, Object value) {
-    if (i < HoodieRecord.HOODIE_META_COLUMNS.size()) {
+    if (i < currentMetaColumn.size()) {
       switch (i) {
         case 0: {
           this.commitTime = value.toString();
@@ -109,6 +146,10 @@ public class HoodieInternalRow extends InternalRow {
         }
         case 4: {
           this.fileName = value.toString();
+          break;
+        }
+        case 5: {
+          this.operation = value.toString();
           break;
         }
         default: throw new IllegalArgumentException("Not expected");
@@ -135,13 +176,16 @@ public class HoodieInternalRow extends InternalRow {
       case 4: {
         return fileName;
       }
+      case 5: {
+        return operation;
+      }
       default: throw new IllegalArgumentException("Not expected");
     }
   }
 
   @Override
   public boolean isNullAt(int ordinal) {
-    if (ordinal < HoodieRecord.HOODIE_META_COLUMNS.size()) {
+    if (ordinal < currentMetaColumn.size()) {
       return null == getMetaColumnVal(ordinal);
     }
     return row.isNullAt(ordinal);
@@ -189,7 +233,7 @@ public class HoodieInternalRow extends InternalRow {
 
   @Override
   public UTF8String getUTF8String(int ordinal) {
-    if (ordinal < HoodieRecord.HOODIE_META_COLUMNS.size()) {
+    if (ordinal < currentMetaColumn.size()) {
       return UTF8String.fromBytes(getMetaColumnVal(ordinal).getBytes());
     }
     return row.getUTF8String(ordinal);
@@ -197,7 +241,7 @@ public class HoodieInternalRow extends InternalRow {
 
   @Override
   public String getString(int ordinal) {
-    if (ordinal < HoodieRecord.HOODIE_META_COLUMNS.size()) {
+    if (ordinal < currentMetaColumn.size()) {
       return new String(getMetaColumnVal(ordinal).getBytes());
     }
     return row.getString(ordinal);
@@ -230,7 +274,7 @@ public class HoodieInternalRow extends InternalRow {
 
   @Override
   public Object get(int ordinal, DataType dataType) {
-    if (ordinal < HoodieRecord.HOODIE_META_COLUMNS.size()) {
+    if (ordinal < currentMetaColumn.size()) {
       return UTF8String.fromBytes(getMetaColumnVal(ordinal).getBytes());
     }
     return row.get(ordinal, dataType);
@@ -238,6 +282,19 @@ public class HoodieInternalRow extends InternalRow {
 
   @Override
   public InternalRow copy() {
-    return new HoodieInternalRow(commitTime, commitSeqNumber, recordKey, partitionPath, fileName, row.copy());
+    if (currentMetaColumn.size() == HoodieRecord.HOODIE_META_COLUMNS.size()) {
+      return new HoodieInternalRow(commitTime, commitSeqNumber, recordKey, partitionPath, fileName, row.copy());
+    } else {
+      return new HoodieInternalRow(commitTime, commitSeqNumber, recordKey, partitionPath, fileName, operation, row.copy());
+    }
+  }
+
+  protected static String getMetaColumnOrNull(InternalRow row, String column) {
+    Integer index = HoodieRecord.HOODIE_META_COLUMNS_NAME_TO_POS_WITH_OPERATION.get(column);
+    if (row.isNullAt(index)) {
+      return null;
+    } else {
+      return row.getString(index);
+    } 
   }
 }

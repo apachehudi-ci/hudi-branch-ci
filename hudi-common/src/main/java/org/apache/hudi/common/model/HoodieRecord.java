@@ -100,6 +100,10 @@ public abstract class HoodieRecord<T> implements Serializable {
       IntStream.range(0, HOODIE_META_COLUMNS.size()).mapToObj(idx -> Pair.of(HOODIE_META_COLUMNS.get(idx), idx))
           .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
 
+  public static final Map<String, Integer> HOODIE_META_COLUMNS_NAME_TO_POS_WITH_OPERATION =
+      IntStream.range(0, HOODIE_META_COLUMNS_WITH_OPERATION.size()).mapToObj(idx -> Pair.of(HOODIE_META_COLUMNS_WITH_OPERATION.get(idx), idx))
+          .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+
   /**
    * Identifies the record across the table.
    */
