@@ -403,7 +403,7 @@ abstract class HoodieBaseRelation(val sqlContext: SQLContext,
       usesVirtualKeys = !tableConfig.populateMetaFields(),
       recordPayloadClassName = tableConfig.getPayloadClass,
       metadataConfig = fileIndex.metadataConfig,
-      mergeClass = tableConfig.getMergeClass,
+      mergeClass,
       recordType = HoodieRecordType.valueOf(optParams.getOrElse(HoodieWriteConfig.RECORD_TYPE.key(), HoodieWriteConfig.RECORD_TYPE.defaultValue()))
     )
   }

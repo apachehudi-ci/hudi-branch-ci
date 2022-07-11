@@ -285,7 +285,7 @@ public class FlinkOptions extends HoodieConfig {
           + "This will render any value set for the option in-effective");
 
   public static final ConfigOption<String> MERGE_CLASS_NAME = ConfigOptions
-      .key("write.merge.class")
+      .key("merge.class")
       .stringType()
       .defaultValue(HoodieAvroRecordMerge.class.getName())
       .withDescription("Merge class provide stateless component interface for merging records, and support various HoodieRecord "
