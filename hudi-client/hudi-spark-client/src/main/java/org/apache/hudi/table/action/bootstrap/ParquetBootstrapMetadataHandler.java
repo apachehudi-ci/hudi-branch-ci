@@ -20,7 +20,6 @@ package org.apache.hudi.table.action.bootstrap;
 
 import org.apache.hudi.avro.HoodieAvroUtils;
 import org.apache.hudi.avro.model.HoodieFileStatus;
-import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.util.Option;
@@ -72,7 +71,7 @@ class ParquetBootstrapMetadataHandler extends BaseBootstrapMetadataHandler {
           reader.getRecordIterator(), new BootstrapRecordConsumer(bootstrapHandle), inp -> {
         try {
           String recKey = inp.getRecordKey(Option.of(keyGenerator));
-          HoodieRecord hoodieRecord = inp.rewriteRecord(reader.getSchema(), HoodieAvroUtils.RECORD_KEY_SCHEMA, new TypedProperties());
+          HoodieRecord hoodieRecord = inp.rewriteRecord(reader.getSchema(), HoodieAvroUtils.RECORD_KEY_SCHEMA);
           return hoodieRecord
               .overrideMetadataFieldValue(HoodieAvroUtils.RECORD_KEY_SCHEMA, new Properties(), 0, recKey)
               .newInstance(new HoodieKey(recKey, partitionPath));

@@ -88,6 +88,7 @@ public class HoodieDeleteHelper<T, R> extends
 
       HoodieData dedupedRecords;
       if (config.getRecordType() == HoodieRecordType.AVRO) {
+        // For BWC, will remove when HoodieRecordPayload removed
         dedupedRecords =
             dedupedKeys.map(key -> new HoodieAvroRecord(key, new EmptyHoodieRecordPayload()));
       } else {

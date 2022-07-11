@@ -21,7 +21,6 @@ package org.apache.hudi.table.action.commit;
 import org.apache.avro.SchemaCompatibility;
 
 import org.apache.hudi.client.WriteStatus;
-import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.data.HoodieData;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieBaseFile;
@@ -80,11 +79,16 @@ public class HoodieMergeHelper<T> extends
     Configuration cfgForHoodieFile = new Configuration(table.getHadoopConf());
     HoodieBaseFile baseFile = mergeHandle.baseFileForMerge();
 
+    // Support schema evolution
     Schema readSchema;
+    // These two schema used to replace gWriter and gReader.
+    // In previous logic, avro record is serialized by gWriter and then is deserialized by gReader.
+    // Now we converge this logic in record#rewrite.
     Schema readerSchema;
     Schema writerSchema;
+    HoodieFileReader reader = HoodieFileReaderFactory.getReaderFactory(table.getConfig().getRecordType()).getFileReader(cfgForHoodieFile, mergeHandle.getOldFilePath());
     if (externalSchemaTransformation || baseFile.getBootstrapBaseFile().isPresent()) {
-      readSchema = HoodieFileReaderFactory.getReaderFactory(table.getConfig().getRecordType()).getFileReader(table.getHadoopConf(), mergeHandle.getOldFilePath()).getSchema();
+      readSchema = reader.getSchema();
       writerSchema = readSchema;
       readerSchema = mergeHandle.getWriterSchemaWithMetaFields();
     } else {
@@ -94,8 +98,6 @@ public class HoodieMergeHelper<T> extends
     }
 
     BoundedInMemoryExecutor<GenericRecord, GenericRecord, Void> wrapper = null;
-    HoodieFileReader reader = HoodieFileReaderFactory.getReaderFactory(table.getConfig().getRecordType()).getFileReader(cfgForHoodieFile, mergeHandle.getOldFilePath());
-
     Option<InternalSchema> querySchemaOpt = SerDeHelper.fromJson(table.getConfig().getInternalSchema());
     boolean needToReWriteRecord = false;
     Map<String, String> renameCols = new HashMap<>();
@@ -143,9 +145,9 @@ public class HoodieMergeHelper<T> extends
           return record;
         }
         try {
-          return ((HoodieRecord) record).rewriteRecord(writerSchema, readerSchema, new TypedProperties());
+          return ((HoodieRecord) record).rewriteRecord(writerSchema, readerSchema);
         } catch (IOException e) {
-          throw new HoodieException(e);
+          throw new HoodieException(String.format("Failed to rewrite record. WriterSchema: %s; ReaderSchema: %s", writerSchema, readerSchema), e);
         }
       }, table.getPreExecuteRunnable());
       wrapper.execute();

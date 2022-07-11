@@ -134,7 +134,7 @@ public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
 
   @Override
   public Object getRecordColumnValues(String[] columns, Schema schema, boolean consistentLogicalTimestampEnabled) {
-    return HoodieSparkRecordUtils.getRecordColumnValues(this, columns, structType, consistentLogicalTimestampEnabled);
+    return HoodieSparkRecordUtils.getRecordColumnValues(data, columns, structType, consistentLogicalTimestampEnabled);
   }
 
   @Override
@@ -146,14 +146,14 @@ public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
   }
 
   @Override
-  public HoodieRecord rewriteRecord(Schema recordSchema, Schema targetSchema, TypedProperties props) throws IOException {
+  public HoodieRecord rewriteRecord(Schema recordSchema, Schema targetSchema) throws IOException {
     StructType targetStructType = HoodieInternalRowUtils.getCachedSchema(targetSchema);
     InternalRow rewriteRow = HoodieInternalRowUtils.rewriteRecord(data, structType, targetStructType);
     return new HoodieSparkRecord(getKey(), rewriteRow, targetStructType, getOperation());
   }
 
   @Override
-  public HoodieRecord rewriteRecord(Schema recordSchema, Properties prop, boolean schemaOnReadEnabled, Schema writeSchemaWithMetaFields) throws IOException {
+  public HoodieRecord rewriteRecord(Schema recordSchema, Properties props, boolean schemaOnReadEnabled, Schema writeSchemaWithMetaFields) throws IOException {
     StructType writeSchemaWithMetaFieldsStructType = HoodieInternalRowUtils.getCachedSchema(writeSchemaWithMetaFields);
     InternalRow rewriteRow = schemaOnReadEnabled ? HoodieInternalRowUtils.rewriteRecordWithNewSchema(data, structType, writeSchemaWithMetaFieldsStructType, new HashMap<>())
         : HoodieInternalRowUtils.rewriteRecord(data, structType, writeSchemaWithMetaFieldsStructType);
@@ -219,18 +219,20 @@ public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
   @Override
   public HoodieRecord transform(Schema schema, Properties prop, boolean useKeygen) {
     StructType structType = HoodieInternalRowUtils.getCachedSchema(schema);
-    Option<SparkKeyGeneratorInterface> keyGeneratorOpt = Option.empty();
+    String key;
+    String partition;
     if (useKeygen && !Boolean.parseBoolean(prop.getOrDefault(POPULATE_META_FIELDS.key(), POPULATE_META_FIELDS.defaultValue().toString()).toString())) {
       try {
-        keyGeneratorOpt = Option.of((SparkKeyGeneratorInterface) HoodieSparkKeyGeneratorFactory.createKeyGenerator(new TypedProperties(prop)));
+        SparkKeyGeneratorInterface keyGeneratorOpt = (SparkKeyGeneratorInterface) HoodieSparkKeyGeneratorFactory.createKeyGenerator(new TypedProperties(prop));
+        key = keyGeneratorOpt.getRecordKey(data, structType);
+        partition = keyGeneratorOpt.getPartitionPath(data, structType);
       } catch (IOException e) {
         throw new HoodieException("Only SparkKeyGeneratorInterface are supported when meta columns are disabled ", e);
       }
+    } else {
+      key = data.get(HoodieMetadataField.RECORD_KEY_METADATA_FIELD.ordinal(), StringType).toString();
+      partition = data.get(HoodieMetadataField.PARTITION_PATH_METADATA_FIELD.ordinal(), StringType).toString();
     }
-    String key = keyGeneratorOpt.isPresent() ? keyGeneratorOpt.get().getRecordKey(data, structType)
-        : data.get(HoodieMetadataField.RECORD_KEY_METADATA_FIELD.ordinal(), StringType).toString();
-    String partition = keyGeneratorOpt.isPresent() ? keyGeneratorOpt.get().getPartitionPath(data, structType)
-        : data.get(HoodieMetadataField.PARTITION_PATH_METADATA_FIELD.ordinal(), StringType).toString();
     this.key = new HoodieKey(key, partition);
 
     return this;
@@ -256,7 +258,7 @@ public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
   @Override
   public boolean shouldIgnore(Schema schema, Properties prop) throws IOException {
     // TODO SENTINEL should refactor SENTINEL without Avro(GenericRecord)
-    if (null != data && data.equals(SENTINEL)) {
+    if (data != null && data.equals(SENTINEL)) {
       return true;
     } else {
       return false;
@@ -266,5 +268,9 @@ public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
   @Override
   public Option<IndexedRecord> toIndexedRecord(Schema schema, Properties prop) throws IOException {
     return Option.of(HoodieInternalRowUtils.row2Avro(schema, data));
+  }
+
+  public StructType getStructType() {
+    return structType;
   }
 }

@@ -18,7 +18,6 @@
 
 package org.apache.hudi.common.model;
 
-import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.keygen.BaseKeyGenerator;
@@ -99,37 +98,37 @@ public class HoodieEmptyRecord<T> extends HoodieRecord<T> {
   }
 
   @Override
-  public HoodieRecord rewriteRecord(Schema recordSchema, Schema targetSchema, TypedProperties props) throws IOException {
+  public HoodieRecord rewriteRecord(Schema recordSchema, Schema targetSchema) throws IOException {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public HoodieRecord rewriteRecord(Schema recordSchema, Properties prop, boolean schemaOnReadEnabled, Schema writeSchemaWithMetaFields) throws IOException {
+  public HoodieRecord rewriteRecord(Schema recordSchema, Properties props, boolean schemaOnReadEnabled, Schema writeSchemaWithMetaFields) throws IOException {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public HoodieRecord rewriteRecordWithMetadata(Schema recordSchema, Properties prop, boolean schemaOnReadEnabled, Schema writeSchemaWithMetaFields, String fileName) throws IOException {
+  public HoodieRecord rewriteRecordWithMetadata(Schema recordSchema, Properties props, boolean schemaOnReadEnabled, Schema writeSchemaWithMetaFields, String fileName) throws IOException {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public HoodieRecord rewriteRecordWithNewSchema(Schema recordSchema, Properties prop, Schema newSchema, Map<String, String> renameCols) throws IOException {
+  public HoodieRecord rewriteRecordWithNewSchema(Schema recordSchema, Properties props, Schema newSchema, Map<String, String> renameCols) throws IOException {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public HoodieRecord rewriteRecordWithNewSchema(Schema recordSchema, Properties prop, Schema newSchema) throws IOException {
+  public HoodieRecord rewriteRecordWithNewSchema(Schema recordSchema, Properties props, Schema newSchema) throws IOException {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public HoodieRecord overrideMetadataFieldValue(Schema recordSchema, Properties prop, int pos, String newValue) throws IOException {
+  public HoodieRecord overrideMetadataFieldValue(Schema recordSchema, Properties props, int pos, String newValue) throws IOException {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public HoodieRecord addMetadataValues(Schema recordSchema, Properties prop, Map<HoodieMetadataField, String> metadataValues) throws IOException {
+  public HoodieRecord addMetadataValues(Schema recordSchema, Properties props, Map<HoodieMetadataField, String> metadataValues) throws IOException {
     throw new UnsupportedOperationException();
   }
 
@@ -139,28 +138,28 @@ public class HoodieEmptyRecord<T> extends HoodieRecord<T> {
   }
 
   @Override
-  public boolean isPresent(Schema schema, Properties prop) throws IOException {
+  public boolean isPresent(Schema schema, Properties props) throws IOException {
     return false;
   }
 
   @Override
-  public boolean shouldIgnore(Schema schema, Properties prop) throws IOException {
+  public boolean shouldIgnore(Schema schema, Properties props) throws IOException {
     return false;
   }
 
   @Override
-  public HoodieRecord expansion(Schema schema, Properties prop, String payloadClass, String preCombineField, Option<Pair<String, String>> simpleKeyGenFieldsOpt, Boolean withOperation,
+  public HoodieRecord expansion(Schema schema, Properties props, String payloadClass, String preCombineField, Option<Pair<String, String>> simpleKeyGenFieldsOpt, Boolean withOperation,
       Option<String> partitionNameOp, Option<Boolean> populateMetaFieldsOp) throws IOException {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public HoodieRecord transform(Schema schema, Properties prop, boolean useKeyGen) {
+  public HoodieRecord transform(Schema schema, Properties props, boolean useKeyGen) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public Option<IndexedRecord> toIndexedRecord(Schema schema, Properties prop) throws IOException {
+  public Option<IndexedRecord> toIndexedRecord(Schema schema, Properties props) throws IOException {
     return Option.empty();
   }
 }

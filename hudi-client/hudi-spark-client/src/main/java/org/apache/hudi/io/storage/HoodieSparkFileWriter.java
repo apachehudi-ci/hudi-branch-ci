@@ -27,6 +27,12 @@ import org.apache.spark.sql.catalyst.InternalRow;
 import java.io.IOException;
 import java.util.Properties;
 
+import static org.apache.hudi.common.model.HoodieRecord.HoodieMetadataField.COMMIT_SEQNO_METADATA_FIELD;
+import static org.apache.hudi.common.model.HoodieRecord.HoodieMetadataField.COMMIT_TIME_METADATA_FIELD;
+import static org.apache.hudi.common.model.HoodieRecord.HoodieMetadataField.FILENAME_METADATA_FIELD;
+import static org.apache.hudi.common.model.HoodieRecord.HoodieMetadataField.PARTITION_PATH_METADATA_FIELD;
+import static org.apache.hudi.common.model.HoodieRecord.HoodieMetadataField.RECORD_KEY_METADATA_FIELD;
+
 public interface HoodieSparkFileWriter extends HoodieFileWriter {
   boolean canWrite();
 
@@ -48,15 +54,11 @@ public interface HoodieSparkFileWriter extends HoodieFileWriter {
 
   default InternalRow prepRecordWithMetadata(HoodieKey key, InternalRow row, String instantTime, Integer partitionId, long recordIndex, String fileName)  {
     String seqId = HoodieRecord.generateSequenceId(instantTime, partitionId, recordIndex);
-    row.update(HoodieRecord.HoodieMetadataField.COMMIT_TIME_METADATA_FIELD.ordinal(), CatalystTypeConverters.convertToCatalyst(instantTime));
-    row.update(HoodieRecord.HoodieMetadataField.COMMIT_SEQNO_METADATA_FIELD.ordinal(), CatalystTypeConverters.convertToCatalyst(seqId));
-    row.update(HoodieRecord.HoodieMetadataField.RECORD_KEY_METADATA_FIELD.ordinal(), CatalystTypeConverters.convertToCatalyst(key.getRecordKey()));
-    row.update(HoodieRecord.HoodieMetadataField.PARTITION_PATH_METADATA_FIELD.ordinal(), CatalystTypeConverters.convertToCatalyst(key.getPartitionPath()));
-    row.update(HoodieRecord.HoodieMetadataField.FILENAME_METADATA_FIELD.ordinal(), CatalystTypeConverters.convertToCatalyst(fileName));
+    row.update(COMMIT_TIME_METADATA_FIELD.ordinal(), CatalystTypeConverters.convertToCatalyst(instantTime));
+    row.update(COMMIT_SEQNO_METADATA_FIELD.ordinal(), CatalystTypeConverters.convertToCatalyst(seqId));
+    row.update(RECORD_KEY_METADATA_FIELD.ordinal(), CatalystTypeConverters.convertToCatalyst(key.getRecordKey()));
+    row.update(PARTITION_PATH_METADATA_FIELD.ordinal(), CatalystTypeConverters.convertToCatalyst(key.getPartitionPath()));
+    row.update(FILENAME_METADATA_FIELD.ordinal(), CatalystTypeConverters.convertToCatalyst(fileName));
     return row;
-    // Object[] metadata = {instantTime, seqId, key.getRecordKey(), key.getPartitionPath(), fileName};
-    // InternalRow metadataRow = new GenericInternalRow(Arrays.stream(metadata)
-    //    .map(o -> CatalystTypeConverters.convertToCatalyst(o)).toArray());
-    // return new JoinedRow(metadataRow, row);
   }
 }

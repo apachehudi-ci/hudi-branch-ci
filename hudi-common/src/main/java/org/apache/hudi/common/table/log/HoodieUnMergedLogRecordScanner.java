@@ -23,6 +23,7 @@ import org.apache.hudi.common.model.HoodieAvroRecordMerge;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.common.util.ValidationUtils;
 import org.apache.hudi.metadata.HoodieTableMetadata;
 
 import org.apache.avro.Schema;
@@ -155,8 +156,8 @@ public class HoodieUnMergedLogRecordScanner extends AbstractHoodieLogRecordReade
 
     @Override
     public HoodieUnMergedLogRecordScanner build() {
-      assert recordType != null;
-      assert mergeClass != null;
+      ValidationUtils.checkArgument(recordType != null);
+      ValidationUtils.checkArgument(mergeClass != null);
 
       if (HoodieTableMetadata.isMetadataTable(basePath)) {
         recordType = HoodieRecordType.AVRO;

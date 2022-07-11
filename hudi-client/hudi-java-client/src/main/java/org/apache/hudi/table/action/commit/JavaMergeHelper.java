@@ -19,7 +19,6 @@
 package org.apache.hudi.table.action.commit;
 
 import org.apache.hudi.client.WriteStatus;
-import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.model.HoodieBaseFile;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
@@ -62,11 +61,16 @@ public class JavaMergeHelper<T> extends BaseMergeHelper<T, List<HoodieRecord<T>>
     HoodieMergeHandle<T, List<HoodieRecord<T>>, List<HoodieKey>, List<WriteStatus>> mergeHandle = upsertHandle;
     HoodieBaseFile baseFile = mergeHandle.baseFileForMerge();
 
+    // Support schema evolution
+    Schema readSchema;
+    // These two schema used to replace gWriter and gReader.
+    // In previous logic, avro record is serialized by gWriter and then is deserialized by gReader.
+    // Now we converge this logic in record#rewrite.
     Schema readerSchema;
     Schema writerSchema;
-    Schema readSchema;
+    HoodieFileReader reader = HoodieFileReaderFactory.getReaderFactory(table.getConfig().getRecordType()).getFileReader(cfgForHoodieFile, mergeHandle.getOldFilePath());
     if (externalSchemaTransformation || baseFile.getBootstrapBaseFile().isPresent()) {
-      readSchema = HoodieFileReaderFactory.getReaderFactory(table.getConfig().getRecordType()).getFileReader(table.getHadoopConf(), mergeHandle.getOldFilePath()).getSchema();
+      readSchema = reader.getSchema();
       writerSchema = readSchema;
       readerSchema = mergeHandle.getWriterSchemaWithMetaFields();
     } else {
@@ -76,7 +80,6 @@ public class JavaMergeHelper<T> extends BaseMergeHelper<T, List<HoodieRecord<T>>
     }
 
     BoundedInMemoryExecutor<GenericRecord, GenericRecord, Void> wrapper = null;
-    HoodieFileReader reader = HoodieFileReaderFactory.getReaderFactory(table.getConfig().getRecordType()).getFileReader(cfgForHoodieFile, mergeHandle.getOldFilePath());
     try {
       final Iterator<HoodieRecord> readerIterator;
       if (baseFile.getBootstrapBaseFile().isPresent()) {
@@ -91,7 +94,7 @@ public class JavaMergeHelper<T> extends BaseMergeHelper<T, List<HoodieRecord<T>>
           return record;
         }
         try {
-          return ((HoodieRecord) record).rewriteRecord(writerSchema, readerSchema, new TypedProperties());
+          return ((HoodieRecord) record).rewriteRecord(writerSchema, readerSchema);
         } catch (IOException e) {
           throw new HoodieException(e);
         }

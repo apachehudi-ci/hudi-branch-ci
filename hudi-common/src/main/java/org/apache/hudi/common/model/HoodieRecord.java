@@ -21,7 +21,6 @@ package org.apache.hudi.common.model;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.IndexedRecord;
-import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.util.CollectionUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.collection.Pair;
@@ -296,35 +295,35 @@ public abstract class HoodieRecord<T> implements Serializable {
 
   public abstract HoodieRecord mergeWith(Schema schema, HoodieRecord other, Schema otherSchema, Schema writerSchema) throws IOException;
 
-  public abstract HoodieRecord rewriteRecord(Schema recordSchema, Schema targetSchema, TypedProperties props) throws IOException;
+  public abstract HoodieRecord rewriteRecord(Schema recordSchema, Schema targetSchema) throws IOException;
 
   /**
    * Rewrite the GenericRecord with the Schema containing the Hoodie Metadata fields.
    */
-  public abstract HoodieRecord rewriteRecord(Schema recordSchema, Properties prop, boolean schemaOnReadEnabled, Schema writeSchemaWithMetaFields) throws IOException;
+  public abstract HoodieRecord rewriteRecord(Schema recordSchema, Properties props, boolean schemaOnReadEnabled, Schema writeSchemaWithMetaFields) throws IOException;
 
-  public abstract HoodieRecord rewriteRecordWithMetadata(Schema recordSchema, Properties prop, boolean schemaOnReadEnabled, Schema writeSchemaWithMetaFields, String fileName) throws IOException;
+  public abstract HoodieRecord rewriteRecordWithMetadata(Schema recordSchema, Properties props, boolean schemaOnReadEnabled, Schema writeSchemaWithMetaFields, String fileName) throws IOException;
 
-  public abstract HoodieRecord rewriteRecordWithNewSchema(Schema recordSchema, Properties prop, Schema newSchema, Map<String, String> renameCols) throws IOException;
+  public abstract HoodieRecord rewriteRecordWithNewSchema(Schema recordSchema, Properties props, Schema newSchema, Map<String, String> renameCols) throws IOException;
 
-  public abstract HoodieRecord rewriteRecordWithNewSchema(Schema recordSchema, Properties prop, Schema newSchema) throws IOException;
+  public abstract HoodieRecord rewriteRecordWithNewSchema(Schema recordSchema, Properties props, Schema newSchema) throws IOException;
 
-  public abstract HoodieRecord overrideMetadataFieldValue(Schema recordSchema, Properties prop, int pos, String newValue) throws IOException;
+  public abstract HoodieRecord overrideMetadataFieldValue(Schema recordSchema, Properties props, int pos, String newValue) throws IOException;
 
-  public abstract HoodieRecord addMetadataValues(Schema recordSchema, Properties prop, Map<HoodieMetadataField, String> metadataValues) throws IOException;
+  public abstract HoodieRecord addMetadataValues(Schema recordSchema, Properties props, Map<HoodieMetadataField, String> metadataValues) throws IOException;
 
   public abstract Option<Map<String, String>> getMetadata();
 
-  public abstract boolean isPresent(Schema schema, Properties prop) throws IOException;
+  public abstract boolean isPresent(Schema schema, Properties props) throws IOException;
 
-  public abstract boolean shouldIgnore(Schema schema, Properties prop) throws IOException;
+  public abstract boolean shouldIgnore(Schema schema, Properties props) throws IOException;
 
   /**
    * This method used to add preCombine field, recordKey etc. And may change the Type of HoodieRecord.
    */
   public abstract HoodieRecord expansion(
       Schema schema,
-      Properties prop,
+      Properties props,
       String payloadClass,
       String preCombineField,
       Option<Pair<String, String>> simpleKeyGenFieldsOpt,
@@ -335,9 +334,9 @@ public abstract class HoodieRecord<T> implements Serializable {
   /**
    * This method used in ClusteringExecutionStrategy.
    */
-  public abstract HoodieRecord transform(Schema schema, Properties prop, boolean useKeyGen);
+  public abstract HoodieRecord transform(Schema schema, Properties props, boolean useKeyGen);
 
-  public abstract Option<IndexedRecord> toIndexedRecord(Schema schema, Properties prop) throws IOException;
+  public abstract Option<IndexedRecord> toIndexedRecord(Schema schema, Properties props) throws IOException;
 
   //////////////////////////////////////////////////////////////////////////////
 

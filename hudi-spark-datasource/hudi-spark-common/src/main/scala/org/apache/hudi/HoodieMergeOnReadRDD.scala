@@ -313,13 +313,6 @@ class HoodieMergeOnReadRDD(@transient sc: SparkContext,
         case HoodieRecordType.SPARK =>
           // Get ordering value in curAvroRecord
           var curRecord = new HoodieSparkRecord(curRow, baseFileReaderSchema.structTypeSchema)
-          val orderField = payloadProps.getProperty(HoodiePayloadProps.PAYLOAD_ORDERING_FIELD_PROP_KEY)
-          if (orderField != null) {
-            val posList = RowKeyGeneratorHelper.getFieldSchemaInfo(baseFileReaderSchema.structTypeSchema, orderField, false).getKey
-            val orderingVal = RowKeyGeneratorHelper.getNestedFieldVal(curRow, baseFileReaderSchema.structTypeSchema, posList, false).asInstanceOf[Comparable[_]]
-            curRecord = new HoodieSparkRecord(curRow, baseFileReaderSchema.structTypeSchema, orderingVal)
-          }
-
           toScalaOption(merge.combineAndGetUpdateValue(curRecord, newRecord, logFileReaderAvroSchema, payloadProps))
             .map(r => {
               // TODO SparkRecordMergeClass always return newer one, so we can do this

@@ -25,8 +25,6 @@ import org.apache.hudi.common.util.ClosableIterator;
 import org.apache.hudi.common.util.MappingIterator;
 
 import org.apache.avro.Schema;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.types.StructType;
 
@@ -35,8 +33,6 @@ import java.io.IOException;
 import static org.apache.hudi.TypeUtils.unsafeCast;
 
 public interface HoodieSparkFileReader extends HoodieFileReader<InternalRow> {
-
-  Logger LOG = LogManager.getLogger(HoodieSparkFileReader.class);
 
   ClosableIterator<InternalRow> getInternalRowIterator(Schema readerSchema) throws IOException;
 

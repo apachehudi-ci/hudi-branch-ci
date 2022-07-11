@@ -34,6 +34,7 @@ import org.apache.hudi.common.util.HoodieTimer;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.ReflectionUtils;
 import org.apache.hudi.common.util.SpillableMapUtils;
+import org.apache.hudi.common.util.ValidationUtils;
 import org.apache.hudi.common.util.collection.ExternalSpillableMap;
 import org.apache.hudi.exception.HoodieIOException;
 import org.apache.hudi.internal.schema.InternalSchema;
@@ -342,8 +343,8 @@ public class HoodieMergedLogRecordScanner extends AbstractHoodieLogRecordReader
       if (this.partitionName == null && CollectionUtils.nonEmpty(this.logFilePaths)) {
         this.partitionName = getRelativePartitionPath(new Path(basePath), new Path(this.logFilePaths.get(0)).getParent());
       }
-      assert recordType != null;
-      assert mergeClass != null;
+      ValidationUtils.checkArgument(recordType != null);
+      ValidationUtils.checkArgument(mergeClass != null);
 
       if (HoodieTableMetadata.isMetadataTable(basePath)) {
         recordType = HoodieRecordType.AVRO;

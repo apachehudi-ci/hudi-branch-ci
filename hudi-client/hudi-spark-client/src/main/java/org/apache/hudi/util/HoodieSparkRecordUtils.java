@@ -115,15 +115,14 @@ public class HoodieSparkRecordUtils {
   /**
    * Gets record column values into one object.
    *
-   * @param record  Hoodie record.
+   * @param row  InternalRow.
    * @param columns Names of the columns to get values.
    * @param structType  {@link StructType} instance.
    * @return Column value if a single column, or concatenated String values by comma.
    */
-  public static Object getRecordColumnValues(HoodieSparkRecord record,
+  public static Object getRecordColumnValues(InternalRow row,
       String[] columns,
       StructType structType, boolean consistentLogicalTimestampEnabled) {
-    InternalRow row = record.getData();
     if (columns.length == 1) {
       List<Integer> posList = RowKeyGeneratorHelper.getFieldSchemaInfo(structType, columns[0], false).getKey();
       return RowKeyGeneratorHelper.getNestedFieldVal(row, structType, posList, true);

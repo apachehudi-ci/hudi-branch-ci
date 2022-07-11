@@ -25,6 +25,7 @@ import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieMerge;
 import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.common.util.ValidationUtils;
 
 import java.io.IOException;
 import java.util.Properties;
@@ -33,8 +34,8 @@ public class HoodieSparkRecordMerge implements HoodieMerge {
 
   @Override
   public HoodieRecord preCombine(HoodieRecord older, HoodieRecord newer) {
-    assert older.getRecordType() == HoodieRecordType.SPARK;
-    assert newer.getRecordType() == HoodieRecordType.SPARK;
+    ValidationUtils.checkArgument(older.getRecordType() == HoodieRecordType.SPARK);
+    ValidationUtils.checkArgument(newer.getRecordType() == HoodieRecordType.SPARK);
 
     if (newer instanceof HoodieEmptyRecord) {
       return older;
@@ -53,8 +54,8 @@ public class HoodieSparkRecordMerge implements HoodieMerge {
 
   @Override
   public Option<HoodieRecord> combineAndGetUpdateValue(HoodieRecord older, HoodieRecord newer, Schema schema, Properties props) throws IOException {
-    assert older.getRecordType() == HoodieRecordType.SPARK;
-    assert newer.getRecordType() == HoodieRecordType.SPARK;
+    ValidationUtils.checkArgument(older.getRecordType() == HoodieRecordType.SPARK);
+    ValidationUtils.checkArgument(newer.getRecordType() == HoodieRecordType.SPARK);
 
     if (newer instanceof HoodieEmptyRecord) {
       return Option.empty();
