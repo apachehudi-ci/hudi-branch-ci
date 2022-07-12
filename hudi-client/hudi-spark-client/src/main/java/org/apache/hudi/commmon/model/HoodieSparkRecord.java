@@ -58,26 +58,28 @@ import static org.apache.spark.sql.types.DataTypes.StringType;
 public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
 
   // IndexedRecord hold its schema, InternalRow should also hold its schema
-  private final StructType structType;
+  private transient StructType structType;
+  // Do not serialize StructType
+  private String structTypeString;
 
   public HoodieSparkRecord(InternalRow data, StructType schema) {
     super(null, data);
-    this.structType = schema;
+    initSchema(schema);
   }
 
   public HoodieSparkRecord(HoodieKey key, InternalRow data, StructType schema) {
     super(key, data);
-    this.structType = schema;
+    initSchema(schema);
   }
 
   public HoodieSparkRecord(HoodieKey key, InternalRow data, StructType schema, HoodieOperation operation) {
     super(key, data, operation);
-    this.structType = schema;
+    initSchema(schema);
   }
 
   public HoodieSparkRecord(HoodieSparkRecord record) {
     super(record);
-    this.structType = record.structType;
+    initSchema(record.getStructType());
   }
 
   @Override
@@ -87,12 +89,12 @@ public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
 
   @Override
   public HoodieRecord<InternalRow> newInstance(HoodieKey key, HoodieOperation op) {
-    return new HoodieSparkRecord(key, data, structType, op);
+    return new HoodieSparkRecord(key, data, getStructType(), op);
   }
 
   @Override
   public HoodieRecord<InternalRow> newInstance(HoodieKey key) {
-    return new HoodieSparkRecord(key, data, structType);
+    return new HoodieSparkRecord(key, data, getStructType());
   }
 
   @Override
@@ -104,7 +106,8 @@ public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
     if (key != null) {
       return getRecordKey();
     }
-    return keyGeneratorOpt.isPresent() ? ((SparkKeyGeneratorInterface) keyGeneratorOpt.get()).getRecordKey(data, structType) : data.getString(HoodieMetadataField.RECORD_KEY_METADATA_FIELD.ordinal());
+    return keyGeneratorOpt.isPresent() ? ((SparkKeyGeneratorInterface) keyGeneratorOpt.get())
+        .getRecordKey(data, getStructType()) : data.getString(HoodieMetadataField.RECORD_KEY_METADATA_FIELD.ordinal());
   }
 
   @Override
@@ -112,8 +115,8 @@ public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
     if (key != null) {
       return getRecordKey();
     }
-    DataType dataType = structType.apply(keyFieldName).dataType();
-    int pos = structType.fieldIndex(keyFieldName);
+    DataType dataType = getStructType().apply(keyFieldName).dataType();
+    int pos = getStructType().fieldIndex(keyFieldName);
     return data.get(pos, dataType).toString();
   }
 
@@ -123,53 +126,53 @@ public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
   }
 
   @Override
-  public Object getRecordColumnValues(String[] columns, Schema schema, boolean consistentLogicalTimestampEnabled) {
-    return HoodieSparkRecordUtils.getRecordColumnValues(data, columns, structType, consistentLogicalTimestampEnabled);
+  public Object getRecordColumnValues(Schema recordSchema, String[] columns, boolean consistentLogicalTimestampEnabled) {
+    return HoodieSparkRecordUtils.getRecordColumnValues(data, columns, getStructType(), consistentLogicalTimestampEnabled);
   }
 
   @Override
   public HoodieRecord mergeWith(Schema schema, HoodieRecord other, Schema otherSchema, Schema writerSchema) throws IOException {
     StructType otherStructType = HoodieInternalRowUtils.getCachedSchema(otherSchema);
     StructType writerStructType = HoodieInternalRowUtils.getCachedSchema(writerSchema);
-    InternalRow mergeRow = HoodieInternalRowUtils.stitchRecords(data, structType, (InternalRow) other.getData(), otherStructType, writerStructType);
+    InternalRow mergeRow = HoodieInternalRowUtils.stitchRecords(data, getStructType(), (InternalRow) other.getData(), otherStructType, writerStructType);
     return new HoodieSparkRecord(getKey(), mergeRow, writerStructType, getOperation());
   }
 
   @Override
   public HoodieRecord rewriteRecord(Schema recordSchema, Schema targetSchema) throws IOException {
     StructType targetStructType = HoodieInternalRowUtils.getCachedSchema(targetSchema);
-    InternalRow rewriteRow = HoodieInternalRowUtils.rewriteRecord(data, structType, targetStructType);
+    InternalRow rewriteRow = HoodieInternalRowUtils.rewriteRecord(data, getStructType(), targetStructType);
     return new HoodieSparkRecord(getKey(), rewriteRow, targetStructType, getOperation());
   }
 
   @Override
   public HoodieRecord rewriteRecord(Schema recordSchema, Properties props, boolean schemaOnReadEnabled, Schema writeSchemaWithMetaFields) throws IOException {
     StructType writeSchemaWithMetaFieldsStructType = HoodieInternalRowUtils.getCachedSchema(writeSchemaWithMetaFields);
-    InternalRow rewriteRow = schemaOnReadEnabled ? HoodieInternalRowUtils.rewriteRecordWithNewSchema(data, structType, writeSchemaWithMetaFieldsStructType, new HashMap<>())
-        : HoodieInternalRowUtils.rewriteRecord(data, structType, writeSchemaWithMetaFieldsStructType);
+    InternalRow rewriteRow = schemaOnReadEnabled ? HoodieInternalRowUtils.rewriteRecordWithNewSchema(data, getStructType(), writeSchemaWithMetaFieldsStructType, new HashMap<>())
+        : HoodieInternalRowUtils.rewriteRecord(data, getStructType(), writeSchemaWithMetaFieldsStructType);
     return new HoodieSparkRecord(getKey(), rewriteRow, writeSchemaWithMetaFieldsStructType, getOperation());
   }
 
   @Override
   public HoodieRecord rewriteRecordWithMetadata(Schema recordSchema, Properties prop, boolean schemaOnReadEnabled, Schema writeSchemaWithMetaFields, String fileName) throws IOException {
     StructType writeSchemaWithMetaFieldsStructType = HoodieInternalRowUtils.getCachedSchema(writeSchemaWithMetaFields);
-    InternalRow rewriteRow = schemaOnReadEnabled ? HoodieInternalRowUtils.rewriteEvolutionRecordWithMetadata(data, structType, writeSchemaWithMetaFieldsStructType, fileName)
-        : HoodieInternalRowUtils.rewriteRecordWithMetadata(data, structType, writeSchemaWithMetaFieldsStructType, fileName);
+    InternalRow rewriteRow = schemaOnReadEnabled ? HoodieInternalRowUtils.rewriteEvolutionRecordWithMetadata(data, getStructType(), writeSchemaWithMetaFieldsStructType, fileName)
+        : HoodieInternalRowUtils.rewriteRecordWithMetadata(data, getStructType(), writeSchemaWithMetaFieldsStructType, fileName);
     return new HoodieSparkRecord(getKey(), rewriteRow, writeSchemaWithMetaFieldsStructType, getOperation());
   }
 
   @Override
   public HoodieRecord rewriteRecordWithNewSchema(Schema recordSchema, Properties prop, Schema newSchema, Map<String, String> renameCols) throws IOException {
     StructType newStructType = HoodieInternalRowUtils.getCachedSchema(newSchema);
-    InternalRow rewriteRow = HoodieInternalRowUtils.rewriteRecordWithNewSchema(data, structType, newStructType, renameCols);
+    InternalRow rewriteRow = HoodieInternalRowUtils.rewriteRecordWithNewSchema(data, getStructType(), newStructType, renameCols);
     return new HoodieSparkRecord(getKey(), rewriteRow, newStructType, getOperation());
   }
 
   @Override
   public HoodieRecord rewriteRecordWithNewSchema(Schema recordSchema, Properties prop, Schema newSchema) throws IOException {
     StructType newStructType = HoodieInternalRowUtils.getCachedSchema(newSchema);
-    InternalRow rewriteRow = HoodieInternalRowUtils.rewriteRecord(data, structType, newStructType);
-    return new HoodieSparkRecord(getKey(), rewriteRow, structType, getOperation());
+    InternalRow rewriteRow = HoodieInternalRowUtils.rewriteRecord(data, getStructType(), newStructType);
+    return new HoodieSparkRecord(getKey(), rewriteRow, getStructType(), getOperation());
   }
 
   @Override
@@ -198,11 +201,11 @@ public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
       Option<Boolean> populateMetaFieldsOp) {
     boolean populateMetaFields = populateMetaFieldsOp.orElse(false);
     if (populateMetaFields) {
-      return HoodieSparkRecordUtils.convertToHoodieSparkRecord(structType, data, withOperation);
+      return HoodieSparkRecordUtils.convertToHoodieSparkRecord(getStructType(), data, withOperation);
     } else if (simpleKeyGenFieldsOpt.isPresent()) {
-      return HoodieSparkRecordUtils.convertToHoodieSparkRecord(structType, data, simpleKeyGenFieldsOpt.get(), withOperation, Option.empty());
+      return HoodieSparkRecordUtils.convertToHoodieSparkRecord(getStructType(), data, simpleKeyGenFieldsOpt.get(), withOperation, Option.empty());
     } else {
-      return HoodieSparkRecordUtils.convertToHoodieSparkRecord(structType, data, withOperation, partitionNameOp);
+      return HoodieSparkRecordUtils.convertToHoodieSparkRecord(getStructType(), data, withOperation, partitionNameOp);
     }
   }
 
@@ -263,15 +266,23 @@ public class HoodieSparkRecord extends HoodieRecord<InternalRow> {
   @Override
   public Comparable<?> getOrderingValue(Properties props) {
     String orderingField = ConfigUtils.getOrderingField(props);
-    if (!HoodieDefaultCatalystExpressionUtils.existField(structType, orderingField)) {
+    if (!HoodieDefaultCatalystExpressionUtils.existField(getStructType(), orderingField)) {
       return 0;
     } else {
-      List<Integer> posList = HoodieInternalRowUtils.getOrderingValPosList(structType, orderingField);
-      return (Comparable<?>) RowKeyGeneratorHelper.getNestedFieldVal(data, structType, posList, false);
+      List<Integer> posList = HoodieInternalRowUtils.getOrderingValPosList(getStructType(), orderingField);
+      return (Comparable<?>) RowKeyGeneratorHelper.getNestedFieldVal(data, getStructType(), posList, false);
     }
   }
 
+  private void initSchema(StructType structType) {
+    this.structType = structType;
+    this.structTypeString = HoodieInternalRowUtils.getCachedSerSchema(structType);
+  }
+
   public StructType getStructType() {
+    if (structType == null && structTypeString != null) {
+      structType = HoodieInternalRowUtils.getCachedDeserSchema(structTypeString);
+    }
     return structType;
   }
 }

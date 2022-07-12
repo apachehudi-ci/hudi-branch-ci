@@ -243,6 +243,14 @@ object HoodieInternalRowUtils {
     schemaSerializeMap.get(structType)
   }
 
+  def getCachedDeserSchema(str: String): StructType = {
+    if (!schemaDeserializeMap.containsKey(str)) {
+      val structType = DataType.fromJson(str).asInstanceOf[StructType]
+      schemaDeserializeMap.put(str, structType)
+    }
+    schemaDeserializeMap.get(str)
+  }
+
   def getCachedSchema(schema: Schema): StructType = {
     if (!schemaMap.containsKey(schema)) {
       val structType = AvroConversionUtils.convertAvroSchemaToStructType(schema)
