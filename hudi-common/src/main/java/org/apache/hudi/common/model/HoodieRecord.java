@@ -287,7 +287,7 @@ public abstract class HoodieRecord<T> implements Serializable {
     }
   }
 
-  public abstract Object getRecordColumnValues(String[] columns, Schema schema, boolean consistentLogicalTimestampEnabled);
+  public abstract Object getRecordColumnValues(Schema recordSchema, String[] columns, boolean consistentLogicalTimestampEnabled);
 
   public abstract HoodieRecord mergeWith(Schema schema, HoodieRecord other, Schema otherSchema, Schema writerSchema) throws IOException;
 
