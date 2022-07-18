@@ -87,12 +87,13 @@ public class HoodieDeleteHelper<T, R> extends
       }
 
       HoodieData dedupedRecords;
-      if (config.getRecordType() == HoodieRecordType.AVRO) {
+      HoodieRecordType recordType = config.getRecordMerger().getRecordType();
+      if (recordType == HoodieRecordType.AVRO) {
         // For BWC, will remove when HoodieRecordPayload removed
         dedupedRecords =
             dedupedKeys.map(key -> new HoodieAvroRecord(key, new EmptyHoodieRecordPayload()));
       } else {
-        dedupedRecords = dedupedKeys.map(key -> new HoodieEmptyRecord<>(key, config.getRecordType()));
+        dedupedRecords = dedupedKeys.map(key -> new HoodieEmptyRecord<>(key, recordType));
       }
       Instant beginTag = Instant.now();
       // perform index loop up to get existing location of records

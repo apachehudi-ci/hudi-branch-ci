@@ -21,11 +21,11 @@ package org.apache.hudi.metadata;
 import org.apache.avro.Schema;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
-import org.apache.hudi.common.model.HoodieAvroRecordMerge;
+import org.apache.hudi.common.model.HoodieAvroRecordMerger;
 import org.apache.hudi.common.model.HoodieRecord;
-import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
 import org.apache.hudi.common.table.log.HoodieMergedLogRecordScanner;
 import org.apache.hudi.common.table.log.InstantRange;
+import org.apache.hudi.common.util.HoodieRecordUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.collection.ExternalSpillableMap;
 import org.apache.hudi.common.util.collection.Pair;
@@ -59,7 +59,7 @@ public class HoodieMetadataMergedLogRecordReader extends HoodieMergedLogRecordSc
                                               Option<InstantRange> instantRange, boolean allowFullScan) {
     super(fs, basePath, logFilePaths, readerSchema, latestInstantTime, maxMemorySizeInBytes, true, false, bufferSize,
         spillableMapBasePath, instantRange, diskMapType, isBitCaskDiskMapCompressionEnabled, false, allowFullScan, Option.of(partitionName),
-        InternalSchema.getEmptyInternalSchema(), HoodieRecordType.AVRO, HoodieAvroRecordMerge.class.getName());
+        InternalSchema.getEmptyInternalSchema(), HoodieRecordUtils.loadRecordMerger(HoodieAvroRecordMerger.class.getName()));
   }
 
   /**

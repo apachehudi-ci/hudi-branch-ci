@@ -19,6 +19,8 @@
 package org.apache.hudi.common.model;
 
 import org.apache.avro.Schema;
+
+import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
 import org.apache.hudi.common.util.Option;
 
 import java.io.IOException;
@@ -30,9 +32,12 @@ import java.util.Properties;
  * It can implement the merging logic of HoodieRecord of different engines
  * and avoid the performance consumption caused by the serialization/deserialization of Avro payload.
  */
-public interface HoodieMerge extends Serializable {
-  
-  HoodieRecord preCombine(HoodieRecord older, HoodieRecord newer);
+public interface HoodieRecordMerger extends Serializable {
 
-  Option<HoodieRecord> combineAndGetUpdateValue(HoodieRecord older, HoodieRecord newer, Schema schema, Properties props) throws IOException;
+  // combineAndGetUpdateValue and precombine
+  Option<HoodieRecord> merge(HoodieRecord older, HoodieRecord newer, Schema schema, Properties props) throws IOException;
+
+  // The record type handled by the current merger
+  // SPARK, AVRO, FLINK
+  HoodieRecordType getRecordType();
 }

@@ -105,7 +105,7 @@ public class TestHoodieHFileReaderWriter extends TestHoodieReaderWriterBase {
     when(partitionSupplier.get()).thenReturn(10);
 
     return (HoodieAvroHFileWriter)HoodieFileWriterFactory.getFileWriter(
-        instantTime, getFilePath(), conf, writeConfig.getStorageConfig(), avroSchema, mockTaskContextSupplier, writeConfig.getRecordType());
+        instantTime, getFilePath(), conf, writeConfig.getStorageConfig(), avroSchema, mockTaskContextSupplier, writeConfig.getRecordMerger().getRecordType());
   }
 
   @Override

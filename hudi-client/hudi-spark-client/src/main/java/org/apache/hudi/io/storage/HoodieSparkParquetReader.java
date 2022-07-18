@@ -73,9 +73,8 @@ public class HoodieSparkParquetReader implements HoodieSparkFileReader {
   public ClosableIterator<InternalRow> getInternalRowIterator(Schema schema) throws IOException {
     StructType structType = HoodieInternalRowUtils.getCachedSchema(schema);
     conf.set(ParquetReadSupport.SPARK_ROW_REQUESTED_SCHEMA(), structType.json());
-    // todo: get it from spark context
-    conf.setBoolean(SQLConf.PARQUET_BINARY_AS_STRING().key(),false);
-    conf.setBoolean(SQLConf.PARQUET_INT96_AS_TIMESTAMP().key(), true);
+    conf.setBoolean(SQLConf.PARQUET_BINARY_AS_STRING().key(), (Boolean) SQLConf.get().getConf(SQLConf.PARQUET_BINARY_AS_STRING()));
+    conf.setBoolean(SQLConf.PARQUET_INT96_AS_TIMESTAMP().key(), (Boolean) SQLConf.get().getConf(SQLConf.PARQUET_INT96_AS_TIMESTAMP()));
     InputFile inputFile = HadoopInputFile.fromPath(path, conf);
     ParquetReader reader = new ParquetReader.Builder<InternalRow>(inputFile) {
       @Override

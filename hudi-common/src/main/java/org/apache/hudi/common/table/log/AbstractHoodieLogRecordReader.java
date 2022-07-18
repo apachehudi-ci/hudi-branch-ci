@@ -22,6 +22,7 @@ import org.apache.hudi.common.model.DeleteRecord;
 import org.apache.hudi.common.model.HoodieLogFile;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
+import org.apache.hudi.common.model.HoodieRecordMerger;
 import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.log.block.HoodieAvroDataBlock;
@@ -91,9 +92,9 @@ public abstract class AbstractHoodieLogRecordReader {
   // Merge strategy to use when combining records from log
   private final String payloadClassFQN;
   // preCombine field
-  private final String preCombineField;
+  protected final String preCombineField;
   // Stateless component for merging records
-  private final String mergeClass;
+  protected final HoodieRecordMerger recordMerger;
   // simple key gen fields
   private Option<Pair<String, String>> simpleKeyGenFields = Option.empty();
   // Log File Paths
@@ -143,16 +144,16 @@ public abstract class AbstractHoodieLogRecordReader {
                                           Schema readerSchema,
                                           String latestInstantTime, boolean readBlocksLazily, boolean reverseReader,
                                           int bufferSize, Option<InstantRange> instantRange,
-                                          boolean withOperationField, HoodieRecordType recordType, String mergeClass) {
+                                          boolean withOperationField, HoodieRecordMerger recordMerger) {
     this(fs, basePath, logFilePaths, readerSchema, latestInstantTime, readBlocksLazily, reverseReader, bufferSize,
-        instantRange, withOperationField, true, Option.empty(), InternalSchema.getEmptyInternalSchema(), recordType, mergeClass);
+        instantRange, withOperationField, true, Option.empty(), InternalSchema.getEmptyInternalSchema(), recordMerger);
   }
 
   protected AbstractHoodieLogRecordReader(FileSystem fs, String basePath, List<String> logFilePaths,
                                           Schema readerSchema, String latestInstantTime, boolean readBlocksLazily,
                                           boolean reverseReader, int bufferSize, Option<InstantRange> instantRange,
                                           boolean withOperationField, boolean forceFullScan,
-                                          Option<String> partitionName, InternalSchema internalSchema, HoodieRecordType recordType, String mergeClass) {
+                                          Option<String> partitionName, InternalSchema internalSchema, HoodieRecordMerger recordMerger) {
     this.readerSchema = readerSchema;
     this.latestInstantTime = latestInstantTime;
     this.hoodieTableMetaClient = HoodieTableMetaClient.builder().setConf(fs.getConf()).setBasePath(basePath).build();
@@ -160,7 +161,7 @@ public abstract class AbstractHoodieLogRecordReader {
     HoodieTableConfig tableConfig = this.hoodieTableMetaClient.getTableConfig();
     this.payloadClassFQN = tableConfig.getPayloadClass();
     this.preCombineField = tableConfig.getPreCombineField();
-    this.mergeClass = mergeClass;
+    this.recordMerger = recordMerger;
     this.totalLogFiles.addAndGet(logFilePaths.size());
     this.logFilePaths = logFilePaths;
     this.reverseReader = reverseReader;
@@ -180,7 +181,7 @@ public abstract class AbstractHoodieLogRecordReader {
           Pair.of(tableConfig.getRecordKeyFieldProp(), tableConfig.getPartitionFieldProp()));
     }
     this.partitionName = partitionName;
-    this.recordType = recordType;
+    this.recordType = recordMerger.getRecordType();
   }
 
   protected String getKeyField() {
@@ -498,10 +499,6 @@ public abstract class AbstractHoodieLogRecordReader {
     return payloadClassFQN;
   }
 
-  protected String getMergeClass() {
-    return mergeClass;
-  }
-
   public Option<String> getPartitionName() {
     return partitionName;
   }
@@ -561,11 +558,7 @@ public abstract class AbstractHoodieLogRecordReader {
       throw new UnsupportedOperationException();
     }
 
-    public Builder withRecordType(HoodieRecordType type) {
-      throw new UnsupportedOperationException();
-    }
-
-    public Builder withMergeClass(String mergeClass) {
+    public Builder withRecordMerger(HoodieRecordMerger recordMerger) {
       throw new UnsupportedOperationException();
     }
 

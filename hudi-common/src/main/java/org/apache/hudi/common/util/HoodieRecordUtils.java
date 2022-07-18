@@ -18,8 +18,8 @@
 
 package org.apache.hudi.common.util;
 
-import org.apache.hudi.common.model.HoodieAvroRecordMerge;
-import org.apache.hudi.common.model.HoodieMerge;
+import org.apache.hudi.common.model.HoodieAvroRecordMerger;
+import org.apache.hudi.common.model.HoodieRecordMerger;
 import org.apache.hudi.common.model.HoodieRecordPayload;
 import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.metadata.HoodieTableMetadata;
@@ -38,19 +38,19 @@ public class HoodieRecordUtils {
   /**
    * Instantiate a given class with a record merge.
    */
-  public static HoodieMerge loadMerge(String mergeClass) {
+  public static HoodieRecordMerger loadRecordMerger(String mergerClass) {
     try {
-      HoodieMerge merge = (HoodieMerge) INSTANCE_CACHE.get(mergeClass);
-      if (null == merge) {
-        synchronized (HoodieMerge.class) {
-          merge = (HoodieMerge) INSTANCE_CACHE.get(mergeClass);
-          if (null == merge) {
-            merge = (HoodieMerge)ReflectionUtils.loadClass(mergeClass, new Object[]{});
-            INSTANCE_CACHE.put(mergeClass, merge);
+      HoodieRecordMerger recordMerger = (HoodieRecordMerger) INSTANCE_CACHE.get(mergerClass);
+      if (null == recordMerger) {
+        synchronized (HoodieRecordMerger.class) {
+          recordMerger = (HoodieRecordMerger) INSTANCE_CACHE.get(mergerClass);
+          if (null == recordMerger) {
+            recordMerger = (HoodieRecordMerger)ReflectionUtils.loadClass(mergerClass, new Object[]{});
+            INSTANCE_CACHE.put(mergerClass, recordMerger);
           }
         }
       }
-      return merge;
+      return recordMerger;
     } catch (HoodieException e) {
       throw new HoodieException("Unable to instantiate hoodie merge class ", e);
     }
@@ -59,11 +59,11 @@ public class HoodieRecordUtils {
   /**
    * Instantiate a given class with a record merge.
    */
-  public static HoodieMerge loadMerge(String mergeClass, String tablePath) {
+  public static HoodieRecordMerger loadRecordMerger(String mergerClass, String tablePath) {
     if (HoodieTableMetadata.isMetadataTable(tablePath)) {
-      return loadMerge(HoodieAvroRecordMerge.class.getName());
+      return loadRecordMerger(HoodieAvroRecordMerger.class.getName());
     } else {
-      return loadMerge(mergeClass);
+      return loadRecordMerger(mergerClass);
     }
   }
 

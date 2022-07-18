@@ -26,13 +26,13 @@ import org.apache.hadoop.mapred.JobConf
 import org.apache.hudi.HoodieBaseRelation.{convertToAvroSchema, createHFileReader, generateUnsafeProjection, getPartitionPath}
 import org.apache.hudi.HoodieConversionUtils.toScalaOption
 import org.apache.hudi.avro.HoodieAvroUtils
-import org.apache.hudi.common.config.{HoodieMetadataConfig, SerializableConfiguration}
+import org.apache.hudi.common.config.HoodieMetadataConfig
 import org.apache.hudi.common.fs.FSUtils
 import org.apache.hudi.common.model.{HoodieFileFormat, HoodieRecord}
 import org.apache.hudi.common.table.timeline.{HoodieInstant, HoodieTimeline}
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView
 import org.apache.hudi.common.table.{HoodieTableConfig, HoodieTableMetaClient, TableSchemaResolver}
-import org.apache.hudi.common.util.StringUtils
+import org.apache.hudi.common.util.{ConfigUtils, StringUtils}
 import org.apache.hudi.common.util.ValidationUtils.checkState
 import org.apache.hudi.internal.schema.convert.AvroInternalSchemaConverter
 import org.apache.hudi.internal.schema.{HoodieSchemaException, InternalSchema}
@@ -50,10 +50,9 @@ import org.apache.spark.sql.sources.{BaseRelation, Filter, PrunedFilteredScan}
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{Row, SQLContext, SparkSession}
 import org.apache.spark.unsafe.types.UTF8String
-
 import java.net.URI
 import java.util.Locale
-import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType
+import org.apache.hudi.common.engine.EngineType
 import org.apache.hudi.config.HoodieWriteConfig
 import scala.collection.JavaConverters._
 import scala.util.control.NonFatal
@@ -70,8 +69,7 @@ case class HoodieTableState(tablePath: String,
                             usesVirtualKeys: Boolean,
                             recordPayloadClassName: String,
                             metadataConfig: HoodieMetadataConfig,
-                            mergeClass: String,
-                            recordType: HoodieRecordType)
+                            mergerClass: String)
 
 /**
  * Hoodie BaseRelation which extends [[PrunedFilteredScan]].
@@ -391,9 +389,8 @@ abstract class HoodieBaseRelation(val sqlContext: SQLContext,
   }
 
   protected def getTableState: HoodieTableState = {
-    // Get MergeClass
-    var mergeClass = optParams.getOrElse(HoodieWriteConfig.MERGE_CLASS_NAME.key(),
-      tableConfig.getMergeClass)
+    val adaptionMergerClass = optParams.getOrElse(HoodieWriteConfig.SELF_ADAPTION_MERGER_CLASS_NAME.key(),
+      HoodieWriteConfig.SELF_ADAPTION_MERGER_CLASS_NAME.defaultValue()).toString.toBoolean
     // Subset of the state of table's configuration as of at the time of the query
     HoodieTableState(
       tablePath = basePath,
@@ -403,8 +400,7 @@ abstract class HoodieBaseRelation(val sqlContext: SQLContext,
       usesVirtualKeys = !tableConfig.populateMetaFields(),
       recordPayloadClassName = tableConfig.getPayloadClass,
       metadataConfig = fileIndex.metadataConfig,
-      mergeClass,
-      recordType = HoodieRecordType.valueOf(optParams.getOrElse(HoodieWriteConfig.RECORD_TYPE.key(), HoodieWriteConfig.RECORD_TYPE.defaultValue()))
+      ConfigUtils.getRecordMergerClass(EngineType.SPARK, adaptionMergerClass, org.apache.hudi.common.util.Option.ofNullable(optParams.get(HoodieWriteConfig.MERGER_CLASS_NAME.key()).orNull))
     )
   }
 

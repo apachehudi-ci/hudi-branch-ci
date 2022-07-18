@@ -36,7 +36,7 @@ public class HoodieRowParquetConfig extends HoodieParquetConfig<HoodieRowParquet
 
   public HoodieRowParquetConfig(HoodieRowParquetWriteSupport writeSupport, CompressionCodecName compressionCodecName,
       int blockSize, int pageSize, long maxFileSize, Configuration hadoopConf,
-      double compressionRatio, boolean dictionEnable) {
-    super(writeSupport, compressionCodecName, blockSize, pageSize, maxFileSize, hadoopConf, compressionRatio, dictionEnable);
+      double compressionRatio, boolean enableDictionary) {
+    super(writeSupport, compressionCodecName, blockSize, pageSize, maxFileSize, hadoopConf, compressionRatio, enableDictionary);
   }
 }

@@ -22,9 +22,7 @@ import org.apache.hudi.commmon.model.HoodieSparkRecord;
 import org.apache.hudi.common.model.HoodieEmptyRecord;
 import org.apache.hudi.common.model.HoodiePayloadProps;
 import org.apache.hudi.common.model.HoodieRecord;
-import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
 import org.apache.hudi.common.util.Option;
-import org.apache.hudi.common.util.ValidationUtils;
 import org.apache.hudi.keygen.RowKeyGeneratorHelper;
 
 import org.apache.avro.Schema;
@@ -33,13 +31,10 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Properties;
 
-public class HoodieSparkDefaultRecordMerge extends HoodieSparkRecordMerge {
+public class HoodieSparkDefaultRecordMerger extends HoodieSparkRecordMerger {
 
   @Override
   public Option<HoodieRecord> combineAndGetUpdateValue(HoodieRecord older, HoodieRecord newer, Schema schema, Properties props) throws IOException {
-    ValidationUtils.checkArgument(older.getRecordType() == HoodieRecordType.SPARK);
-    ValidationUtils.checkArgument(newer.getRecordType() == HoodieRecordType.SPARK);
-
     // Null check is needed here to support schema evolution. The record in storage may be from old schema where
     // the new ordering column might not be present and hence returns null.
     if (!needUpdatingPersistedRecord(older, newer, props)) {
@@ -54,9 +49,6 @@ public class HoodieSparkDefaultRecordMerge extends HoodieSparkRecordMerge {
   }
 
   protected boolean needUpdatingPersistedRecord(HoodieRecord older, HoodieRecord newer, Properties properties) {
-    ValidationUtils.checkArgument(older.getRecordType() == HoodieRecordType.SPARK);
-    ValidationUtils.checkArgument(newer.getRecordType() == HoodieRecordType.SPARK);
-
     /*
      * Combining strategy here returns currentRecord on disk if incoming record is older.
      * The incoming record can be either a delete (sent as an upsert with _hoodie_is_deleted set to true)

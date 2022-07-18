@@ -216,8 +216,7 @@ public abstract class MultipleSparkJobExecutionStrategy<T>
               .withPartition(clusteringOp.getPartitionPath())
               .withDiskMapType(config.getCommonConfig().getSpillableDiskMapType())
               .withBitCaskDiskMapCompressionEnabled(config.getCommonConfig().isBitCaskDiskMapCompressionEnabled())
-              .withRecordType(config.getRecordType())
-              .withMergeClass(config.getMergeClass())
+              .withRecordMerger(config.getRecordMerger())
               .build();
 
           Option<HoodieFileReader> baseFileReader = StringUtils.isNullOrEmpty(clusteringOp.getDataFilePath())

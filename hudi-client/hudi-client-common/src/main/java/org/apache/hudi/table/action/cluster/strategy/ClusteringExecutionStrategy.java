@@ -46,7 +46,7 @@ public abstract class ClusteringExecutionStrategy<T, I, K, O> implements Seriali
     this.writeConfig = writeConfig;
     this.hoodieTable = table;
     this.engineContext = engineContext;
-    this.recordType = table.getConfig().getRecordType();
+    this.recordType = table.getConfig().getRecordMerger().getRecordType();
   }
 
   /**

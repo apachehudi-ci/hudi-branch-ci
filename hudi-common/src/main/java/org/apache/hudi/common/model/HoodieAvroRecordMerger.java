@@ -30,12 +30,33 @@ import java.io.IOException;
 import java.util.Properties;
 
 import static org.apache.hudi.TypeUtils.unsafeCast;
+import static org.apache.hudi.common.model.HoodieRecord.Source.BASE;
+import static org.apache.hudi.common.model.HoodieRecord.Source.WRITE;
+import static org.apache.hudi.common.model.HoodieRecord.Source.LOG;
 
-public class HoodieAvroRecordMerge implements HoodieMerge {
+public class HoodieAvroRecordMerger implements HoodieRecordMerger {
+
   @Override
-  public HoodieRecord preCombine(HoodieRecord older, HoodieRecord newer) {
+  public Option<HoodieRecord> merge(HoodieRecord older, HoodieRecord newer, Schema schema, Properties props) throws IOException {
     ValidationUtils.checkArgument(older.getRecordType() == HoodieRecordType.AVRO);
     ValidationUtils.checkArgument(newer.getRecordType() == HoodieRecordType.AVRO);
+    if (older.getSource() == BASE && newer.getSource() == LOG) {
+      return combineAndGetUpdateValue(older, newer, schema, props);
+    } else if (older.getSource() == LOG && newer.getSource() == LOG) {
+      return Option.of(preCombine(older, newer));
+    } else if (older.getSource() == WRITE && newer.getSource() == WRITE) {
+      return Option.of(preCombine(older, newer));
+    } else {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  @Override
+  public HoodieRecordType getRecordType() {
+    return HoodieRecordType.AVRO;
+  }
+
+  private HoodieRecord preCombine(HoodieRecord older, HoodieRecord newer) {
     HoodieRecordPayload picked = unsafeCast(((HoodieAvroRecord) newer).getData().preCombine(((HoodieAvroRecord) older).getData()));
     if (picked instanceof HoodieMetadataPayload) {
       // NOTE: HoodieMetadataPayload return a new payload
@@ -44,10 +65,7 @@ public class HoodieAvroRecordMerge implements HoodieMerge {
     return picked.equals(((HoodieAvroRecord) newer).getData()) ? newer : older;
   }
 
-  @Override
-  public Option<HoodieRecord> combineAndGetUpdateValue(HoodieRecord older, HoodieRecord newer, Schema schema, Properties props) throws IOException {
-    ValidationUtils.checkArgument(older.getRecordType() == HoodieRecordType.AVRO);
-    ValidationUtils.checkArgument(newer.getRecordType() == HoodieRecordType.AVRO);
+  private Option<HoodieRecord> combineAndGetUpdateValue(HoodieRecord older, HoodieRecord newer, Schema schema, Properties props) throws IOException {
     Option<IndexedRecord> previousRecordAvroPayload = older.toIndexedRecord(schema, props);
     if (!previousRecordAvroPayload.isPresent()) {
       return Option.empty();

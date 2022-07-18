@@ -64,7 +64,7 @@ public abstract class BaseMergeHelper<T, I, K, O> {
                                                       boolean externalSchemaTransformation) throws IOException {
     Path externalFilePath = new Path(baseFile.getBootstrapBaseFile().get().getPath());
     Configuration bootstrapFileConfig = new Configuration(table.getHadoopConf());
-    HoodieRecordType recordType = table.getConfig().getRecordType();
+    HoodieRecordType recordType = table.getConfig().getRecordMerger().getRecordType();
     HoodieFileReader bootstrapReader = HoodieFileReaderFactory.getReaderFactory(recordType).getFileReader(bootstrapFileConfig, externalFilePath);
 
     Schema bootstrapReadSchema;

@@ -18,7 +18,6 @@
 
 package org.apache.hudi.util;
 
-import org.apache.hudi.HoodieInternalRowUtils;
 import org.apache.hudi.commmon.model.HoodieSparkRecord;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieOperation;
@@ -28,14 +27,12 @@ import org.apache.hudi.common.util.StringUtils;
 import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.keygen.RowKeyGeneratorHelper;
 
+import org.apache.spark.sql.HoodieDefaultCatalystExpressionUtils;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.types.DataType;
-import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 
 import java.util.List;
-
-import scala.Tuple2;
 
 public class HoodieSparkRecordUtils {
 
@@ -49,15 +46,15 @@ public class HoodieSparkRecordUtils {
   /**
    * Utility method to convert InternalRow to HoodieRecord using schema and payload class.
    */
-  public static HoodieRecord<InternalRow> convertToHoodieSparkRecord(StructType structType, InternalRow data, String preCombineField, boolean withOperationField) {
-    return convertToHoodieSparkRecord(structType, data, preCombineField,
+  public static HoodieRecord<InternalRow> convertToHoodieSparkRecord(StructType structType, InternalRow data, boolean withOperationField) {
+    return convertToHoodieSparkRecord(structType, data,
         Pair.of(HoodieRecord.RECORD_KEY_METADATA_FIELD, HoodieRecord.PARTITION_PATH_METADATA_FIELD),
         withOperationField, Option.empty());
   }
 
-  public static HoodieRecord<InternalRow> convertToHoodieSparkRecord(StructType structType, InternalRow data, String preCombineField, boolean withOperationField,
+  public static HoodieRecord<InternalRow> convertToHoodieSparkRecord(StructType structType, InternalRow data, boolean withOperationField,
       Option<String> partitionName) {
-    return convertToHoodieSparkRecord(structType, data, preCombineField,
+    return convertToHoodieSparkRecord(structType, data,
         Pair.of(HoodieRecord.RECORD_KEY_METADATA_FIELD, HoodieRecord.PARTITION_PATH_METADATA_FIELD),
         withOperationField, partitionName);
   }
@@ -65,38 +62,21 @@ public class HoodieSparkRecordUtils {
   /**
    * Utility method to convert bytes to HoodieRecord using schema and payload class.
    */
-  public static HoodieRecord<InternalRow> convertToHoodieSparkRecord(StructType structType, InternalRow data, String preCombineField, Pair<String, String> recordKeyPartitionPathFieldPair,
+  public static HoodieRecord<InternalRow> convertToHoodieSparkRecord(StructType structType, InternalRow data, Pair<String, String> recordKeyPartitionPathFieldPair,
       boolean withOperationField, Option<String> partitionName) {
     final String recKey = getValue(structType, recordKeyPartitionPathFieldPair.getKey(), data).toString();
     final String partitionPath = (partitionName.isPresent() ? partitionName.get() :
         getValue(structType, recordKeyPartitionPathFieldPair.getRight(), data).toString());
 
-    Object preCombineVal = getPreCombineVal(structType, data, preCombineField);
     HoodieOperation operation = withOperationField
         ? HoodieOperation.fromName(getNullableValAsString(structType, data, HoodieRecord.OPERATION_METADATA_FIELD)) : null;
-    return new HoodieSparkRecord(new HoodieKey(recKey, partitionPath), data, structType, operation, (Comparable<?>) preCombineVal);
-  }
-
-  /**
-   * Returns the preCombine value with given field name.
-   *
-   * @param data            The avro record
-   * @param preCombineField The preCombine field name
-   * @return the preCombine field value or 0 if the field does not exist in the avro schema
-   */
-  private static Object getPreCombineVal(StructType structType, InternalRow data, String preCombineField) {
-    if (preCombineField == null) {
-      return 0;
-    }
-    return !HoodieInternalRowUtils.getCachedSchemaPosMap(structType).contains(preCombineField)
-        ? 0 : getValue(structType, preCombineField, data);
+    return new HoodieSparkRecord(new HoodieKey(recKey, partitionPath), data, structType, operation);
   }
 
   private static Object getValue(StructType structType, String fieldName, InternalRow row) {
-    Tuple2<StructField, Object> tuple2 = HoodieInternalRowUtils.getCachedSchemaPosMap(structType).apply(fieldName);
-    int pos = (Integer) tuple2._2;
-    DataType type = tuple2._1.dataType();
-    return row.get(pos, type);
+    DataType dataType = structType.apply(fieldName).dataType();
+    int pos = structType.fieldIndex(fieldName);
+    return row.get(pos, dataType);
   }
 
   /**
@@ -107,7 +87,7 @@ public class HoodieSparkRecordUtils {
    * @return the string form of the field or empty if the schema does not contain the field name or the value is null
    */
   private static Option<String> getNullableValAsString(StructType structType, InternalRow row, String fieldName) {
-    String fieldVal = !HoodieInternalRowUtils.getCachedSchemaPosMap(structType).contains(fieldName)
+    String fieldVal = !HoodieDefaultCatalystExpressionUtils.existField(structType, fieldName)
         ? null : StringUtils.objToString(getValue(structType, fieldName, row));
     return Option.ofNullable(fieldVal);
   }

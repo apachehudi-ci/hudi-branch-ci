@@ -67,7 +67,7 @@ public class FlinkMergeHelper<T> extends BaseMergeHelper<T, List<HoodieRecord<T>
     final boolean externalSchemaTransformation = table.getConfig().shouldUseExternalSchemaTransformation();
     HoodieBaseFile baseFile = mergeHandle.baseFileForMerge();
     Configuration cfgForHoodieFile = new Configuration(table.getHadoopConf());
-    HoodieFileReader reader = HoodieFileReaderFactory.getReaderFactory(table.getConfig().getRecordType()).getFileReader(cfgForHoodieFile, mergeHandle.getOldFilePath());
+    HoodieFileReader reader = HoodieFileReaderFactory.getReaderFactory(table.getConfig().getRecordMerger().getRecordType()).getFileReader(cfgForHoodieFile, mergeHandle.getOldFilePath());
     if (externalSchemaTransformation || baseFile.getBootstrapBaseFile().isPresent()) {
       readSchema = reader.getSchema();
       writerSchema = readSchema;

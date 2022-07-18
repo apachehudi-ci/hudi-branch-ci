@@ -21,7 +21,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.hudi.DataSourceWriteOptions._
 import org.apache.hudi.common.config.{HoodieMetadataConfig, HoodieStorageConfig}
 import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType
-import org.apache.hudi.common.model.{DefaultHoodieRecordPayload, HoodieAvroRecordMerge, HoodieTableType}
+import org.apache.hudi.common.model.{DefaultHoodieRecordPayload, HoodieAvroRecordMerger, HoodieTableType}
 import org.apache.hudi.common.table.HoodieTableMetaClient
 import org.apache.hudi.common.testutils.HoodieTestDataGenerator
 import org.apache.hudi.common.testutils.RawTripTestPayload.recordsToStrings
@@ -30,7 +30,7 @@ import org.apache.hudi.index.HoodieIndex.IndexType
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions.Config
 import org.apache.hudi.testutils.{DataSourceTestUtils, HoodieClientTestBase}
-import org.apache.hudi.{DataSourceReadOptions, DataSourceWriteOptions, HoodieDataSourceHelpers, HoodieSparkDefaultRecordMerge, HoodieSparkRecordMerge, SparkDatasetMixin}
+import org.apache.hudi.{DataSourceReadOptions, DataSourceWriteOptions, HoodieDataSourceHelpers, HoodieSparkDefaultRecordMerger, HoodieSparkRecordMerger, SparkDatasetMixin}
 import org.apache.log4j.LogManager
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
@@ -58,17 +58,15 @@ class TestMORDataSource extends HoodieClientTestBase with SparkDatasetMixin {
     HoodieWriteConfig.TBL_NAME.key -> "hoodie_test"
   )
   val sparkOpts = Map(
-    DataSourceWriteOptions.MERGE_CLASS_NAME.key -> classOf[HoodieSparkRecordMerge].getName,
-    HoodieWriteConfig.RECORD_TYPE.key -> HoodieRecordType.SPARK.name,
+    HoodieWriteConfig.SELF_ADAPTION_MERGER_CLASS_NAME.key -> "true",
     HoodieStorageConfig.LOGFILE_DATA_BLOCK_FORMAT.key -> "parquet"
   )
   val sparkDefaultOpts = Map(
-    DataSourceWriteOptions.MERGE_CLASS_NAME.key -> classOf[HoodieSparkDefaultRecordMerge].getName,
-    HoodieWriteConfig.RECORD_TYPE.key -> HoodieRecordType.SPARK.name,
+    DataSourceWriteOptions.MERGER_CLASS_NAME.key -> classOf[HoodieSparkDefaultRecordMerger].getName,
     HoodieStorageConfig.LOGFILE_DATA_BLOCK_FORMAT.key -> "parquet"
   )
   val avroOpts = Map(
-    HoodieWriteConfig.RECORD_TYPE.key -> HoodieRecordType.AVRO.name
+    DataSourceWriteOptions.MERGER_CLASS_NAME.key -> classOf[HoodieAvroRecordMerger].getName
   )
 
   val verificationCol: String = "driver"

@@ -22,7 +22,7 @@ import org.apache.hudi.client.clustering.plan.strategy.FlinkSizeBasedClusteringP
 import org.apache.hudi.common.config.ConfigClassProperty;
 import org.apache.hudi.common.config.ConfigGroups;
 import org.apache.hudi.common.config.HoodieConfig;
-import org.apache.hudi.common.model.HoodieAvroRecordMerge;
+import org.apache.hudi.common.model.HoodieAvroRecordMerger;
 import org.apache.hudi.common.model.HoodieCleaningPolicy;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.OverwriteWithLatestAvroPayload;
@@ -284,10 +284,10 @@ public class FlinkOptions extends HoodieConfig {
       .withDescription("Payload class used. Override this, if you like to roll your own merge logic, when upserting/inserting.\n"
           + "This will render any value set for the option in-effective");
 
-  public static final ConfigOption<String> MERGE_CLASS_NAME = ConfigOptions
-      .key("merge.class")
+  public static final ConfigOption<String> RECORD_MERGER_CLASS_NAME = ConfigOptions
+      .key("record.merger.class")
       .stringType()
-      .defaultValue(HoodieAvroRecordMerge.class.getName())
+      .defaultValue(HoodieAvroRecordMerger.class.getName())
       .withDescription("Merge class provide stateless component interface for merging records, and support various HoodieRecord "
           + "types, such as Spark records or Flink records.");
 

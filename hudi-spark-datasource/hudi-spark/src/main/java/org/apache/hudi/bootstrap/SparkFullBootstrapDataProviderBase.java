@@ -35,7 +35,6 @@ import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.exception.HoodieIOException;
 import org.apache.hudi.keygen.KeyGenerator;
-import org.apache.hudi.keygen.RowKeyGeneratorHelper;
 import org.apache.hudi.keygen.SparkKeyGeneratorInterface;
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 import org.apache.hudi.keygen.factory.HoodieSparkKeyGeneratorFactory;
@@ -63,12 +62,12 @@ public abstract class SparkFullBootstrapDataProviderBase extends FullRecordBoots
 
   @Override
   public JavaRDD<HoodieRecord> generateInputRecords(String tableName, String sourceBasePath,
-                                                    List<Pair<String, List<HoodieFileStatus>>> partitionPathsWithFiles) {
+                                                    List<Pair<String, List<HoodieFileStatus>>> partitionPathsWithFiles, HoodieWriteConfig config) {
     String[] filePaths = partitionPathsWithFiles.stream().map(Pair::getValue)
         .flatMap(f -> f.stream().map(fs -> FileStatusUtils.toPath(fs.getPath()).toString()))
         .toArray(String[]::new);
 
-    HoodieRecordType recordType = HoodieRecordType.valueOf(this.props.getString(HoodieWriteConfig.RECORD_TYPE.key()));
+    HoodieRecordType recordType =  config.getRecordMerger().getRecordType();
     Dataset inputDataset = sparkSession.read().format(getFormat()).load(filePaths);
     try {
       KeyGenerator keyGenerator = HoodieSparkKeyGeneratorFactory.createKeyGenerator(props);
@@ -93,15 +92,12 @@ public abstract class SparkFullBootstrapDataProviderBase extends FullRecordBoots
       } else if (recordType == HoodieRecordType.SPARK) {
         SparkKeyGeneratorInterface sparkKeyGenerator = (SparkKeyGeneratorInterface) keyGenerator;
         StructType structType = inputDataset.schema();
-        List<Integer> posList = RowKeyGeneratorHelper.getFieldSchemaInfo(structType, precombineKey, false).getKey();
         return inputDataset.queryExecution().toRdd().toJavaRDD().map(row -> {
           InternalRow internalRow = row.copy();
-          // TODO KEYGENERATOR_CONSISTENT_LOGICAL_TIMESTAMP_ENABLED not support
-          Comparable<?> orderingVal = (Comparable<?>) RowKeyGeneratorHelper.getNestedFieldVal(internalRow, structType, posList, false);
           String recordKey = sparkKeyGenerator.getRecordKey(internalRow, structType);
           String partitionPath = sparkKeyGenerator.getPartitionPath(internalRow, structType);
           HoodieKey key = new HoodieKey(recordKey, partitionPath);
-          return new HoodieSparkRecord(key, internalRow, structType, orderingVal);
+          return new HoodieSparkRecord(key, internalRow, structType);
         });
       } else {
         throw new UnsupportedOperationException(recordType.name());

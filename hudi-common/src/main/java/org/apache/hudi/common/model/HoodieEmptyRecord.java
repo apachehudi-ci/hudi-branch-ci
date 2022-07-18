@@ -32,34 +32,39 @@ import java.util.Properties;
 public class HoodieEmptyRecord<T> extends HoodieRecord<T> {
 
   private final HoodieRecordType type;
+  private final Comparable<?> orderingVal;
 
   public HoodieEmptyRecord(HoodieKey key, HoodieRecordType type) {
     super(key, null);
     this.type = type;
-  }
-
-  public HoodieEmptyRecord(HoodieKey key, Comparable<?> orderingVal, HoodieRecordType type) {
-    super(key, null, orderingVal);
-    this.type = type;
+    this.orderingVal = null;
   }
 
   public HoodieEmptyRecord(HoodieKey key, HoodieOperation operation, Comparable<?> orderingVal, HoodieRecordType type) {
-    super(key, null, operation, orderingVal);
+    super(key, null, operation);
     this.type = type;
+    this.orderingVal = orderingVal;
   }
 
   public HoodieEmptyRecord(HoodieRecord<T> record, HoodieRecordType type) {
     super(record);
     this.type = type;
+    this.orderingVal = record.getOrderingValue(new Properties());
   }
 
   public HoodieEmptyRecord(HoodieRecordType type) {
     this.type = type;
+    this.orderingVal = null;
   }
 
   @Override
   public T getData() {
     return null;
+  }
+
+  @Override
+  public Comparable<?> getOrderingValue(Properties props) {
+    return orderingVal;
   }
 
   @Override
@@ -69,7 +74,7 @@ public class HoodieEmptyRecord<T> extends HoodieRecord<T> {
 
   @Override
   public HoodieRecord<T> newInstance(HoodieKey key, HoodieOperation op) {
-    return new HoodieEmptyRecord<>(key, op, type);
+    return new HoodieEmptyRecord<>(key, op, orderingVal, type);
   }
 
   @Override

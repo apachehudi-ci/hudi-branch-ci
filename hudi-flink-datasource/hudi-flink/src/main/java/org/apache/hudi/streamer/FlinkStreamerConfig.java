@@ -19,7 +19,7 @@
 package org.apache.hudi.streamer;
 
 import org.apache.hudi.client.utils.OperationConverter;
-import org.apache.hudi.common.model.HoodieAvroRecordMerge;
+import org.apache.hudi.common.model.HoodieAvroRecordMerger;
 import org.apache.hudi.common.model.HoodieCleaningPolicy;
 import org.apache.hudi.common.model.OverwriteWithLatestAvroPayload;
 import org.apache.hudi.common.model.WriteOperationType;
@@ -120,7 +120,7 @@ public class FlinkStreamerConfig extends Configuration {
 
   @Parameter(names = {"--merge-class"}, description = "Implements of HoodieMerge, that defines how to merge two records."
       + "Implement your own, if you want to implement specific record merge logic.")
-  public String mergeClassName = HoodieAvroRecordMerge.class.getName();
+  public String mergeClassName = HoodieAvroRecordMerger.class.getName();
 
   @Parameter(names = {"--op"}, description = "Takes one of these values : UPSERT (default), INSERT (use when input "
       + "is purely new data/inserts to gain speed).", converter = OperationConverter.class)
@@ -361,7 +361,7 @@ public class FlinkStreamerConfig extends Configuration {
     conf.setString(FlinkOptions.OPERATION, config.operation.value());
     conf.setString(FlinkOptions.PRECOMBINE_FIELD, config.sourceOrderingField);
     conf.setString(FlinkOptions.PAYLOAD_CLASS_NAME, config.payloadClassName);
-    conf.setString(FlinkOptions.MERGE_CLASS_NAME, config.mergeClassName);
+    conf.setString(FlinkOptions.RECORD_MERGER_CLASS_NAME, config.mergeClassName);
     conf.setBoolean(FlinkOptions.PRE_COMBINE, config.preCombine);
     conf.setInteger(FlinkOptions.RETRY_TIMES, Integer.parseInt(config.instantRetryTimes));
     conf.setLong(FlinkOptions.RETRY_INTERVAL_MS, Long.parseLong(config.instantRetryInterval));

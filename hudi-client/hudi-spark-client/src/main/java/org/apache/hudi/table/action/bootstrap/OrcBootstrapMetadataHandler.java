@@ -65,7 +65,7 @@ class OrcBootstrapMetadataHandler extends BaseBootstrapMetadataHandler {
   void executeBootstrap(HoodieBootstrapHandle<?, ?, ?, ?> bootstrapHandle, Path sourceFilePath, KeyGeneratorInterface keyGenerator,
                         String partitionPath, Schema avroSchema) throws Exception {
     // TODO support spark orc reader
-    if (config.getRecordType() == HoodieRecordType.SPARK) {
+    if (config.getRecordMerger().getRecordType() == HoodieRecordType.SPARK) {
       throw new UnsupportedOperationException();
     }
     BoundedInMemoryExecutor<GenericRecord, HoodieRecord, Void> wrapper = null;

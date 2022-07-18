@@ -135,31 +135,25 @@ public abstract class HoodieRecord<T> implements Serializable {
   private HoodieOperation operation;
 
   /**
-   * For purposes of preCombining.
+   * Source of records.
    */
-  private Comparable<?> orderingVal;
+  private Source source;
 
   public HoodieRecord(HoodieKey key, T data) {
-    this(key, data, null, null);
+    this(key, data, null);
   }
 
-  public HoodieRecord(HoodieKey key, T data, Comparable<?> orderingVal) {
-    this(key, data, null, orderingVal);
-  }
-
-  public HoodieRecord(HoodieKey key, T data, HoodieOperation operation, Comparable<?> orderingVal) {
+  public HoodieRecord(HoodieKey key, T data, HoodieOperation operation) {
     this.key = key;
     this.data = data;
     this.currentLocation = null;
     this.newLocation = null;
     this.sealed = false;
     this.operation = operation;
-    // default natural order is 0
-    this.orderingVal = orderingVal == null ? 0 : orderingVal;
   }
 
   public HoodieRecord(HoodieRecord<T> record) {
-    this(record.key, record.data, record.operation, record.orderingVal);
+    this(record.key, record.data, record.operation);
     this.currentLocation = record.currentLocation;
     this.newLocation = record.newLocation;
     this.sealed = record.sealed;
@@ -182,9 +176,7 @@ public abstract class HoodieRecord<T> implements Serializable {
     return operation;
   }
 
-  public Comparable<?> getOrderingValue() {
-    return orderingVal;
-  }
+  public abstract Comparable<?> getOrderingValue(Properties props);
 
   public T getData() {
     if (data == null) {
@@ -348,6 +340,14 @@ public abstract class HoodieRecord<T> implements Serializable {
     return instantTime + "_" + partitionId + "_" + recordIndex;
   }
 
+  public Source getSource() {
+    return source;
+  }
+
+  public void setSource(Source source) {
+    this.source = source;
+  }
+
   /**
    * A special record returned by {@link HoodieRecordPayload}, which means we should just skip this record.
    * This record is only used for {@link HoodieRecordPayload} currently, so it should not
@@ -391,5 +391,9 @@ public abstract class HoodieRecord<T> implements Serializable {
 
   public enum HoodieRecordType {
     AVRO, SPARK
+  }
+
+  public enum Source {
+    LOG, BASE, WRITE
   }
 }

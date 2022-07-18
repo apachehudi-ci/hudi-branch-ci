@@ -19,12 +19,10 @@
 package org.apache.hudi.common.table.log;
 
 import org.apache.hudi.common.model.DeleteRecord;
-import org.apache.hudi.common.model.HoodieAvroRecordMerge;
 import org.apache.hudi.common.model.HoodieRecord;
-import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
+import org.apache.hudi.common.model.HoodieRecordMerger;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.ValidationUtils;
-import org.apache.hudi.metadata.HoodieTableMetadata;
 
 import org.apache.avro.Schema;
 import org.apache.hadoop.fs.FileSystem;
@@ -40,8 +38,8 @@ public class HoodieUnMergedLogRecordScanner extends AbstractHoodieLogRecordReade
 
   private HoodieUnMergedLogRecordScanner(FileSystem fs, String basePath, List<String> logFilePaths, Schema readerSchema,
                                          String latestInstantTime, boolean readBlocksLazily, boolean reverseReader, int bufferSize,
-                                         LogRecordScannerCallback callback, Option<InstantRange> instantRange, HoodieRecordType recordType, String mergeClass) {
-    super(fs, basePath, logFilePaths, readerSchema, latestInstantTime, readBlocksLazily, reverseReader, bufferSize, instantRange, false, recordType, mergeClass);
+                                         LogRecordScannerCallback callback, Option<InstantRange> instantRange, HoodieRecordMerger recordMerger) {
+    super(fs, basePath, logFilePaths, readerSchema, latestInstantTime, readBlocksLazily, reverseReader, bufferSize, instantRange, false, recordMerger);
     this.callback = callback;
   }
 
@@ -87,10 +85,7 @@ public class HoodieUnMergedLogRecordScanner extends AbstractHoodieLogRecordReade
     private Option<InstantRange> instantRange = Option.empty();
     // specific configurations
     private LogRecordScannerCallback callback;
-    // Record type read from log block
-    private HoodieRecordType recordType;
-    // Merge class name
-    private String mergeClass;
+    private HoodieRecordMerger recordMerger;
 
     public Builder withFileSystem(FileSystem fs) {
       this.fs = fs;
@@ -143,29 +138,17 @@ public class HoodieUnMergedLogRecordScanner extends AbstractHoodieLogRecordReade
     }
 
     @Override
-    public Builder withRecordType(HoodieRecordType type) {
-      this.recordType = type;
-      return this;
-    }
-
-    @Override
-    public Builder withMergeClass(String mergeClass) {
-      this.mergeClass = mergeClass;
+    public Builder withRecordMerger(HoodieRecordMerger recordMerger) {
+      this.recordMerger = recordMerger;
       return this;
     }
 
     @Override
     public HoodieUnMergedLogRecordScanner build() {
-      ValidationUtils.checkArgument(recordType != null);
-      ValidationUtils.checkArgument(mergeClass != null);
-
-      if (HoodieTableMetadata.isMetadataTable(basePath)) {
-        recordType = HoodieRecordType.AVRO;
-        mergeClass = HoodieAvroRecordMerge.class.getName();
-      }
+      ValidationUtils.checkArgument(recordMerger != null);
 
       return new HoodieUnMergedLogRecordScanner(fs, basePath, logFilePaths, readerSchema,
-          latestInstantTime, readBlocksLazily, reverseReader, bufferSize, callback, instantRange, recordType, mergeClass);
+          latestInstantTime, readBlocksLazily, reverseReader, bufferSize, callback, instantRange, recordMerger);
     }
   }
 }

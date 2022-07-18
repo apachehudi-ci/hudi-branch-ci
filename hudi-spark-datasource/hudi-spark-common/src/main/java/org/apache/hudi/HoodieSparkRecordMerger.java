@@ -18,46 +18,57 @@
 
 package org.apache.hudi;
 
-import org.apache.avro.Schema;
-
-import org.apache.hudi.common.model.HoodieEmptyRecord;
 import org.apache.hudi.common.model.HoodieRecord;
-import org.apache.hudi.common.model.HoodieMerge;
 import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
+import org.apache.hudi.common.model.HoodieRecordMerger;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.ValidationUtils;
+
+import org.apache.avro.Schema;
 
 import java.io.IOException;
 import java.util.Properties;
 
-public class HoodieSparkRecordMerge implements HoodieMerge {
+import static org.apache.hudi.common.model.HoodieRecord.Source.BASE;
+import static org.apache.hudi.common.model.HoodieRecord.Source.LOG;
+import static org.apache.hudi.common.model.HoodieRecord.Source.WRITE;
+
+public class HoodieSparkRecordMerger implements HoodieRecordMerger {
 
   @Override
-  public HoodieRecord preCombine(HoodieRecord older, HoodieRecord newer) {
+  public Option<HoodieRecord> merge(HoodieRecord older, HoodieRecord newer, Schema schema, Properties props) throws IOException {
     ValidationUtils.checkArgument(older.getRecordType() == HoodieRecordType.SPARK);
     ValidationUtils.checkArgument(newer.getRecordType() == HoodieRecordType.SPARK);
-
-    if (newer instanceof HoodieEmptyRecord) {
-      return older;
+    if (older.getSource() == BASE && newer.getSource() == LOG) {
+      return combineAndGetUpdateValue(older, newer, schema, props);
+    } else if (older.getSource() == LOG && newer.getSource() == LOG) {
+      return Option.of(preCombine(older, newer, props));
+    } else if (older.getSource() == WRITE && newer.getSource() == WRITE) {
+      return Option.of(preCombine(older, newer, props));
+    } else {
+      throw new UnsupportedOperationException();
     }
+  }
 
+  @Override
+  public HoodieRecordType getRecordType() {
+    return HoodieRecordType.SPARK;
+  }
+
+  private HoodieRecord preCombine(HoodieRecord older, HoodieRecord newer, Properties props) {
     if (older.getData() == null) {
       // use natural order for delete record
-      return older;
+      return newer;
     }
-    if (older.getOrderingValue().compareTo(newer.getOrderingValue()) > 0) {
+    if (older.getOrderingValue(props).compareTo(newer.getOrderingValue(props)) > 0) {
       return older;
     } else {
       return newer;
     }
   }
 
-  @Override
-  public Option<HoodieRecord> combineAndGetUpdateValue(HoodieRecord older, HoodieRecord newer, Schema schema, Properties props) throws IOException {
-    ValidationUtils.checkArgument(older.getRecordType() == HoodieRecordType.SPARK);
-    ValidationUtils.checkArgument(newer.getRecordType() == HoodieRecordType.SPARK);
-
-    if (newer instanceof HoodieEmptyRecord) {
+  protected Option<HoodieRecord> combineAndGetUpdateValue(HoodieRecord older, HoodieRecord newer, Schema schema, Properties props) throws IOException {
+    if (newer.getData() == null) {
       return Option.empty();
     } else {
       return Option.of(newer);

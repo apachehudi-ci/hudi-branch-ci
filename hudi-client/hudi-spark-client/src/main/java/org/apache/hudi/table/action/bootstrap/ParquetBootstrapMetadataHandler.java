@@ -64,7 +64,7 @@ class ParquetBootstrapMetadataHandler extends BaseBootstrapMetadataHandler {
   void executeBootstrap(HoodieBootstrapHandle<?, ?, ?, ?> bootstrapHandle,
                         Path sourceFilePath, KeyGeneratorInterface keyGenerator, String partitionPath, Schema avroSchema) throws Exception {
     BoundedInMemoryExecutor<HoodieRecord, HoodieRecord, Void> wrapper = null;
-    HoodieFileReader reader = HoodieFileReaderFactory.getReaderFactory(table.getConfig().getRecordType())
+    HoodieFileReader reader = HoodieFileReaderFactory.getReaderFactory(table.getConfig().getRecordMerger().getRecordType())
             .getFileReader(table.getHadoopConf(), sourceFilePath);
     try {
       wrapper = new BoundedInMemoryExecutor<HoodieRecord, HoodieRecord, Void>(config.getWriteBufferLimitBytes(),

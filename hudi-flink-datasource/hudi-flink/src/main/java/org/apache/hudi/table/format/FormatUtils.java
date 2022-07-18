@@ -21,11 +21,11 @@ package org.apache.hudi.table.format;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieOperation;
 import org.apache.hudi.common.model.HoodieRecord;
-import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
 import org.apache.hudi.common.table.log.HoodieMergedLogRecordScanner;
 import org.apache.hudi.common.table.log.HoodieUnMergedLogRecordScanner;
 import org.apache.hudi.common.util.DefaultSizeEstimator;
 import org.apache.hudi.common.util.Functions;
+import org.apache.hudi.common.util.HoodieRecordUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.queue.BoundedInMemoryExecutor;
 import org.apache.hudi.common.util.queue.BoundedInMemoryQueueProducer;
@@ -141,8 +141,7 @@ public class FormatUtils {
         .withSpillableMapBasePath(writeConfig.getSpillableMapBasePath())
         .withInstantRange(split.getInstantRange())
         .withOperationField(flinkConf.getBoolean(FlinkOptions.CHANGELOG_ENABLED))
-        .withRecordType(writeConfig.getRecordType())
-        .withMergeClass(writeConfig.getMergeClass())
+        .withRecordMerger(writeConfig.getRecordMerger())
         .build();
   }
 
@@ -169,10 +168,8 @@ public class FormatUtils {
                 HoodieRealtimeConfig.DEFAULT_MAX_DFS_STREAM_BUFFER_SIZE))
         .withInstantRange(split.getInstantRange())
         .withLogRecordScannerCallback(callback)
-        .withMergeClass(flinkConf.getString(FlinkOptions.MERGE_CLASS_NAME,
-            FlinkOptions.MERGE_CLASS_NAME.defaultValue()))
-        // TODO pass from flink options
-        .withRecordType(HoodieRecordType.AVRO)
+        .withRecordMerger(HoodieRecordUtils.loadRecordMerger(flinkConf.getString(FlinkOptions.RECORD_MERGER_CLASS_NAME,
+            FlinkOptions.RECORD_MERGER_CLASS_NAME.defaultValue())))
         .build();
   }
 
@@ -250,8 +247,7 @@ public class FormatUtils {
         .withSpillableMapBasePath(writeConfig.getSpillableMapBasePath())
         .withDiskMapType(writeConfig.getCommonConfig().getSpillableDiskMapType())
         .withBitCaskDiskMapCompressionEnabled(writeConfig.getCommonConfig().isBitCaskDiskMapCompressionEnabled())
-        .withMergeClass(writeConfig.getMergeClass())
-        .withRecordType(writeConfig.getRecordType())
+        .withRecordMerger(writeConfig.getRecordMerger())
         .build();
   }
 

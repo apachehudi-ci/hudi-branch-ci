@@ -34,12 +34,10 @@ import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.engine.EngineType;
 import org.apache.hudi.common.fs.ConsistencyGuardConfig;
 import org.apache.hudi.common.fs.FileSystemRetryConfig;
-import org.apache.hudi.common.model.HoodieAvroRecordMerge;
 import org.apache.hudi.common.model.HoodieCleaningPolicy;
 import org.apache.hudi.common.model.HoodieFailedWritesCleaningPolicy;
 import org.apache.hudi.common.model.HoodieFileFormat;
-import org.apache.hudi.common.model.HoodieRecord;
-import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
+import org.apache.hudi.common.model.HoodieRecordMerger;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.OverwriteWithLatestAvroPayload;
 import org.apache.hudi.common.model.WriteConcurrencyMode;
@@ -48,6 +46,7 @@ import org.apache.hudi.common.table.log.block.HoodieLogBlock;
 import org.apache.hudi.common.table.marker.MarkerType;
 import org.apache.hudi.common.table.timeline.versioning.TimelineLayoutVersion;
 import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
+import org.apache.hudi.common.util.ConfigUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.ReflectionUtils;
 import org.apache.hudi.common.util.StringUtils;
@@ -64,7 +63,6 @@ import org.apache.hudi.index.HoodieIndex;
 import org.apache.hudi.keygen.SimpleAvroKeyGenerator;
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 import org.apache.hudi.keygen.constant.KeyGeneratorType;
-import org.apache.hudi.metadata.HoodieTableMetadata;
 import org.apache.hudi.metrics.MetricsReporterType;
 import org.apache.hudi.metrics.datadog.DatadogHttpClient.ApiSite;
 import org.apache.hudi.table.RandomFileIdPrefixProvider;
@@ -91,7 +89,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -129,23 +126,16 @@ public class HoodieWriteConfig extends HoodieConfig {
       .withDocumentation("Payload class used. Override this, if you like to roll your own merge logic, when upserting/inserting. "
           + "This will render any value set for PRECOMBINE_FIELD_OPT_VAL in-effective");
 
-  // Detect HoodieMerge type with HoodieRecordType.
-  public static final Function<HoodieConfig, Option<String>> MERGE_CLASS_INFER_FUNCTION = cfg -> {
-    if (cfg.getStringOrDefault(HoodieWriteConfig.RECORD_TYPE).equals(HoodieRecordType.AVRO.name())) {
-      return Option.of(HoodieAvroRecordMerge.class.getName());
-    } else if (cfg.getStringOrDefault(HoodieWriteConfig.RECORD_TYPE).equals(HoodieRecordType.SPARK.name())) {
-      return Option.of("org.apache.hudi.HoodieSparkRecordMerge");
-    } else {
-      return Option.empty();
-    }
-  };
-
-  public static final ConfigProperty<String> MERGE_CLASS_NAME = ConfigProperty
+  public static final ConfigProperty<String> MERGER_CLASS_NAME = ConfigProperty
       .key("hoodie.datasource.write.merge.class")
-      .defaultValue(HoodieAvroRecordMerge.class.getName())
-      .withInferFunction(MERGE_CLASS_INFER_FUNCTION)
+      .noDefaultValue()
       .withDocumentation("Merge class provide stateless component interface for merging records, and support various HoodieRecord "
           + "types, such as Spark records or Flink records.");
+
+  public static final ConfigProperty<Boolean> SELF_ADAPTION_MERGER_CLASS_NAME = ConfigProperty
+      .key("hoodie.datasource.write.self.adaption.merge.class")
+      .defaultValue(false)
+      .withDocumentation("Automatically identify merger class. If false use default merger class(HoodieAvroRecordMerger)");
 
   public static final ConfigProperty<String> KEYGENERATOR_CLASS_NAME = ConfigProperty
       .key("hoodie.datasource.write.keygenerator.class")
@@ -158,13 +148,6 @@ public class HoodieWriteConfig extends HoodieConfig {
       .defaultValue(KeyGeneratorType.SIMPLE.name())
       .withDocumentation("Easily configure one the built-in key generators, instead of specifying the key generator class."
           + "Currently supports SIMPLE, COMPLEX, TIMESTAMP, CUSTOM, NON_PARTITION, GLOBAL_DELETE");
-
-  public static final ConfigProperty<String> RECORD_TYPE = ConfigProperty
-      .key("hoodie.datasource.write.record.type")
-      .defaultValue(HoodieRecordType.AVRO.name())
-      .withValidValues(HoodieRecordType.AVRO.name(), HoodieRecordType.SPARK.name())
-      .withDocumentation("The data type used by engine."
-          + "Currently supports AVRO, SPARK");
 
   public static final ConfigProperty<String> ROLLBACK_USING_MARKERS_ENABLE = ConfigProperty
       .key("hoodie.rollback.using.markers")
@@ -527,7 +510,7 @@ public class HoodieWriteConfig extends HoodieConfig {
   private HoodieCommonConfig commonConfig;
   private HoodieStorageConfig storageConfig;
   private EngineType engineType;
-  private HoodieRecordType recordType;
+  private HoodieRecordMerger recordMerger;
 
   /**
    * @deprecated Use {@link #TBL_NAME} and its methods instead
@@ -904,7 +887,7 @@ public class HoodieWriteConfig extends HoodieConfig {
     super();
     this.engineType = EngineType.SPARK;
     this.clientSpecifiedViewStorageConfig = null;
-    this.recordType = generateRecordType();
+    applyMergerClass();
   }
 
   protected HoodieWriteConfig(EngineType engineType, Properties props) {
@@ -912,7 +895,7 @@ public class HoodieWriteConfig extends HoodieConfig {
     Properties newProps = new Properties();
     newProps.putAll(props);
     this.engineType = engineType;
-    this.recordType = generateRecordType();
+    applyMergerClass();
     this.consistencyGuardConfig = ConsistencyGuardConfig.newBuilder().fromProperties(newProps).build();
     this.fileSystemRetryConfig = FileSystemRetryConfig.newBuilder().fromProperties(newProps).build();
     this.clientSpecifiedViewStorageConfig = FileSystemViewStorageConfig.newBuilder().fromProperties(newProps).build();
@@ -924,14 +907,12 @@ public class HoodieWriteConfig extends HoodieConfig {
     this.storageConfig = HoodieStorageConfig.newBuilder().fromProperties(props).build();
   }
 
-  private HoodieRecordType generateRecordType() {
-    HoodieRecordType recordType = HoodieRecord.HoodieRecordType.valueOf(getStringOrDefault(RECORD_TYPE));
-    String basePath = getString(BASE_PATH);
-    boolean metadataTable = HoodieTableMetadata.isMetadataTable(basePath);
-    if (metadataTable) {
-      recordType = HoodieRecordType.AVRO;
+  private void applyMergerClass() {
+    if (getBoolean(SELF_ADAPTION_MERGER_CLASS_NAME)) {
+      this.recordMerger = ConfigUtils.generateRecordMerger(getString(BASE_PATH), engineType, Option.ofNullable(getString(MERGER_CLASS_NAME)));
+    } else {
+      this.recordMerger = ConfigUtils.generateRecordMerger(getString(BASE_PATH), Option.ofNullable(getString(MERGER_CLASS_NAME)));
     }
-    return recordType;
   }
 
   public static HoodieWriteConfig.Builder newBuilder() {
@@ -945,12 +926,20 @@ public class HoodieWriteConfig extends HoodieConfig {
     return getString(BASE_PATH);
   }
 
+  public HoodieRecordMerger getRecordMerger() {
+    return recordMerger;
+  }
+
   public String getSchema() {
     return getString(AVRO_SCHEMA_STRING);
   }
 
   public void setSchema(String schemaStr) {
     setValue(AVRO_SCHEMA_STRING, schemaStr);
+  }
+
+  public void setMergerClass(String mergerClass) {
+    setValue(MERGER_CLASS_NAME, mergerClass);
   }
 
   public String getInternalSchema() {
@@ -1014,10 +1003,6 @@ public class HoodieWriteConfig extends HoodieConfig {
 
   public String getKeyGeneratorClass() {
     return getString(KEYGENERATOR_CLASS_NAME);
-  }
-
-  public HoodieRecord.HoodieRecordType getRecordType() {
-    return recordType;
   }
 
   public boolean isConsistentLogicalTimestampEnabled() {
@@ -1372,10 +1357,6 @@ public class HoodieWriteConfig extends HoodieConfig {
 
   public String getPayloadClass() {
     return getString(HoodieCompactionConfig.PAYLOAD_CLASS_NAME);
-  }
-
-  public String getMergeClass() {
-    return getString(HoodieCompactionConfig.MERGE_CLASS_NAME);
   }
 
   public int getTargetPartitionsPerDayBasedCompaction() {
@@ -2254,6 +2235,11 @@ public class HoodieWriteConfig extends HoodieConfig {
 
     public Builder withWritePayLoad(String payload) {
       writeConfig.setValue(WRITE_PAYLOAD_CLASS_NAME, payload);
+      return this;
+    }
+
+    public Builder withMergerClass(String mergerClass) {
+      writeConfig.setValue(MERGER_CLASS_NAME, mergerClass);
       return this;
     }
 

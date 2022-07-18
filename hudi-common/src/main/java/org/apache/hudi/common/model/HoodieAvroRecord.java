@@ -41,12 +41,13 @@ import java.util.Properties;
 import static org.apache.hudi.TypeUtils.unsafeCast;
 
 public class HoodieAvroRecord<T extends HoodieRecordPayload> extends HoodieRecord<T> {
+
   public HoodieAvroRecord(HoodieKey key, T data) {
     super(key, data);
   }
 
   public HoodieAvroRecord(HoodieKey key, T data, HoodieOperation operation) {
-    super(key, data, operation, null);
+    super(key, data, operation);
   }
 
   public HoodieAvroRecord(HoodieRecord<T> record) {
@@ -80,7 +81,7 @@ public class HoodieAvroRecord<T extends HoodieRecordPayload> extends HoodieRecor
   }
 
   @Override
-  public Comparable getOrderingValue() {
+  public Comparable<?> getOrderingValue(Properties props) {
     return this.getData().getOrderingValue();
   }
 
@@ -116,7 +117,7 @@ public class HoodieAvroRecord<T extends HoodieRecordPayload> extends HoodieRecor
         (GenericRecord) toIndexedRecord(schema, new Properties()).get(),
         (GenericRecord) other.toIndexedRecord(otherSchema, new Properties()).get(),
         writerSchema);
-    return new HoodieAvroRecord(getKey(), instantiateRecordPayloadWrapper(mergedPayload, getOrderingValue()), getOperation());
+    return new HoodieAvroRecord(getKey(), instantiateRecordPayloadWrapper(mergedPayload, getOrderingValue(null)), getOperation());
   }
 
   @Override
@@ -138,7 +139,7 @@ public class HoodieAvroRecord<T extends HoodieRecordPayload> extends HoodieRecor
   @Override
   public HoodieRecord rewriteRecordWithMetadata(Schema recordSchema, Properties props, boolean schemaOnReadEnabled, Schema writeSchemaWithMetaFields, String fileName) throws IOException {
     GenericRecord record = (GenericRecord) getData().getInsertValue(recordSchema, props).get();
-    GenericRecord rewriteRecord =  schemaOnReadEnabled ? HoodieAvroUtils.rewriteEvolutionRecordWithMetadata(record, writeSchemaWithMetaFields, fileName)
+    GenericRecord rewriteRecord = schemaOnReadEnabled ? HoodieAvroUtils.rewriteEvolutionRecordWithMetadata(record, writeSchemaWithMetaFields, fileName)
         : HoodieAvroUtils.rewriteRecordWithMetadata(record, writeSchemaWithMetaFields, fileName);
     return new HoodieAvroRecord<>(getKey(), new RewriteAvroPayload(rewriteRecord), getOperation());
   }
@@ -223,7 +224,7 @@ public class HoodieAvroRecord<T extends HoodieRecordPayload> extends HoodieRecor
     return unsafeCast(
         HoodieRecordUtils.loadPayload(
             getData().getClass().getCanonicalName(),
-            new Object[]{combinedAvroPayload, newPreCombineVal},
+            new Object[] {combinedAvroPayload, newPreCombineVal},
             GenericRecord.class,
             Comparable.class));
   }

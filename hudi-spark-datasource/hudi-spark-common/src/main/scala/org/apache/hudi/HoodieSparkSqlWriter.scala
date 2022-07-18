@@ -32,7 +32,7 @@ import org.apache.hudi.common.fs.FSUtils
 import org.apache.hudi.common.model._
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline
 import org.apache.hudi.common.table.{HoodieTableConfig, HoodieTableMetaClient, TableSchemaResolver}
-import org.apache.hudi.common.util.{CommitUtils, StringUtils}
+import org.apache.hudi.common.util.{CommitUtils, ConfigUtils, StringUtils}
 import org.apache.hudi.config.HoodieBootstrapConfig.{BASE_PATH, INDEX_CLASS_NAME}
 import org.apache.hudi.config.{HoodieInternalConfig, HoodieWriteConfig}
 import org.apache.hudi.exception.HoodieException
@@ -43,7 +43,7 @@ import org.apache.hudi.internal.DataSourceInternalWriterHelper
 import org.apache.hudi.internal.schema.InternalSchema
 import org.apache.hudi.internal.schema.utils.{AvroSchemaEvolutionUtils, SerDeHelper}
 import org.apache.hudi.keygen.factory.HoodieSparkKeyGeneratorFactory
-import org.apache.hudi.keygen.{RowKeyGeneratorHelper, SparkKeyGeneratorInterface, TimestampBasedAvroKeyGenerator, TimestampBasedKeyGenerator}
+import org.apache.hudi.keygen.{SparkKeyGeneratorInterface, TimestampBasedAvroKeyGenerator, TimestampBasedKeyGenerator}
 import org.apache.hudi.sync.common.HoodieSyncConfig
 import org.apache.hudi.sync.common.util.SyncUtilHelpers
 import org.apache.hudi.table.BulkInsertPartitioner
@@ -151,7 +151,6 @@ object HoodieSparkSqlWriter {
           .setBaseFileFormat(baseFileFormat)
           .setArchiveLogFolder(archiveLogFolder)
           .setPayloadClassName(hoodieConfig.getString(PAYLOAD_CLASS_NAME))
-          .setMergeClassName(hoodieConfig.getString(MERGE_CLASS_NAME))
           // we can't fetch preCombine field from hoodieConfig object, since it falls back to "ts" as default value,
           // but we are interested in what user has set, hence fetching from optParams.
           .setPreCombineField(optParams.getOrElse(PRECOMBINE_FIELD.key(), null))
@@ -263,11 +262,11 @@ object HoodieSparkSqlWriter {
 
 
             val writeSchema = if (dropPartitionColumns) generateAvroSchemaWithoutPartitionColumns(partitionColumns, schema) else schema
-            // Create a HoodieWriteClient & issue the write.
-            val hoodieAllIncomingRecords = createHoodieRecordRdd(df, hoodieConfig, parameters, schema)
             val client = hoodieWriteClient.getOrElse(DataSourceUtils.createHoodieClient(jsc, writeSchema.toString, path,
               tblName, mapAsJavaMap(addSchemaEvolutionParameters(parameters, internalSchemaOpt) - HoodieWriteConfig.AUTO_COMMIT_ENABLE.key)
             )).asInstanceOf[SparkRDDWriteClient[HoodieRecordPayload[Nothing]]]
+            // Create a HoodieWriteClient & issue the write.
+            val hoodieAllIncomingRecords = createHoodieRecordRdd(df, client.getConfig, parameters, schema)
 
             if (isAsyncCompactionEnabled(client, tableConfig, parameters, jsc.hadoopConfiguration())) {
               asyncCompactionTriggerFn.get.apply(client)
@@ -456,7 +455,6 @@ object HoodieSparkSqlWriter {
           .setRecordKeyFields(recordKeyFields)
           .setArchiveLogFolder(archiveLogFolder)
           .setPayloadClassName(hoodieConfig.getStringOrDefault(PAYLOAD_CLASS_NAME))
-          .setMergeClassName(hoodieConfig.getStringOrDefault(MERGE_CLASS_NAME))
           .setPreCombineField(hoodieConfig.getStringOrDefault(PRECOMBINE_FIELD, null))
           .setBootstrapIndexClass(bootstrapIndexClass)
           .setBaseFileFormat(baseFileFormat)
@@ -765,7 +763,7 @@ object HoodieSparkSqlWriter {
     }
   }
 
-  private def createHoodieRecordRdd(df: DataFrame, config: HoodieConfig, parameters: Map[String, String], schema: Schema): JavaRDD[HoodieRecord[_]] = {
+  private def createHoodieRecordRdd(df: DataFrame, config: HoodieWriteConfig, parameters: Map[String, String], schema: Schema): JavaRDD[HoodieRecord[_]] = {
     val reconcileSchema = parameters(DataSourceWriteOptions.RECONCILE_SCHEMA.key()).toBoolean
     val tblName = config.getString(HoodieWriteConfig.TBL_NAME)
     val (structName, nameSpace) = AvroConversionUtils.getAvroRecordNameAndNamespace(tblName)
@@ -777,7 +775,7 @@ object HoodieSparkSqlWriter {
     val keyGenerator = HoodieSparkKeyGeneratorFactory.createKeyGenerator(new TypedProperties(config.getProps))
     val partitionCols = HoodieSparkUtils.getPartitionColumns(keyGenerator, toProperties(parameters))
     val dropPartitionColumns = config.getBoolean(DataSourceWriteOptions.DROP_PARTITION_COLUMNS)
-   HoodieRecord.HoodieRecordType.valueOf(config.getStringOrDefault(HoodieWriteConfig.RECORD_TYPE)) match {
+    config.getRecordMerger.getRecordType match {
       case HoodieRecord.HoodieRecordType.AVRO =>
         val genericRecords: RDD[GenericRecord] = HoodieSparkUtils.createRdd(df, structName, nameSpace, reconcileSchema,
           org.apache.hudi.common.util.Option.of(schema))
@@ -801,22 +799,16 @@ object HoodieSparkSqlWriter {
         // ut will use AvroKeyGenerator, so we need to cast it in spark record
         val sparkKeyGenerator = keyGenerator.asInstanceOf[SparkKeyGeneratorInterface]
         val structType = HoodieInternalRowUtils.getCachedSchema(schema)
-        val posList = RowKeyGeneratorHelper.getFieldSchemaInfo(structType, precombineField, false).getKey
         df.queryExecution.toRdd.map(row => {
           val internalRow = row.copy()
           val (processedRow, writeSchema) = getSparkProcessedRecord(partitionCols, internalRow, dropPartitionColumns, structType)
           val recordKey = sparkKeyGenerator.getRecordKey(internalRow, structType)
           val partitionPath = sparkKeyGenerator.getPartitionPath(internalRow, structType)
           val key = new HoodieKey(recordKey, partitionPath)
-          val hoodieRecord = if (shouldCombine) {
-            val orderingVal = RowKeyGeneratorHelper.getNestedFieldVal(internalRow, structType, posList, false).asInstanceOf[Comparable[_]]
-            new HoodieSparkRecord(key, processedRow, writeSchema, orderingVal)
-          } else {
-            new HoodieSparkRecord(key, processedRow, writeSchema, 0)
-          }
-          hoodieRecord
+
+          new HoodieSparkRecord(key, processedRow, writeSchema)
         }).toJavaRDD().asInstanceOf[JavaRDD[HoodieRecord[_]]]
-   }
+    }
   }
 
 }

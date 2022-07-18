@@ -22,7 +22,8 @@ import org.apache.hudi.common.model.HoodieAvroIndexedRecord;
 import org.apache.hudi.common.model.HoodieAvroRecord;
 import org.apache.hudi.common.model.HoodieOperation;
 import org.apache.hudi.common.model.HoodieRecord;
-import org.apache.hudi.common.model.HoodieMerge;
+import org.apache.hudi.common.model.HoodieRecord.Source;
+import org.apache.hudi.common.model.HoodieRecordMerger;
 import org.apache.hudi.common.table.log.HoodieMergedLogRecordScanner;
 import org.apache.hudi.common.table.log.InstantRange;
 import org.apache.hudi.common.util.ClosableIterator;
@@ -633,7 +634,7 @@ public class MergeOnReadInputFormat
 
     private final InstantRange instantRange;
 
-    private final HoodieMerge merge;
+    private final HoodieRecordMerger recordMerger;
 
     // add the flag because the flink ParquetColumnarRowSplitReader is buggy:
     // method #reachedEnd() returns false after it returns true.
@@ -669,7 +670,7 @@ public class MergeOnReadInputFormat
       this.avroToRowDataConverter = AvroToRowDataConverters.createRowConverter(requiredRowType);
       this.projection = RowDataProjection.instance(requiredRowType, requiredPos);
       this.instantRange = split.getInstantRange().orElse(null);
-      this.merge = HoodieRecordUtils.loadMerge(finkConf.getString(FlinkOptions.MERGE_CLASS_NAME));
+      this.recordMerger = HoodieRecordUtils.loadRecordMerger(finkConf.getString(FlinkOptions.RECORD_MERGER_CLASS_NAME));
     }
 
     @Override
@@ -760,8 +761,10 @@ public class MergeOnReadInputFormat
         String curKey) throws IOException {
       final HoodieAvroRecord<?> record = (HoodieAvroRecord) scanner.getRecords().get(curKey);
       GenericRecord historyAvroRecord = (GenericRecord) rowDataToAvroConverter.convert(tableSchema, curRow);
-      // TODO IndexedRecord to HoodieRecord
-      Option<HoodieRecord> resultRecord = merge.combineAndGetUpdateValue(new HoodieAvroIndexedRecord(historyAvroRecord), record, tableSchema, new Properties());
+      HoodieAvroIndexedRecord hoodieAvroIndexedRecord = new HoodieAvroIndexedRecord(historyAvroRecord);
+      record.setSource(Source.LOG);
+      hoodieAvroIndexedRecord.setSource(Source.BASE);
+      Option<HoodieRecord> resultRecord = recordMerger.merge(hoodieAvroIndexedRecord, record, tableSchema, new Properties());
       return ((HoodieAvroIndexedRecord) resultRecord.get()).toIndexedRecord();
     }
   }

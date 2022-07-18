@@ -262,7 +262,7 @@ public class SparkBootstrapCommitActionExecutor<T>
             properties, context);
     JavaRDD<HoodieRecord> inputRecordsRDD =
         (JavaRDD<HoodieRecord>) inputProvider.generateInputRecords("bootstrap_source", config.getBootstrapSourceBasePath(),
-            partitionFilesList);
+            partitionFilesList, config);
     // Start Full Bootstrap
     final HoodieInstant requested = new HoodieInstant(State.REQUESTED, table.getMetaClient().getCommitActionType(),
         HoodieTimeline.FULL_BOOTSTRAP_INSTANT_TS);

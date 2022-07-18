@@ -289,7 +289,7 @@ public class DFSHoodieDatasetInputReader extends DFSDeltaInputReader {
           .withDiskMapType(HoodieCommonConfig.SPILLABLE_DISK_MAP_TYPE.defaultValue())
           .withBitCaskDiskMapCompressionEnabled(HoodieCommonConfig.DISK_MAP_BITCASK_COMPRESSION_ENABLED.defaultValue())
           .withRecordType(HoodieRecordType.valueOf(HoodieWriteConfig.RECORD_TYPE.defaultValue()))
-          .withMergeClass(HoodieCompactionConfig.MERGE_CLASS_NAME.defaultValue())
+          .withRecordMerger(HoodieCompactionConfig.MERGE_CLASS_NAME.defaultValue())
           .build();
       // readAvro log files
       Iterable<HoodieRecord> iterable = () -> scanner.iterator();
