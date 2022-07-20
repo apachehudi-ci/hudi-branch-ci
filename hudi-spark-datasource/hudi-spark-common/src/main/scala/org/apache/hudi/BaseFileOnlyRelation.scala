@@ -90,7 +90,6 @@ class BaseFileOnlyRelation(sqlContext: SQLContext,
     )
 
     // SPARK-37273 FileScanRDD constructor changed in SPARK 3.3
-    // TODO: Critical change introduced in Spark 3.3, need to test manually
     sparkAdapter.createHoodieFileScanRDD(sparkSession, baseFileReader, fileSplits.map(_.filePartition), requiredSchema.structTypeSchema)
       .asInstanceOf[HoodieUnsafeRDD]
   }
