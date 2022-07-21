@@ -114,12 +114,8 @@ class TestCallCommandParser extends HoodieSparkSqlTestBase {
     try {
       parser.parsePlan(sql)
     } catch {
-      case e: Throwable =>
-        if (e.getMessage.contains(errorMsg)) {
-          hasException = true
-        } else {
-          fail("Exception should contain: " + errorMsg + ", error message: " + e.getMessage, e)
-        }
+      case e: Throwable if e.getMessage.contains(errorMsg) => hasException = true
+      case f: Throwable => fail("Exception should contain: " + errorMsg + ", error message: " + f.getMessage, f)
     }
     assertResult(true)(hasException)
   }
