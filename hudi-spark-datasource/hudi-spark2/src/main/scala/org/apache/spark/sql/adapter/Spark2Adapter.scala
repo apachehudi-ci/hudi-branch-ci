@@ -125,8 +125,11 @@ class Spark2Adapter extends SparkAdapter {
     new Spark2HoodieFileScanRDD(sparkSession, readFunction, filePartitions)
   }
 
-  override def getDeleteFromTable(table: LogicalPlan, condition: Option[Expression]): LogicalPlan = {
-    DeleteFromTable(table, condition)
+  override def resolveDeleteFromTable(dft: Command,
+                                      resolveExpression: Expression => Expression): DeleteFromTable = {
+    val deleteFromTableCommand = dft.asInstanceOf[DeleteFromTable]
+    val resolvedCondition = deleteFromTableCommand.condition.map(resolveExpression)
+    DeleteFromTable(deleteFromTableCommand.table, resolvedCondition)
   }
 
   override def getQueryParserFromExtendedSqlParser(session: SparkSession, delegate: ParserInterface,

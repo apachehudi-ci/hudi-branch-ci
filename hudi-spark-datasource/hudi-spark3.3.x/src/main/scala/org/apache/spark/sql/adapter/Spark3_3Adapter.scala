@@ -20,7 +20,7 @@ package org.apache.spark.sql.adapter
 import org.apache.avro.Schema
 import org.apache.hudi.Spark33HoodieFileScanRDD
 import org.apache.spark.sql.avro._
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression, Literal}
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
 import org.apache.spark.sql.catalyst.parser.ParserInterface
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.InternalRow
@@ -81,8 +81,10 @@ class Spark3_3Adapter extends BaseSpark3Adapter {
   }
 
 
-  override def getDeleteFromTable(table: LogicalPlan, condition: Option[Expression]): DeleteFromTable = {
-    DeleteFromTable(table, condition.getOrElse(Literal.TrueLiteral))
+  override def resolveDeleteFromTable(dft: Command,
+                                      resolveExpression: Expression => Expression): DeleteFromTable = {
+    val deleteFromTableCommand = dft.asInstanceOf[DeleteFromTable]
+    DeleteFromTable(deleteFromTableCommand.table, resolveExpression(deleteFromTableCommand.condition))
   }
 
   override def getQueryParserFromExtendedSqlParser(session: SparkSession, delegate: ParserInterface,

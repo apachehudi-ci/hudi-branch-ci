@@ -27,7 +27,7 @@ import org.apache.spark.sql.catalyst.catalog.CatalogTable
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression, InterpretedPredicate}
 import org.apache.spark.sql.catalyst.parser.ParserInterface
-import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, SubqueryAlias}
+import org.apache.spark.sql.catalyst.plans.logical.{Command, LogicalPlan, SubqueryAlias}
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.datasources.{FilePartition, FileScanRDD, LogicalRelation, PartitionedFile, SparkParsePartitionUtil}
 import org.apache.spark.sql.internal.SQLConf
@@ -150,9 +150,11 @@ trait SparkAdapter extends Serializable {
                               metadataColumns: Seq[AttributeReference] = Seq.empty): FileScanRDD
 
   /**
-   * Get [[DeleteFromTable]]
+   * Resolve [[DeleteFromTable]]
+   * SPARK-38626 condition is no longer Option in Spark 3.3
    */
-  def getDeleteFromTable(table: LogicalPlan, condition: Option[Expression]): LogicalPlan
+  def resolveDeleteFromTable(dft: Command,
+                             resolveExpression: Expression => Expression): LogicalPlan
 
   /**
    * Get parseQuery from ExtendedSqlParser, only Spark 3.3+ use this

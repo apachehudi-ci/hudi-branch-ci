@@ -56,7 +56,10 @@ class Spark3_1Adapter extends BaseSpark3Adapter {
     new Spark31HoodieFileScanRDD(sparkSession, readFunction, filePartitions)
   }
 
-  override def getDeleteFromTable(table: LogicalPlan, condition: Option[Expression]): DeleteFromTable = {
-    DeleteFromTable(table, condition)
+  override def resolveDeleteFromTable(dft: Command,
+                                      resolveExpression: Expression => Expression): DeleteFromTable = {
+    val deleteFromTableCommand = dft.asInstanceOf[DeleteFromTable]
+    val resolvedCondition = deleteFromTableCommand.condition.map(resolveExpression)
+    DeleteFromTable(deleteFromTableCommand.table, resolvedCondition)
   }
 }

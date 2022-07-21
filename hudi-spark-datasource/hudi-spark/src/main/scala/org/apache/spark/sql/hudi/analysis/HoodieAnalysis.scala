@@ -424,21 +424,10 @@ case class HoodieResolveReferences(sparkSession: SparkSession) extends Rule[Logi
       UpdateTable(table, resolvedAssignments, resolvedCondition)
 
     // Resolve Delete Table
-    case DeleteFromTable(table, condition)
+    case dft @ DeleteFromTable(table, condition)
       if sparkAdapter.isHoodieTable(table, sparkSession) && table.resolved =>
-      // SPARK-38626 condition is no longer Option in Spark 3.3
-      // unwrap Option[Expression] to Expression for earlier versions of Spark
-      val unwrappedCondition: Expression = condition match {
-        case option: Option[Expression] => option.getOrElse(null)
-        case expr: Expression => expr
-        case _ => throw new IllegalArgumentException(s"condition has to be either Option[Expression] or Expression")
-      }
-      if (unwrappedCondition == null) {
-        sparkAdapter.getDeleteFromTable(table, None)
-      } else {
-        // Return the resolved DeleteTable
-        sparkAdapter.getDeleteFromTable(table, Option(resolveExpressionFrom(table)(unwrappedCondition)))
-      }
+      val resolveExpression = resolveExpressionFrom(table, None)_
+      sparkAdapter.resolveDeleteFromTable(dft, resolveExpression)
 
     // Append the meta field to the insert query to walk through the validate for the
     // number of insert fields with the number of the target table fields.
