@@ -141,10 +141,11 @@ trait SparkAdapter extends Serializable {
 
   /**
    * Create instance of [[HoodieFileScanRDD]]
+   * SPARK-37273 FileScanRDD constructor changed in SPARK 3.3
    */
-  def createHoodieFileScanRDD(@transient sparkSession: SparkSession,
+  def createHoodieFileScanRDD(sparkSession: SparkSession,
                               readFunction: PartitionedFile => Iterator[InternalRow],
-                              @transient filePartitions: Seq[FilePartition],
+                              filePartitions: Seq[FilePartition],
                               readDataSchema: StructType,
                               metadataColumns: Seq[AttributeReference] = Seq.empty): FileScanRDD
 

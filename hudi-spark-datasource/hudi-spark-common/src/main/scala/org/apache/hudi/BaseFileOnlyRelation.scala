@@ -89,7 +89,6 @@ class BaseFileOnlyRelation(sqlContext: SQLContext,
       hadoopConf = embedInternalSchema(new Configuration(conf), requiredSchema.internalSchema)
     )
 
-    // SPARK-37273 FileScanRDD constructor changed in SPARK 3.3
     sparkAdapter.createHoodieFileScanRDD(sparkSession, baseFileReader, fileSplits.map(_.filePartition), requiredSchema.structTypeSchema)
       .asInstanceOf[HoodieUnsafeRDD]
   }
