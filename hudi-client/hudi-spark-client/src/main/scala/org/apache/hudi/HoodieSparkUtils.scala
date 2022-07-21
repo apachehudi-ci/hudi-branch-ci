@@ -52,20 +52,19 @@ private[hudi] trait SparkVersionsSupport {
   def isSpark3_0: Boolean = getSparkVersion.startsWith("3.0")
   def isSpark3_1: Boolean = getSparkVersion.startsWith("3.1")
   def isSpark3_2: Boolean = getSparkVersion.startsWith("3.2")
+  def isSpark3_3: Boolean = getSparkVersion.startsWith("3.3")
 
   def gteqSpark3_1: Boolean = getSparkVersion >= "3.1"
   def gteqSpark3_1_3: Boolean = getSparkVersion >= "3.1.3"
   def gteqSpark3_2: Boolean = getSparkVersion >= "3.2"
   def gteqSpark3_2_1: Boolean = getSparkVersion >= "3.2.1"
+  def gteqSpark3_3: Boolean = getSparkVersion >= "3.3"
+  def gteqSpark3_3_0: Boolean = getSparkVersion >= "3.3.0"
 }
 
 object HoodieSparkUtils extends SparkAdapterSupport with SparkVersionsSupport {
 
   override def getSparkVersion: String = SPARK_VERSION
-
-  def isSpark3_3: Boolean = SPARK_VERSION.startsWith("3.3")
-
-  def gteqSpark3_3_0: Boolean = SPARK_VERSION >= "3.3.0"
 
   def getMetaSchema: StructType = {
     StructType(HoodieRecord.HOODIE_META_COLUMNS.asScala.map(col => {

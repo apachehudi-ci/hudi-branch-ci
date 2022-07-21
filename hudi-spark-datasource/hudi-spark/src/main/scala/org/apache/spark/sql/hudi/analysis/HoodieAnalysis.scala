@@ -44,15 +44,26 @@ import scala.collection.mutable.ListBuffer
 object HoodieAnalysis {
   type RuleBuilder = SparkSession => Rule[LogicalPlan]
 
-  def customOptimizerRules: Seq[RuleBuilder] =
-    if (HoodieSparkUtils.gteqSpark3_1) {
-      val nestedSchemaPruningClass = "org.apache.spark.sql.execution.datasources.NestedSchemaPruning"
+  def customOptimizerRules: Seq[RuleBuilder] = {
+    if (HoodieSparkUtils.gteqSpark3_3) {
+      val nestedSchemaPruningClass = "org.apache.spark.sql.execution.datasources.Spark33NestedSchemaPruning"
+      val nestedSchemaPruningRule = ReflectionUtils.loadClass(nestedSchemaPruningClass).asInstanceOf[Rule[LogicalPlan]]
+
+      Seq(_ => nestedSchemaPruningRule)
+    } else if (HoodieSparkUtils.gteqSpark3_2) {
+      val nestedSchemaPruningClass = "org.apache.spark.sql.execution.datasources.Spark32NestedSchemaPruning"
+      val nestedSchemaPruningRule = ReflectionUtils.loadClass(nestedSchemaPruningClass).asInstanceOf[Rule[LogicalPlan]]
+
+      Seq(_ => nestedSchemaPruningRule)
+    } else if (HoodieSparkUtils.gteqSpark3_1) {
+      val nestedSchemaPruningClass = "org.apache.spark.sql.execution.datasources.Spark31NestedSchemaPruning"
       val nestedSchemaPruningRule = ReflectionUtils.loadClass(nestedSchemaPruningClass).asInstanceOf[Rule[LogicalPlan]]
 
       Seq(_ => nestedSchemaPruningRule)
     } else {
       Seq.empty
     }
+  }
 
   def customResolutionRules: Seq[RuleBuilder] = {
     val rules: ListBuffer[RuleBuilder] = ListBuffer(

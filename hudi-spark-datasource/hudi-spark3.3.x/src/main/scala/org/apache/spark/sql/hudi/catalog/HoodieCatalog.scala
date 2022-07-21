@@ -23,7 +23,6 @@ import org.apache.hudi.exception.HoodieException
 import org.apache.hudi.sql.InsertMode
 import org.apache.hudi.sync.common.util.ConfigUtils
 import org.apache.hudi.{DataSourceReadOptions, DataSourceWriteOptions, SparkAdapterSupport}
-import org.apache.spark.sql.HoodieSpark3_3SqlUtils.convertTransforms
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.analysis.{NoSuchTableException, TableAlreadyExistsException, UnresolvedAttribute}
 import org.apache.spark.sql.catalyst.catalog.HoodieCatalogTable.needFilterProps
@@ -356,7 +355,7 @@ object HoodieCatalog {
         identityCols += col
 
 
-      case BucketTransform(numBuckets, FieldReference(Seq(col))) =>
+      case BucketTransform(numBuckets, Seq(FieldReference(Seq(col))), _) =>
         bucketSpec = Some(BucketSpec(numBuckets, col :: Nil, Nil))
 
       case _ =>

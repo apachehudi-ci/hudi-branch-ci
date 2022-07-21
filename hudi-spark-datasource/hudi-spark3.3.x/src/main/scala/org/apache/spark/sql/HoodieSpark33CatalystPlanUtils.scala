@@ -21,7 +21,7 @@ package org.apache.spark.sql
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, TimeTravelRelation}
 
-object HoodieSpark32CatalystPlanUtils extends HoodieSpark3CatalystPlanUtils {
+object HoodieSpark33CatalystPlanUtils extends HoodieSpark3CatalystPlanUtils {
 
   override def isRelationTimeTravel(plan: LogicalPlan): Boolean = {
     plan.isInstanceOf[TimeTravelRelation]

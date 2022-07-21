@@ -22,10 +22,11 @@ import org.apache.avro.Schema
 import org.apache.hudi.{Spark2HoodieFileScanRDD, Spark2RowSerDe}
 import org.apache.hudi.client.utils.SparkRowSerDe
 import org.apache.spark.sql.avro._
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression, InterpretedPredicate}
 import org.apache.spark.sql.catalyst.parser.ParserInterface
-import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, DeleteFromTable}
+import org.apache.spark.sql.catalyst.plans.logical.{Command, LogicalPlan, DeleteFromTable}
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat, Spark24HoodieParquetFileFormat}
 import org.apache.spark.sql.execution.datasources.{FilePartition, FileScanRDD, PartitionedFile, Spark2ParsePartitionUtil, SparkParsePartitionUtil}
 import org.apache.spark.sql.hudi.SparkAdapter

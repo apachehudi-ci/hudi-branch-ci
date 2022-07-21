@@ -28,12 +28,14 @@ import org.apache.spark.sql.execution.datasources.{FilePartition, FileScanRDD, P
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat, Spark33HoodieParquetFileFormat}
 import org.apache.spark.sql.parser.HoodieSpark3_3ExtendedSqlParser
 import org.apache.spark.sql.types.{DataType, StructType}
-import org.apache.spark.sql.{HoodieCatalystExpressionUtils, HoodieSpark3_3CatalystExpressionUtils, SparkSession}
+import org.apache.spark.sql.{HoodieCatalystExpressionUtils, HoodieCatalystPlansUtils, HoodieSpark33CatalystPlanUtils, HoodieSpark33CatalystExpressionUtils, SparkSession}
 
 /**
  * Implementation of [[SparkAdapter]] for Spark 3.3.x branch
  */
 class Spark3_3Adapter extends BaseSpark3Adapter {
+
+  def getCatalystPlanUtils: HoodieCatalystPlansUtils = HoodieSpark33CatalystPlanUtils
 
   override def createAvroSerializer(rootCatalystType: DataType, rootAvroType: Schema, nullable: Boolean): HoodieAvroSerializer =
     new HoodieSpark3_2AvroSerializer(rootCatalystType, rootAvroType, nullable)
@@ -41,32 +43,7 @@ class Spark3_3Adapter extends BaseSpark3Adapter {
   override def createAvroDeserializer(rootAvroType: Schema, rootCatalystType: DataType): HoodieAvroDeserializer =
     new HoodieSpark3_2AvroDeserializer(rootAvroType, rootCatalystType)
 
-  override def createCatalystExpressionUtils(): HoodieCatalystExpressionUtils = HoodieSpark3_3CatalystExpressionUtils
-
-  /**
-   * if the logical plan is a TimeTravelRelation LogicalPlan.
-   */
-  override def isRelationTimeTravel(plan: LogicalPlan): Boolean = {
-    plan.isInstanceOf[TimeTravelRelation]
-  }
-
-  /**
-   * Get the member of the TimeTravelRelation LogicalPlan.
-   */
-  override def getRelationTimeTravel(plan: LogicalPlan): Option[(LogicalPlan, Option[Expression], Option[String])] = {
-    plan match {
-      case timeTravel: TimeTravelRelation =>
-        Some((timeTravel.table, timeTravel.timestamp, timeTravel.version))
-      case _ =>
-        None
-    }
-  }
-
-  override def createExtendedSparkParser: Option[(SparkSession, ParserInterface) => ParserInterface] = {
-    Some(
-      (spark: SparkSession, delegate: ParserInterface) => new HoodieSpark3_3ExtendedSqlParser(spark, delegate)
-    )
-  }
+  override def getCatalystExpressionUtils(): HoodieCatalystExpressionUtils = HoodieSpark33CatalystExpressionUtils
 
   override def createHoodieParquetFileFormat(appendPartitionValues: Boolean): Option[ParquetFileFormat] = {
     Some(new Spark33HoodieParquetFileFormat(appendPartitionValues))
