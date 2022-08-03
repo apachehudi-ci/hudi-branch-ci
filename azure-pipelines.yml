@@ -61,7 +61,7 @@ variables:
   JOB1_MODULES: ${{ join(',',parameters.job1Modules) }}
   JOB2_MODULES: ${{ join(',',parameters.job2Modules) }}
   JOB3_MODULES: ${{ join(',',parameters.job3Modules) }}
-  JOB4_MODULES: ${{ join(',',parameters.job4Modules) }}
+  JOB4_MODULES: ${{ parameters.job4Modules }}
 
 stages:
   - stage: test
