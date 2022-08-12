@@ -21,6 +21,7 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hudi.HoodieConversionUtils.toJavaOption
 import org.apache.hudi.QuickstartUtils.{convertToStringList, getQuickstartWriteConfigs}
 import org.apache.hudi.common.config.HoodieMetadataConfig
+import org.apache.hudi.config.{HoodieCompactionConfig, HoodieIndexConfig, HoodieWriteConfig}
 import org.apache.hudi.common.model.HoodieRecord
 import org.apache.hudi.common.table.timeline.HoodieInstant
 import org.apache.hudi.common.table.{HoodieTableConfig, HoodieTableMetaClient, TableSchemaResolver}
@@ -28,7 +29,6 @@ import org.apache.hudi.common.testutils.HoodieTestDataGenerator
 import org.apache.hudi.common.testutils.RawTripTestPayload.{deleteRecordsToStrings, recordsToStrings}
 import org.apache.hudi.common.util
 import org.apache.hudi.common.util.PartitionPathEncodeUtils.DEFAULT_PARTITION_PATH
-import org.apache.hudi.config.HoodieWriteConfig
 import org.apache.hudi.config.metrics.HoodieMetricsConfig
 import org.apache.hudi.exception.{HoodieException, HoodieUpsertException}
 import org.apache.hudi.keygen._
@@ -96,6 +96,67 @@ class TestCOWDataSource extends HoodieClientTestBase {
     cleanupFileSystem()
     FileSystem.closeAll()
     System.gc()
+  }
+
+  @Test def testFileLayout() {
+    // generate data
+    val dataGen1 = new HoodieTestDataGenerator(Array("2022-01-01"))
+    val records1 = recordsToStrings(dataGen1.generateInserts("001", 5)).toList
+    val inputDF1 = spark.read.json(spark.sparkContext.parallelize(records1, 2))
+
+    val r = scala.util.Random
+    val num = r.nextInt(99999)
+    val tablePath = "/Users/yxchang/tables/prefix/" + num
+    val storagePath = "/Users/yxchang/tables/storage"
+//    val tablePath = "s3a://yxchang-emr-dev/tables/hudi/normal/" + num
+//    val storagePath = "s3a://yxchang-emr-dev/tables/hudi/storage"
+
+    println("Data being written: ")
+    inputDF1.show(false)
+    println("yxchang --> writing data to: " + tablePath)
+    inputDF1.write.format("hudi")
+      .options(commonOpts)
+      .option(DataSourceWriteOptions.TABLE_TYPE.key, DataSourceWriteOptions.MOR_TABLE_TYPE_OPT_VAL)
+      .option(HoodieWriteConfig.TBL_NAME.key, num)
+      .option(DataSourceWriteOptions.OPERATION.key, DataSourceWriteOptions.UPSERT_OPERATION_OPT_VAL)
+      .option(HoodieTableConfig.HOODIE_STORAGE_STRATEGY_CLASS_NAME.key, HoodieTableConfig.StorageStrategy.OBJECT_STORE.value)
+      .option(HoodieWriteConfig.STORAGE_PATH.key, storagePath)
+      .mode(SaveMode.Overwrite)
+      .save(tablePath)
+
+//    val dataGen2 = new HoodieTestDataGenerator(Array("2022-10-01"))
+//    val records2 = recordsToStrings(dataGen2.generateInserts("100", 23)).toList
+//    val inputDF2 = spark.read.json(spark.sparkContext.parallelize(records2, 2))
+//
+//    println("writing 2nd batch...")
+//    inputDF2.show(false)
+//
+//    inputDF2.write.format("hudi")
+//      .options(commonOpts)
+//      .option(DataSourceWriteOptions.TABLE_TYPE.key, DataSourceWriteOptions.MOR_TABLE_TYPE_OPT_VAL)
+//      .option(HoodieWriteConfig.TBL_NAME.key, num)
+//      .option(DataSourceWriteOptions.OPERATION.key, DataSourceWriteOptions.INSERT_OPERATION_OPT_VAL)
+//      .option(HoodieTableConfig.HOODIE_STORAGE_STRATEGY_CLASS_NAME.key, HoodieTableConfig.StorageStrategy.OBJECT_STORE.value)
+//      .option(HoodieWriteConfig.STORAGE_PATH.key, storagePath)
+//      .mode(SaveMode.Append)
+//      .save(tablePath)
+
+
+    println("Reading from metadata table")
+
+    spark.read.format("hudi")
+      .option(DataSourceReadOptions.EXTRACT_PARTITION_VALUES_FROM_PARTITION_PATH.key(), "true")
+      .option(HoodieIndexConfig.INDEX_TYPE.key(), "BLOOM")
+      .option(HoodieMetadataConfig.ENABLE.key(), "true")
+      .load(tablePath + "/.hoodie/metadata").show(false)
+
+    println("Done reading metadata, now reading from: " + tablePath)
+
+    spark.read.format("hudi")
+      .option(DataSourceReadOptions.EXTRACT_PARTITION_VALUES_FROM_PARTITION_PATH.key(), "true")
+      .option(HoodieIndexConfig.INDEX_TYPE.key(), "BLOOM")
+      .option(HoodieMetadataConfig.ENABLE.key(), "true")
+      .load(tablePath).show(false)
   }
 
   @Test def testShortNameStorage() {

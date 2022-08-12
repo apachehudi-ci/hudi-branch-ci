@@ -139,6 +139,9 @@
       <plugin>
         <groupId>org.scalastyle</groupId>
         <artifactId>scalastyle-maven-plugin</artifactId>
+        <configuration>
+          <includeTestSourceDirectory>false</includeTestSourceDirectory>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.jacoco</groupId>

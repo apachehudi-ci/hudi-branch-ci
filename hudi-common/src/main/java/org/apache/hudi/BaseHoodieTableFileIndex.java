@@ -228,8 +228,8 @@ public abstract class BaseHoodieTableFileIndex implements AutoCloseable {
     Map<PartitionPath, FileStatus[]> cachedPartitionToFiles = new HashMap<>();
 
     // Fetch from the FileStatusCache
-    List<PartitionPath> partitionPaths = getAllQueryPartitionPaths();
-    partitionPaths.forEach(partitionPath -> {
+    List<PartitionPath> logicalPartitionPaths = getAllQueryPartitionPaths();
+    logicalPartitionPaths.forEach(partitionPath -> {
       Option<FileStatus[]> filesInPartition = fileStatusCache.get(partitionPath.fullPartitionPath(basePath));
       if (filesInPartition.isPresent()) {
         cachedPartitionToFiles.put(partitionPath, filesInPartition.get());
@@ -245,7 +245,7 @@ public abstract class BaseHoodieTableFileIndex implements AutoCloseable {
     } else {
       Map<String, PartitionPath> fullPartitionPathsMapToFetch = pathToFetch.stream()
           .collect(Collectors.toMap(
-              partitionPath -> partitionPath.fullPartitionPath(basePath).toString(),
+              logicalPartitionPath -> logicalPartitionPath.fullPartitionPath(basePath).toString(),
               Function.identity())
           );
 
@@ -274,7 +274,8 @@ public abstract class BaseHoodieTableFileIndex implements AutoCloseable {
     resetTableMetadata(newTableMetadata);
 
     Map<PartitionPath, FileStatus[]> partitionFiles = loadPartitionPathFiles();
-    FileStatus[] allFiles = partitionFiles.values().stream().flatMap(Arrays::stream).toArray(FileStatus[]::new);
+    Map<String, FileStatus[]> partitionStrToFiles = partitionFiles.entrySet().stream()
+        .collect(Collectors.toMap(e -> e.getKey().path, Map.Entry::getValue));
 
     metaClient.reloadActiveTimeline();
 
@@ -284,7 +285,7 @@ public abstract class BaseHoodieTableFileIndex implements AutoCloseable {
     // TODO we can optimize the flow by:
     //  - First fetch list of files from instants of interest
     //  - Load FileStatus's
-    this.fileSystemView = new HoodieTableFileSystemView(metaClient, activeTimeline, allFiles);
+    fileSystemView = new HoodieTableFileSystemView(metaClient, activeTimeline, partitionStrToFiles);
 
     Option<String> queryInstant =
         specifiedQueryInstant.or(() -> latestInstant.map(HoodieInstant::getTimestamp));

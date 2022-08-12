@@ -123,7 +123,7 @@ public class TestCopyOnWriteActionExecutor extends HoodieClientTestBase {
       String writeToken = FSUtils.makeWriteToken(TaskContext.getPartitionId(), TaskContext.get().stageId(),
           TaskContext.get().taskAttemptId());
       HoodieCreateHandle io = new HoodieCreateHandle(config, instantTime, table, partitionPath, fileName, supplier);
-      return Pair.of(io.makeNewPath(record.getPartitionPath()), writeToken);
+      return Pair.of(io.makeNewPhysicalPath(record.getPartitionPath()), writeToken);
     }).collect().get(0);
 
     assertEquals(newPathWithWriteToken.getKey().toString(), Paths.get(this.basePath, partitionPath,

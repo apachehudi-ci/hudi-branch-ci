@@ -155,7 +155,7 @@ public class HoodieRowDataCreateHandle implements Serializable {
     stat.setNumInserts(writeStatus.getTotalRecords());
     stat.setPrevCommit(HoodieWriteStat.NULL_COMMIT);
     stat.setFileId(fileId);
-    stat.setPath(new Path(writeConfig.getBasePath()), path);
+    stat.setPath(FSUtils.getLogicalRelativeFilePathStr(partitionPath, path.getName()));
     long fileSizeInBytes = FSUtils.getFileSize(table.getMetaClient().getFs(), path);
     stat.setTotalWriteBytes(fileSizeInBytes);
     stat.setFileSizeInBytes(fileSizeInBytes);

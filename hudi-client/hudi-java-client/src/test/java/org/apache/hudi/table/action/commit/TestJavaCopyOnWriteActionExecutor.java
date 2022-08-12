@@ -99,7 +99,7 @@ public class TestJavaCopyOnWriteActionExecutor extends HoodieJavaClientTestBase 
           context.getTaskContextSupplier().getAttemptIdSupplier().get());
       HoodieCreateHandle io = new HoodieCreateHandle(config, instantTime, table, partitionPath, fileName,
           context.getTaskContextSupplier());
-      return Pair.of(io.makeNewPath(record.getPartitionPath()), writeToken);
+      return Pair.of(io.makeNewPhysicalPath(record.getPartitionPath()), writeToken);
     }).collect(Collectors.toList()).get(0);
 
     assertEquals(newPathWithWriteToken.getKey().toString(), Paths.get(this.basePath, partitionPath,

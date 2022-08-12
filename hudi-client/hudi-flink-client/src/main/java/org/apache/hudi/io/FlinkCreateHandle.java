@@ -90,7 +90,7 @@ public class FlinkCreateHandle<T extends HoodieRecordPayload, I, K, O>
     final String lastWriteToken = FSUtils.makeWriteToken(getPartitionId(), getStageId(), lastAttemptId);
     final String lastDataFileName = FSUtils.makeBaseFileName(instantTime,
         lastWriteToken, this.fileId, hoodieTable.getBaseFileExtension());
-    final Path path = makeNewFilePath(partitionPath, lastDataFileName);
+    final Path path = makeNewFilePhysicalPath(partitionPath, lastDataFileName);
     try {
       if (fs.exists(path)) {
         LOG.info("Deleting invalid INSERT file due to task retry: " + lastDataFileName);
@@ -108,8 +108,8 @@ public class FlinkCreateHandle<T extends HoodieRecordPayload, I, K, O>
   }
 
   @Override
-  public Path makeNewPath(String partitionPath) {
-    Path path = super.makeNewPath(partitionPath);
+  public Path makeNewPhysicalPath(String partitionPath) {
+    Path path = super.makeNewPhysicalPath(partitionPath);
     // If the data file already exists, it means the write task write new data bucket multiple times
     // in one hoodie commit, rolls over to a new name instead.
 
@@ -138,7 +138,7 @@ public class FlinkCreateHandle<T extends HoodieRecordPayload, I, K, O>
   private Path newFilePathWithRollover(int rollNumber) {
     final String dataFileName = FSUtils.makeBaseFileName(instantTime, writeToken + "-" + rollNumber, fileId,
         hoodieTable.getBaseFileExtension());
-    return makeNewFilePath(partitionPath, dataFileName);
+    return makeNewFilePhysicalPath(partitionPath, dataFileName);
   }
 
   @Override
@@ -160,17 +160,17 @@ public class FlinkCreateHandle<T extends HoodieRecordPayload, I, K, O>
     } catch (Throwable throwable) {
       LOG.warn("Error while trying to dispose the CREATE handle", throwable);
       try {
-        fs.delete(path, false);
-        LOG.info("Deleting the intermediate CREATE data file: " + path + " success!");
+        fs.delete(physicalPath, false);
+        LOG.info("Deleting the intermediate CREATE data file: " + physicalPath + " success!");
       } catch (IOException e) {
         // logging a warning and ignore the exception.
-        LOG.warn("Deleting the intermediate CREATE data file: " + path + " failed", e);
+        LOG.warn("Deleting the intermediate CREATE data file: " + physicalPath + " failed", e);
       }
     }
   }
 
   @Override
   public Path getWritePath() {
-    return path;
+    return physicalPath;
   }
 }

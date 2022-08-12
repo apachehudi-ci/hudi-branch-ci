@@ -18,6 +18,8 @@
 
 package org.apache.hudi.source;
 
+import java.util.HashMap;
+import java.util.Map.Entry;
 import org.apache.hudi.client.common.HoodieFlinkEngineContext;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.fs.FSUtils;
@@ -136,6 +138,7 @@ public class FileIndex {
     if (!tableExists) {
       return new FileStatus[0];
     }
+
     String[] partitions = getOrBuildPartitionPaths().stream().map(p -> fullPartitionPath(path, p)).toArray(String[]::new);
     FileStatus[] allFileStatus = FSUtils.getFilesInPartitions(HoodieFlinkEngineContext.DEFAULT, metadataConfig, path.toString(),
             partitions, "/tmp/")
@@ -145,9 +148,37 @@ public class FileIndex {
       // no need to filter by col stats or error occurs.
       return allFileStatus;
     }
+
     return Arrays.stream(allFileStatus).parallel()
         .filter(fileStatus -> candidateFiles.contains(fileStatus.getPath().getName()))
         .toArray(FileStatus[]::new);
+  }
+
+  public Map<String, FileStatus[]> getPartitionToFiles() {
+    if (!tableExists) {
+      return new HashMap<>();
+    }
+
+    String[] partitions = getOrBuildPartitionPaths().stream().map(p -> fullPartitionPath(path, p)).toArray(String[]::new);
+    Map<String, FileStatus[]> partitionToFiles = FSUtils.getFilesInPartitions(HoodieFlinkEngineContext.DEFAULT, metadataConfig, path.toString(),
+            partitions, "/tmp/");
+    FileStatus[] allFileStatus = partitionToFiles.values().stream().flatMap(Arrays::stream).toArray(FileStatus[]::new);
+    Set<String> candidateFiles = candidateFilesInMetadataTable(allFileStatus);
+    if (candidateFiles == null) {
+      // no need to filter by col stats or error occurs.
+      return partitionToFiles;
+    }
+
+    partitionToFiles = partitionToFiles.entrySet().stream()
+        .collect(Collectors.toMap(
+            Map.Entry::getKey,
+            e -> Arrays.stream(e.getValue())
+                .filter(fileStatus -> candidateFiles.contains(fileStatus.getPath().getName()))
+                .toArray(FileStatus[]::new)
+        ));
+    partitionToFiles.entrySet().removeIf(e -> e.getValue().length == 0);
+
+    return partitionToFiles;
   }
 
   /**

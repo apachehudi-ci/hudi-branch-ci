@@ -92,7 +92,7 @@ public class FlinkMergeAndReplaceHandle<T extends HoodieRecordPayload, I, K, O>
     final String lastWriteToken = FSUtils.makeWriteToken(getPartitionId(), getStageId(), lastAttemptId);
     final String lastDataFileName = FSUtils.makeBaseFileName(instantTime,
         lastWriteToken, this.fileId, hoodieTable.getBaseFileExtension());
-    final Path path = makeNewFilePath(partitionPath, lastDataFileName);
+    final Path path = makeNewFilePhysicalPath(partitionPath, lastDataFileName);
     try {
       if (fs.exists(path)) {
         LOG.info("Deleting invalid MERGE and REPLACE base file due to task retry: " + lastDataFileName);
@@ -125,7 +125,7 @@ public class FlinkMergeAndReplaceHandle<T extends HoodieRecordPayload, I, K, O>
       while (fs.exists(newFilePath)) {
         Path oldPath = newFilePath;
         newFileName = newFileNameWithRollover(rollNumber++);
-        newFilePath = makeNewFilePath(partitionPath, newFileName);
+        newFilePath = makeNewFilePhysicalPath(partitionPath, newFileName);
         LOG.warn("Duplicate write for MERGE and REPLACE handle with path: " + oldPath + ", rolls over to new path: " + newFilePath);
       }
     } catch (IOException e) {
@@ -144,7 +144,7 @@ public class FlinkMergeAndReplaceHandle<T extends HoodieRecordPayload, I, K, O>
   @Override
   protected void setWriteStatusPath() {
     // should still report the old file path.
-    writeStatus.getStat().setPath(new Path(config.getBasePath()), oldFilePath);
+    writeStatus.getStat().setPath(FSUtils.getLogicalRelativeFilePathStr(partitionPath, oldFilePath.getName()));
   }
 
   boolean needsUpdateLocation() {

@@ -25,6 +25,8 @@ import org.apache.hadoop.fs.Path;
 import javax.annotation.Nullable;
 
 import java.io.Serializable;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 
 /**
  * Statistics about a single Hoodie write operation.
@@ -33,6 +35,8 @@ import java.io.Serializable;
 public class HoodieWriteStat implements Serializable {
 
   public static final String NULL_COMMIT = "null";
+
+  private static final Logger LOG = LogManager.getLogger(HoodieWriteStat.class);
 
   /**
    * Id of the file being written.
@@ -179,6 +183,7 @@ public class HoodieWriteStat implements Serializable {
 
   public void setPath(String path) {
     this.path = path;
+    LOG.info("WriteStat, set path to: " + path);
   }
 
   public void setPrevCommit(String prevCommit) {
@@ -375,11 +380,13 @@ public class HoodieWriteStat implements Serializable {
     this.runtimeStats = runtimeStats;
   }
 
+  // TODO: remove this method
   /**
-   * Set path and tempPath relative to the given basePath.
+   * Set path and tempPath relative to the given base path.
    */
-  public void setPath(Path basePath, Path path) {
-    this.path = path.toString().replace(basePath + "/", "");
+  public void setPath(Path basePath, Path logicalPath) {
+    this.path = logicalPath.toString().replace(basePath + "/", "");
+    LOG.info("writeStat, set path to: " + this.path + ", storagePath: " + basePath);
   }
 
   @Override

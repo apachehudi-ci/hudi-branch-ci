@@ -224,12 +224,9 @@ public class FSUtils {
 
     String fullPartitionPathStr = fullPartitionPath.toString();
 
-    if (!fullPartitionPathStr.startsWith(basePath.toString())) {
-      throw new IllegalArgumentException("Partition path does not belong to base-path");
-    }
-
     int partitionStartIndex = fullPartitionPathStr.indexOf(basePath.getName(),
         basePath.getParent() == null ? 0 : basePath.getParent().toString().length());
+
     // Partition-Path could be empty for non-partitioned tables
     return partitionStartIndex + basePath.getName().length() == fullPartitionPathStr.length() ? ""
         : fullPartitionPathStr.substring(partitionStartIndex + basePath.getName().length() + 1);
@@ -600,21 +597,40 @@ public class FSUtils {
     return sizeInBytes / (1024 * 1024);
   }
 
-  public static Path getPartitionPath(String basePath, String partitionPath) {
+  public static String stripLeadingSlash(String pathStr) {
+    return pathStr.startsWith("/") ? pathStr.substring(1) : pathStr;
+  }
+
+  /**
+   * Return logical relative file path as string with given partition path and file name
+   * @param partitionPath partition path, e.g. country=usa, 2022/02/22
+   * @param fileName Hudi file name
+   * @return logical relative file path in string e.g. country=usa/abcde.parquet
+   * */
+  public static String getLogicalRelativeFilePathStr(String partitionPath, String fileName) {
+    return (partitionPath.isEmpty() ? "" : partitionPath + "/") + fileName;
+  }
+
+  public static String getPartitionPathStr(String basePath, String partitionPath) {
     if (StringUtils.isNullOrEmpty(partitionPath)) {
-      return new Path(basePath);
+      return basePath;
     }
 
     // NOTE: We have to chop leading "/" to make sure Hadoop does not treat it like
     //       absolute path
-    String properPartitionPath = partitionPath.startsWith("/")
-        ? partitionPath.substring(1)
-        : partitionPath;
-    return getPartitionPath(new CachingPath(basePath), properPartitionPath);
+    String properPartitionPath = stripLeadingSlash(partitionPath);
+
+    return String.format("%s/%s", basePath, properPartitionPath);
+  }
+
+  public static Path getPartitionPath(String basePath, String partitionPath) {
+    String pathStr = getPartitionPathStr(basePath, partitionPath);
+
+    return new Path(pathStr);
   }
 
   public static Path getPartitionPath(Path basePath, String partitionPath) {
-    // For non-partitioned table, return only base-path
+    // FOr non-partitioned table, return only base-path
     return StringUtils.isNullOrEmpty(partitionPath) ? basePath : new CachingPath(basePath, partitionPath);
   }
 
@@ -631,9 +647,7 @@ public class FSUtils {
    * @return Extracted file name in String.
    */
   public static String getFileName(String filePathWithPartition, String partition) {
-    int offset = StringUtils.isNullOrEmpty(partition)
-        ? (filePathWithPartition.startsWith("/") ? 1 : 0) : partition.length() + 1;
-    return filePathWithPartition.substring(offset);
+    return new Path(filePathWithPartition).getName();
   }
 
   /**

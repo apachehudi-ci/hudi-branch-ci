@@ -56,7 +56,7 @@ public class HoodieCreateHandle<T extends HoodieRecordPayload, I, K, O> extends 
   private static final Logger LOG = LogManager.getLogger(HoodieCreateHandle.class);
 
   protected final HoodieFileWriter<IndexedRecord> fileWriter;
-  protected final Path path;
+  protected final Path physicalPath;
   protected long recordsWritten = 0;
   protected long insertRecordsWritten = 0;
   protected long recordsDeleted = 0;
@@ -92,8 +92,7 @@ public class HoodieCreateHandle<T extends HoodieRecordPayload, I, K, O> extends 
     writeStatus.setFileId(fileId);
     writeStatus.setPartitionPath(partitionPath);
     writeStatus.setStat(new HoodieWriteStat());
-
-    this.path = makeNewPath(partitionPath);
+    this.physicalPath = makeNewPhysicalPath(partitionPath);
 
     try {
       HoodiePartitionMetadata partitionMetadata = new HoodiePartitionMetadata(fs, instantTime,
@@ -101,10 +100,10 @@ public class HoodieCreateHandle<T extends HoodieRecordPayload, I, K, O> extends 
           hoodieTable.getPartitionMetafileFormat());
       partitionMetadata.trySave(getPartitionId());
       createMarkerFile(partitionPath, FSUtils.makeBaseFileName(this.instantTime, this.writeToken, this.fileId, hoodieTable.getBaseFileExtension()));
-      this.fileWriter = HoodieFileWriterFactory.getFileWriter(instantTime, path, hoodieTable, config,
+      this.fileWriter = HoodieFileWriterFactory.getFileWriter(instantTime, physicalPath, hoodieTable, config,
         writeSchemaWithMetaFields, this.taskContextSupplier);
     } catch (IOException e) {
-      throw new HoodieInsertException("Failed to initialize HoodieStorageWriter for path " + path, e);
+      throw new HoodieInsertException("Failed to initialize HoodieStorageWriter for path " + physicalPath, e);
     }
     LOG.info("New CreateHandle for partition :" + partitionPath + " with fileId " + fileId);
   }
@@ -143,7 +142,7 @@ public class HoodieCreateHandle<T extends HoodieRecordPayload, I, K, O> extends 
         // Convert GenericRecord to GenericRecord with hoodie commit metadata in schema
         if (preserveMetadata) {
           fileWriter.writeAvro(record.getRecordKey(),
-              rewriteRecordWithMetadata((GenericRecord) avroRecord.get(), path.getName()));
+              rewriteRecordWithMetadata((GenericRecord) avroRecord.get(), physicalPath.getName()));
         } else {
           fileWriter.writeAvroWithMetadata(record.getKey(), rewriteRecord((GenericRecord) avroRecord.get()));
         }
@@ -191,7 +190,7 @@ public class HoodieCreateHandle<T extends HoodieRecordPayload, I, K, O> extends 
         }
       }
     } catch (IOException io) {
-      throw new HoodieInsertException("Failed to insert records for path " + path, io);
+      throw new HoodieInsertException("Failed to insert records for path " + physicalPath, io);
     }
   }
 
@@ -218,7 +217,7 @@ public class HoodieCreateHandle<T extends HoodieRecordPayload, I, K, O> extends 
 
       return Collections.singletonList(writeStatus);
     } catch (IOException e) {
-      throw new HoodieInsertException("Failed to close the Insert Handle for path " + path, e);
+      throw new HoodieInsertException("Failed to close the Insert Handle for path " + physicalPath, e);
     }
   }
 
@@ -235,10 +234,10 @@ public class HoodieCreateHandle<T extends HoodieRecordPayload, I, K, O> extends 
     stat.setNumInserts(insertRecordsWritten);
     stat.setPrevCommit(HoodieWriteStat.NULL_COMMIT);
     stat.setFileId(writeStatus.getFileId());
-    stat.setPath(new Path(config.getBasePath()), path);
+    stat.setPath(FSUtils.getLogicalRelativeFilePathStr(partitionPath, physicalPath.getName()));
     stat.setTotalWriteErrors(writeStatus.getTotalErrorRecords());
 
-    long fileSize = FSUtils.getFileSize(fs, path);
+    long fileSize = FSUtils.getFileSize(fs, physicalPath);
     stat.setTotalWriteBytes(fileSize);
     stat.setFileSizeInBytes(fileSize);
 

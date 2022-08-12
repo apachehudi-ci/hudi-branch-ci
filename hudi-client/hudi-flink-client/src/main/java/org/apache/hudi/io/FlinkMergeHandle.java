@@ -96,7 +96,7 @@ public class FlinkMergeHandle<T extends HoodieRecordPayload, I, K, O>
     final String lastWriteToken = FSUtils.makeWriteToken(getPartitionId(), getStageId(), lastAttemptId);
     final String lastDataFileName = FSUtils.makeBaseFileName(instantTime,
         lastWriteToken, this.fileId, hoodieTable.getBaseFileExtension());
-    final Path path = makeNewFilePath(partitionPath, lastDataFileName);
+    final Path path = makeNewFilePhysicalPath(partitionPath, lastDataFileName);
     if (path.equals(oldFilePath)) {
       // In some rare cases, the old attempt file is used as the old base file to merge
       // because the flink index eagerly records that.
@@ -151,7 +151,7 @@ public class FlinkMergeHandle<T extends HoodieRecordPayload, I, K, O>
         oldFilePath = newFilePath;
         rolloverPaths.add(oldFilePath);
         newFileName = newFileNameWithRollover(rollNumber++);
-        newFilePath = makeNewFilePath(partitionPath, newFileName);
+        newFilePath = makeNewFilePhysicalPath(partitionPath, newFileName);
         LOG.warn("Duplicate write for MERGE bucket with path: " + oldFilePath + ", rolls over to new path: " + newFilePath);
       }
     } catch (IOException e) {
@@ -170,7 +170,7 @@ public class FlinkMergeHandle<T extends HoodieRecordPayload, I, K, O>
   @Override
   protected void setWriteStatusPath() {
     // if there was rollover, should set up the path as the initial new file path.
-    writeStatus.getStat().setPath(new Path(config.getBasePath()), getWritePath());
+    writeStatus.getStat().setPath(FSUtils.getLogicalRelativeFilePathStr(partitionPath, getWritePath().getName()));
   }
 
   @Override

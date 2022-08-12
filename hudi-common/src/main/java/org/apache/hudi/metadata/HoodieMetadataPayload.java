@@ -18,6 +18,7 @@
 
 package org.apache.hudi.metadata;
 
+import java.net.URI;
 import org.apache.avro.Conversions;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
@@ -48,6 +49,7 @@ import org.apache.hudi.common.model.HoodieColumnRangeMetadata;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieRecordPayload;
+import org.apache.hudi.common.storage.HoodieStorageStrategy;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.hash.ColumnIndexID;
 import org.apache.hudi.common.util.hash.FileIndexID;
@@ -75,6 +77,8 @@ import java.util.Properties;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 
 import static org.apache.hudi.common.util.DateTimeUtils.instantToMicros;
 import static org.apache.hudi.common.util.DateTimeUtils.microsToInstant;
@@ -118,6 +122,7 @@ public class HoodieMetadataPayload implements HoodieRecordPayload<HoodieMetadata
   protected static final int METADATA_TYPE_FILE_LIST = 2;
   protected static final int METADATA_TYPE_COLUMN_STATS = 3;
   protected static final int METADATA_TYPE_BLOOM_FILTER = 4;
+  private static final Logger LOG = LogManager.getLogger(HoodieMetadataPayload.class);
 
   // HoodieMetadata schema field ids
   public static final String KEY_FIELD_NAME = HoodieHFileReader.KEY_FIELD_NAME;
@@ -199,6 +204,7 @@ public class HoodieMetadataPayload implements HoodieRecordPayload<HoodieMetadata
         filesystemMetadata.keySet().forEach(k -> {
           GenericRecord v = filesystemMetadata.get(k);
           filesystemMetadata.put(k, new HoodieMetadataFileInfo((Long) v.get("size"), (Boolean) v.get("isDeleted")));
+          LOG.info("Initializing metadata, key: " + k + ", size:" + v.get("size"));
         });
       }
 
@@ -473,21 +479,27 @@ public class HoodieMetadataPayload implements HoodieRecordPayload<HoodieMetadata
   /**
    * Returns the files added as part of this record.
    */
-  public FileStatus[] getFileStatuses(Configuration hadoopConf, Path partitionPath) throws IOException {
-    FileSystem fs = partitionPath.getFileSystem(hadoopConf);
-    return getFileStatuses(fs, partitionPath);
-  }
+  public FileStatus[] getFileStatuses(FileSystem fs, String partitionPath,
+      HoodieStorageStrategy storageStrategy) {
+    URI uri = fs.getUri();
+    String scheme = uri.getScheme();
+    String authority = uri.getAuthority();
 
-  /**
-   * Returns the files added as part of this record.
-   */
-  public FileStatus[] getFileStatuses(FileSystem fs, Path partitionPath) {
-    long blockSize = fs.getDefaultBlockSize(partitionPath);
     return filterFileInfoEntries(false)
         .map(e -> {
+          String fileName = e.getKey();
+          String fileId = FSUtils.getFileId(fileName);
+
+          // Convert logical path to physical path
+          Path physicalPartitionPath = new Path(scheme, authority,
+              storageStrategy.storageLocation(partitionPath, fileId));
+
+          long blockSize = fs.getDefaultBlockSize(physicalPartitionPath);
+
+
           // NOTE: Since we know that the Metadata Table's Payload is simply a file-name we're
           //       creating Hadoop's Path using more performant unsafe variant
-          CachingPath filePath = new CachingPath(partitionPath, createPathUnsafe(e.getKey()));
+          CachingPath filePath = new CachingPath(physicalPartitionPath, createPathUnsafe(fileName));
           return new FileStatus(e.getValue().getSize(), false, 0, blockSize, 0, 0,
               null, null, null, filePath);
         })

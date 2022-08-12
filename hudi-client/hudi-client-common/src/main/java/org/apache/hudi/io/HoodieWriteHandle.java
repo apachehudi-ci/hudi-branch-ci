@@ -36,6 +36,7 @@ import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.exception.HoodieIOException;
 import org.apache.hudi.io.storage.HoodieFileWriter;
 import org.apache.hudi.io.storage.HoodieFileWriterFactory;
+import org.apache.hudi.common.storage.HoodieStorageStrategy;
 import org.apache.hudi.table.HoodieTable;
 import org.apache.hudi.table.marker.WriteMarkersFactory;
 
@@ -107,6 +108,7 @@ public abstract class HoodieWriteHandle<T extends HoodieRecordPayload, I, K, O> 
   protected final TaskContextSupplier taskContextSupplier;
   // For full schema evolution
   protected final boolean schemaOnReadEnabled;
+  protected final HoodieStorageStrategy storageStrategy;
 
   public HoodieWriteHandle(HoodieWriteConfig config, String instantTime, String partitionPath,
                            String fileId, HoodieTable<T, I, K, O> hoodieTable, TaskContextSupplier taskContextSupplier) {
@@ -130,6 +132,7 @@ public abstract class HoodieWriteHandle<T extends HoodieRecordPayload, I, K, O> 
     this.taskContextSupplier = taskContextSupplier;
     this.writeToken = makeWriteToken();
     schemaOnReadEnabled = !isNullOrEmpty(hoodieTable.getConfig().getInternalSchema());
+    storageStrategy = config.getStorageStrategy();
   }
 
   /**
@@ -158,8 +161,9 @@ public abstract class HoodieWriteHandle<T extends HoodieRecordPayload, I, K, O> 
     return FSUtils.makeWriteToken(getPartitionId(), getStageId(), getAttemptId());
   }
 
-  public Path makeNewPath(String partitionPath) {
-    Path path = FSUtils.getPartitionPath(config.getBasePath(), partitionPath);
+  public Path makeNewPhysicalPath(String partitionPath) {
+    String storageLocation = storageStrategy.storageLocation(partitionPath, fileId);
+    Path path = new Path(storageLocation);
     try {
       if (!fs.exists(path)) {
         fs.mkdirs(path); // create a new partition as needed.
@@ -167,18 +171,19 @@ public abstract class HoodieWriteHandle<T extends HoodieRecordPayload, I, K, O> 
     } catch (IOException e) {
       throw new HoodieIOException("Failed to make dir " + path, e);
     }
+    LOG.info("write handle, physical partition path: " + path);
 
-    return new Path(path.toString(), FSUtils.makeBaseFileName(instantTime, writeToken, fileId,
+    return new Path(storageLocation, FSUtils.makeBaseFileName(instantTime, writeToken, fileId,
         hoodieTable.getMetaClient().getTableConfig().getBaseFileFormat().getFileExtension()));
   }
 
   /**
    * Make new file path with given file name.
    */
-  protected Path makeNewFilePath(String partitionPath, String fileName) {
-    String relativePath = new Path((partitionPath.isEmpty() ? "" : partitionPath + "/")
-        + fileName).toString();
-    return new Path(config.getBasePath(), relativePath);
+  protected Path makeNewFilePhysicalPath(String partitionPath, String fileName) {
+    String storageLocation = storageStrategy.storageLocation(partitionPath, fileId);
+
+    return new Path(storageLocation, fileName);
   }
 
   /**

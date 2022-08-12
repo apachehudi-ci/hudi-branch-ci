@@ -212,12 +212,12 @@ public class HoodieMergeHandle<T extends HoodieRecordPayload, I, K, O> extends H
   }
 
   protected void setWriteStatusPath() {
-    writeStatus.getStat().setPath(new Path(config.getBasePath()), newFilePath);
+    writeStatus.getStat().setPath(FSUtils.getLogicalRelativeFilePathStr(partitionPath, newFilePath.getName()));
   }
 
   protected void makeOldAndNewFilePaths(String partitionPath, String oldFileName, String newFileName) {
-    oldFilePath = makeNewFilePath(partitionPath, oldFileName);
-    newFilePath = makeNewFilePath(partitionPath, newFileName);
+    oldFilePath = makeNewFilePhysicalPath(partitionPath, oldFileName);
+    newFilePath = makeNewFilePhysicalPath(partitionPath, newFileName);
   }
 
   /**

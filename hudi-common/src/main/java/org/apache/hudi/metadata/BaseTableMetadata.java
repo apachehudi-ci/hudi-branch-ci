@@ -19,6 +19,7 @@
 
 package org.apache.hudi.metadata;
 
+import java.net.URI;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hudi.avro.model.HoodieMetadataBloomFilter;
 import org.apache.hudi.avro.model.HoodieMetadataColumnStats;
@@ -157,8 +158,8 @@ public abstract class BaseTableMetadata implements HoodieTableMetadata {
 
     if (isMetadataTableEnabled) {
       try {
-        List<Path> partitionPaths = partitions.stream().map(Path::new).collect(Collectors.toList());
-        return fetchAllFilesInPartitionPaths(partitionPaths);
+        List<Path> logicalPartitionPaths = partitions.stream().map(Path::new).collect(Collectors.toList());
+        return fetchAllFilesInPartitionPaths(logicalPartitionPaths);
       } catch (Exception e) {
         throw new HoodieMetadataException("Failed to retrieve files in partition from metadata", e);
       }
@@ -287,7 +288,7 @@ public abstract class BaseTableMetadata implements HoodieTableMetadata {
    * Returns a list of all partitions.
    */
   protected List<String> fetchAllPartitionPaths() {
-    HoodieTimer timer = new HoodieTimer().startTimer();
+    HoodieTimer timer = HoodieTimer.start();
     Option<HoodieRecord<HoodieMetadataPayload>> recordOpt = getRecordByKey(RECORDKEY_PARTITION_LIST,
         MetadataPartitionType.FILES.getPartitionPath());
     metrics.ifPresent(m -> m.updateMetrics(HoodieMetadataMetrics.LOOKUP_PARTITIONS_STR, timer.endTimer()));
@@ -315,11 +316,11 @@ public abstract class BaseTableMetadata implements HoodieTableMetadata {
    *
    * @param partitionPath The absolute path of the partition
    */
-  FileStatus[] fetchAllFilesInPartition(Path partitionPath) throws IOException {
+  FileStatus[] fetchAllFilesInPartition(Path partitionPath) {
     String relativePartitionPath = FSUtils.getRelativePartitionPath(dataBasePath.get(), partitionPath);
     String recordKey = relativePartitionPath.isEmpty() ? NON_PARTITIONED_NAME : relativePartitionPath;
 
-    HoodieTimer timer = new HoodieTimer().startTimer();
+    HoodieTimer timer = HoodieTimer.start();
     Option<HoodieRecord<HoodieMetadataPayload>> recordOpt = getRecordByKey(recordKey,
         MetadataPartitionType.FILES.getPartitionPath());
     metrics.ifPresent(m -> m.updateMetrics(HoodieMetadataMetrics.LOOKUP_FILES_STR, timer.endTimer()));
@@ -328,7 +329,8 @@ public abstract class BaseTableMetadata implements HoodieTableMetadata {
       HoodieMetadataPayload metadataPayload = record.getData();
       checkForSpuriousDeletes(metadataPayload, recordKey);
       try {
-        return metadataPayload.getFileStatuses(hadoopConf.get(), partitionPath);
+        return metadataPayload.getFileStatuses(partitionPath.getFileSystem(hadoopConf.get()), recordKey,
+            dataMetaClient.getStorageStrategy());
       } catch (IOException e) {
         throw new HoodieIOException("Failed to extract file-statuses from the payload", e);
       }
@@ -367,7 +369,9 @@ public abstract class BaseTableMetadata implements HoodieTableMetadata {
             HoodieMetadataPayload metadataPayload = record.getData();
             checkForSpuriousDeletes(metadataPayload, partitionId);
 
-            FileStatus[] files = metadataPayload.getFileStatuses(fs, partitionPath);
+            FileStatus[] files = metadataPayload.getFileStatuses(fs, partitionId, dataMetaClient.getStorageStrategy());
+
+            // return Pair<logicalPath, statuses>
             return Pair.of(partitionPath.toString(), files);
           })
               .orElse(null);
