@@ -26,15 +26,6 @@ HIVE_DATA=${WORKDIR}/data/hive
 JAR_DATA=${WORKDIR}/data/jars
 UTILITIES_DATA=${WORKDIR}/data/utilities
 
-echo "print workdir"
-ls $WORKDIR
-echo "print hive data"
-ls $HIVE_DATA
-echo "print jar data"
-ls $JAR_DATA
-echo "print utilities data"
-ls $UTILITIES_DATA
-
 run_hive_sync () {
     echo "::warning::validate.sh setting up hive sync"
     #put config files in correct place
@@ -60,6 +51,7 @@ run_hive_sync () {
 }
 
 test_utilities_bundle () {
+    echo "::warning::validate.sh running deltastreamer"
     $SPARK_HOME/bin/spark-submit --driver-memory 8g --executor-memory 8g \
     --class org.apache.hudi.utilities.deltastreamer.HoodieDeltaStreamer \
     $JARS_BEGIN $JARS_ARG \
@@ -69,6 +61,7 @@ test_utilities_bundle () {
     --source-ordering-field date_col --table-type MERGE_ON_READ \
     --target-base-path file://${OUTPUT_DIR} \
     --target-table ny_hudi_tbl  --op UPSERT
+    echo "::warning::validate.sh done with deltastreamer"
 
     OUTPUT_SIZE=$(du -s ${OUTPUT_DIR} | awk '{print $1}')
     if [[ -z $OUTPUT_SIZE || "$OUTPUT_SIZE" -lt "1000" ]]; then
@@ -76,6 +69,7 @@ test_utilities_bundle () {
         exit 1
     fi
 
+    echo "::warning::validate.sh validating deltastreamer in spark shell"
     SHELL_COMMAND="$SPARK_HOME/bin/spark-shell --jars $JARS_ARG $SHELL_ARGS -i $COMMANDS_FILE"
     LOGFILE="$WORKDIR/submit.log"
     $SHELL_COMMAND >> $LOGFILE 
@@ -84,6 +78,7 @@ test_utilities_bundle () {
         echo "::error::validate.sh $SHELL_RESULT)"
         exit 1
     fi
+    echo "::warning::validate.sh done validating deltastreamer in spark shell"
 }
 
 
@@ -94,6 +89,7 @@ test_utilities_bundle () {
 
 SHELL_ARGS=$(cat $UTILITIES_DATA/shell_args)
 
+echo "::warning::validate.sh testing utilities bundle"
 JARS_BEGIN=""
 JARS_ARG=$JAR_DATA/utilities.jar
 OUTPUT_DIR=/tmp/hudi-deltastreamer-ny/
@@ -102,7 +98,9 @@ test_utilities_bundle
 if [ "$?" -ne 0 ]; then
     exit 1
 fi
+echo "::warning::validate.sh done testing utilities bundle"
 
+echo "::warning::validate.sh testing utilities slim bundle"
 JARS_BEGIN="--jars"
 JARS_ARG="$JAR_DATA/spark.jar $JAR_DATA/utilities-slim.jar"
 OUTPUT_DIR=/tmp/hudi-deltastreamer-ny-slim/
@@ -111,4 +109,5 @@ test_utilities_bundle
 if [ "$?" -ne 0 ]; then
     exit 1
 fi
+echo "::warning::validate.sh done testing utilities slim bundle"
 
