@@ -21,20 +21,23 @@
 # $WORKDIR/jars/ is supposed to be mounted to a host directory where bundle jars are placed
 # TODO: $JAR_COMBINATIONS should have different orders for different jars to detect class loading issues
 
-WORKDIR=/opt/hudi-bundles
+WORKDIR=/opt/bundle-validation
+HIVE_DATA=${WORKDIR}/data/hive
+JAR_DATA=${WORKDIR}/data/jars
+UTILITIES_DATA=${WORKDIR}/data/utilities
 
 run_hive_sync () {
     echo "::warning::validate.sh setting up hive sync"
     #put config files in correct place
-    cp $WORKDIR/hive/spark-defaults.conf $SPARK_HOME/conf/
-    cp $WORKDIR/hive/hive-site.xml $HIVE_HOME/conf/
+    cp $HIVE_DATA/spark-defaults.conf $SPARK_HOME/conf/
+    cp $HIVE_DATA/hive-site.xml $HIVE_HOME/conf/
     ln -sf $HIVE_HOME/conf/hive-site.xml $SPARK_HOME/conf/hive-site.xml
     cp $DERBY_HOME/lib/derbyclient.jar $SPARK_HOME/jars/
 
     $DERBY_HOME/bin/startNetworkServer -h 0.0.0.0 &
     $HIVE_HOME/bin/hiveserver2 &
     echo "::warning::validate.sh hive setup complete. Testing"
-    $SPARK_HOME/bin/spark-shell --jars $WORKDIR/jars/spark.jar < $WORKDIR/hive/validate.scala
+    $SPARK_HOME/bin/spark-shell --jars $JAR_DATA/spark.jar < $HIVE_DATA/validate.scala
     if [ "$?" -ne 0 ]; then
         echo "::error::validate.sh failed hive testing)"
         exit 1
@@ -51,7 +54,7 @@ test_utilities_bundle () {
     $SPARK_HOME/bin/spark-submit --driver-memory 8g --executor-memory 8g \
     --class org.apache.hudi.utilities.deltastreamer.HoodieDeltaStreamer \
     $JARS_BEGIN $JARS_ARG \
-    --props $WORKDIR/utilities/parquet-dfs-compact.props \
+    --props $UTILITIES_DATA/parquet-dfs-compact.props \
     --schemaprovider-class org.apache.hudi.utilities.schema.FilebasedSchemaProvider \
     --source-class org.apache.hudi.utilities.sources.ParquetDFSSource \
     --source-ordering-field date_col --table-type MERGE_ON_READ \
@@ -75,26 +78,26 @@ test_utilities_bundle () {
 }
 
 
-run_hive_sync
-if [ "$?" -ne 0 ]; then
-    exit 1
-fi
+# run_hive_sync
+# if [ "$?" -ne 0 ]; then
+#     exit 1
+# fi
 
-SHELL_ARGS=$(cat $WORKDIR/utilities/shell_args)
+SHELL_ARGS=$(cat $UTILITIES_DATA/shell_args)
 
 JARS_BEGIN=""
-JARS_ARG=$WORKDIR/jars/utilities.jar
+JARS_ARG=$JAR_DATA/utilities.jar
 OUTPUT_DIR=/tmp/hudi-deltastreamer-ny/
-COMMANDS_FILE=$WORKDIR/utilities/commands.scala
+COMMANDS_FILE=$UTILITIES_DATA/commands.scala
 test_utilities_bundle
 if [ "$?" -ne 0 ]; then
     exit 1
 fi
 
 JARS_BEGIN="--jars"
-JARS_ARG="$WORKDIR/jars/spark.jar $WORKDIR/jars/utilities-slim.jar"
+JARS_ARG="$JAR_DATA/spark.jar $JAR_DATA/utilities-slim.jar"
 OUTPUT_DIR=/tmp/hudi-deltastreamer-ny-slim/
-COMMANDS_FILE=$WORKDIR/utilities/slimcommands.scala
+COMMANDS_FILE=$UTILITIES_DATA/slimcommands.scala
 test_utilities_bundle
 if [ "$?" -ne 0 ]; then
     exit 1

@@ -77,7 +77,7 @@ if [[ $SPARK_PROFILE = "spark3.2" || $SPARK_PROFILE = "spark3.3" ]]; then
     SHELL_ARGS+=" --conf 'spark.sql.catalog.spark_catalog=org.apache.spark.sql.hudi.catalog.HoodieCatalog'"
 fi
 SHELL_ARGS+=" --conf 'spark.sql.extensions=org.apache.spark.sql.hudi.HoodieSparkSessionExtension'"
-echo $SHELL_ARGS >> ${BUNDLE_VALIDATION_DIR}/utilities/shell_args
+echo $SHELL_ARGS > ${BUNDLE_VALIDATION_DIR}/utilities/shell_args
 
 #build docker image
 cd ${GITHUB_WORKSPACE}/packaging/bundle-validation || exit 1
@@ -91,4 +91,4 @@ docker build \
 .
 
 #run script in docker
-docker run -v ${GITHUB_WORKSPACE}/bundle-validation:/opt/bundle-validation -i hudi-ci-bundle-validation:$IMAGE_TAG bash validate.sh
+docker run -v ${GITHUB_WORKSPACE}/bundle-validation:/opt/bundle-validation/data -i hudi-ci-bundle-validation:$IMAGE_TAG bash validate.sh

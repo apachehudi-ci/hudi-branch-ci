@@ -18,8 +18,8 @@ FROM adoptopenjdk/openjdk8:alpine
 
 RUN apk add --no-cache --upgrade bash
 
-RUN mkdir /opt/hudi-bundles
-ENV WORKDIR=/opt/hudi-bundles
+RUN mkdir /opt/bundle-validation
+ENV WORKDIR=/opt/bundle-validation
 WORKDIR $WORKDIR
 
 ARG HADOOP_VERSION=2.7.7
