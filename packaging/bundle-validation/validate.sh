@@ -76,7 +76,7 @@ test_utilities_bundle () {
         exit 1
     fi
 
-    SHELL_COMMAND=$SPARK_HOME/bin/spark-shell --jars $JARS_ARG $SHELL_ARGS -i $COMMANDS_FILE
+    SHELL_COMMAND="$SPARK_HOME/bin/spark-shell --jars $JARS_ARG $SHELL_ARGS -i $COMMANDS_FILE"
     LOGFILE="$WORKDIR/submit.log"
     $SHELL_COMMAND >> $LOGFILE 
     if [ "$?" -ne 0 ]; then
