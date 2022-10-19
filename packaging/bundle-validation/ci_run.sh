@@ -59,9 +59,9 @@ BUNDLE_VALIDATION_DIR=${GITHUB_WORKSPACE}/bundle-validation
 mkdir $BUNDLE_VALIDATION_DIR
 JARS_DIR=${BUNDLE_VALIDATION_DIR}/jars
 mkdir $JARS_DIR
-cp packaging/hudi-spark-bundle/target/hudi-${SPARK_PROFILE}-bundle_${SCALA_PROFILE#'scala-'}-$HUDI_VERSION.jar $JARS_DIR/spark.jar
-cp packaging/hudi-utilities-bundle/target/hudi-utilities-bundle_${SCALA_PROFILE#'scala-'}-$HUDI_VERSION.jar $JARS_DIR/utilities.jar
-cp packaging/hudi-utilities-slim-bundle/target/hudi-utilities-slim-bundle_${SCALA_PROFILE#'scala-'}-$HUDI_VERSION.jar $JARS_DIR/utilities-slim.jar
+cp ${GITHUB_WORKSPACE}/packaging/hudi-spark-bundle/target/hudi-${SPARK_PROFILE}-bundle_${SCALA_PROFILE#'scala-'}-$HUDI_VERSION.jar $JARS_DIR/spark.jar
+cp ${GITHUB_WORKSPACE}/packaging/hudi-utilities-bundle/target/hudi-utilities-bundle_${SCALA_PROFILE#'scala-'}-$HUDI_VERSION.jar $JARS_DIR/utilities.jar
+cp ${GITHUB_WORKSPACE}/packaging/hudi-utilities-slim-bundle/target/hudi-utilities-slim-bundle_${SCALA_PROFILE#'scala-'}-$HUDI_VERSION.jar $JARS_DIR/utilities-slim.jar
 echo 'Validating jars below:'
 ls -l $JARS_DIR
 
@@ -80,7 +80,7 @@ SHELL_ARGS+=" --conf 'spark.sql.extensions=org.apache.spark.sql.hudi.HoodieSpark
 echo $SHELL_ARGS >> ${BUNDLE_VALIDATION_DIR}/utilities/shell_args
 
 #build docker image
-cd packaging/bundle-validation/spark-write-hive-sync || exit 1
+cd ${GITHUB_WORKSPACE}/packaging/bundle-validation || exit 1
 docker build \
 --build-arg HADOOP_VERSION=$HADOOP_VERSION \
 --build-arg HIVE_VERSION=$HIVE_VERSION \
