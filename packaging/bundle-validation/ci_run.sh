@@ -72,11 +72,11 @@ cp -r ${GITHUB_WORKSPACE}/packaging/bundle-validation/hive ${BUNDLE_VALIDATION_D
 cp -r ${GITHUB_WORKSPACE}/packaging/bundle-validation/utilities ${BUNDLE_VALIDATION_DIR}/
 
 #add shell args to utilities data
-SHELL_ARGS=" --conf 'spark.serializer=org.apache.spark.serializer.KryoSerializer'" 
+SHELL_ARGS=" --conf spark.serializer=org.apache.spark.serializer.KryoSerializer" 
 if [[ $SPARK_PROFILE = "spark3.2" || $SPARK_PROFILE = "spark3.3" ]]; then
-    SHELL_ARGS+=" --conf 'spark.sql.catalog.spark_catalog=org.apache.spark.sql.hudi.catalog.HoodieCatalog'"
+    SHELL_ARGS+=" --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.hudi.catalog.HoodieCatalog"
 fi
-SHELL_ARGS+=" --conf 'spark.sql.extensions=org.apache.spark.sql.hudi.HoodieSparkSessionExtension'"
+SHELL_ARGS+=" --conf spark.sql.extensions=org.apache.spark.sql.hudi.HoodieSparkSessionExtension"
 echo $SHELL_ARGS > ${BUNDLE_VALIDATION_DIR}/utilities/shell_args
 
 #build docker image
