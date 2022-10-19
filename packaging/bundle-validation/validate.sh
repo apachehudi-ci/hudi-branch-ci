@@ -26,6 +26,11 @@ HIVE_DATA=${WORKDIR}/data/hive
 JAR_DATA=${WORKDIR}/data/jars
 UTILITIES_DATA=${WORKDIR}/data/utilities
 
+ls $WORKDIR
+ls $HIVE_DATA
+ls $JAR_DATA
+ls $UTILITIES_DATA
+
 run_hive_sync () {
     echo "::warning::validate.sh setting up hive sync"
     #put config files in correct place
