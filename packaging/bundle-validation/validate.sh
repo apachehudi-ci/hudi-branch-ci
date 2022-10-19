@@ -26,9 +26,13 @@ HIVE_DATA=${WORKDIR}/data/hive
 JAR_DATA=${WORKDIR}/data/jars
 UTILITIES_DATA=${WORKDIR}/data/utilities
 
+echo "print workdir"
 ls $WORKDIR
+echo "print hive data"
 ls $HIVE_DATA
+echo "print jar data"
 ls $JAR_DATA
+echo "print utilities data"
 ls $UTILITIES_DATA
 
 run_hive_sync () {
