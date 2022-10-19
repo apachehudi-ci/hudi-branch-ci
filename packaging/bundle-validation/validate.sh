@@ -71,6 +71,7 @@ test_utilities_bundle () {
 
     echo "::warning::validate.sh validating deltastreamer in spark shell"
     SHELL_COMMAND="$SPARK_HOME/bin/spark-shell --jars $JARS_ARG $SHELL_ARGS -i $COMMANDS_FILE"
+    echo "this is the shell command: $SHELL_COMMAND"
     LOGFILE="$WORKDIR/submit.log"
     $SHELL_COMMAND >> $LOGFILE 
     if [ "$?" -ne 0 ]; then
