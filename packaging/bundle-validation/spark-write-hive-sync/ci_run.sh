@@ -22,11 +22,6 @@
 # and contains environment-specific variables
 
 HUDI_VERSION=$1
-# to store bundle jars for validation
-mkdir ${GITHUB_WORKSPACE}/jars
-cp packaging/hudi-spark-bundle/target/hudi-*-$HUDI_VERSION.jar ${GITHUB_WORKSPACE}/jars
-echo 'Validating jars below:'
-ls -l ${GITHUB_WORKSPACE}/jars
 
 # choose versions based on build profiles
 if [[ ${SPARK_PROFILE} == 'spark2.4' ]]; then
@@ -59,6 +54,32 @@ elif [[ ${SPARK_PROFILE} == 'spark3.3' ]]; then
   IMAGE_TAG=spark330hive313
 fi
 
+#Copy bundle jars
+BUNDLE_VALIDATION_DIR=${GITHUB_WORKSPACE}/bundle-validation
+mkdir $BUNDLE_VALIDATION_DIR
+JARS_DIR=${BUNDLE_VALIDATION_DIR}/jars
+mkdir $JARS_DIR
+cp packaging/hudi-spark-bundle/target/hudi-${SPARK_PROFILE}-bundle_${SCALA_PROFILE#'scala-'}-$HUDI_VERSION.jar $JARS_DIR/spark.jar
+cp packaging/hudi-utilities-bundle/target/hudi-utilities-bundle_${SCALA_PROFILE#'scala-'}-$HUDI_VERSION.jar $JARS_DIR/utilities.jar
+cp packaging/hudi-utilities-slim-bundle/target/hudi-utilities-slim-bundle_${SCALA_PROFILE#'scala-'}-$HUDI_VERSION.jar $JARS_DIR/utilities-slim.jar
+echo 'Validating jars below:'
+ls -l $JARS_DIR
+
+#Copy hive data
+cp -r ${GITHUB_WORKSPACE}/packaging/bundle-validation/hive ${BUNDLE_VALIDATION_DIR}/
+
+#Copy utilities data
+cp -r ${GITHUB_WORKSPACE}/packaging/bundle-validation/utilities ${BUNDLE_VALIDATION_DIR}/
+
+#add shell args to utilities data
+SHELL_ARGS=" --conf 'spark.serializer=org.apache.spark.serializer.KryoSerializer'" 
+if [[ $SPARK_PROFILE = "spark3.2" || $SPARK_PROFILE = "spark3.3" ]]; then
+    SHELL_ARGS+=" --conf 'spark.sql.catalog.spark_catalog=org.apache.spark.sql.hudi.catalog.HoodieCatalog'"
+fi
+SHELL_ARGS+=" --conf 'spark.sql.extensions=org.apache.spark.sql.hudi.HoodieSparkSessionExtension'"
+echo $SHELL_ARGS >> ${BUNDLE_VALIDATION_DIR}/utilities/shell_args
+
+#build docker image
 cd packaging/bundle-validation/spark-write-hive-sync || exit 1
 docker build \
 --build-arg HADOOP_VERSION=$HADOOP_VERSION \
@@ -68,4 +89,6 @@ docker build \
 --build-arg SPARK_HADOOP_VERSION=$SPARK_HADOOP_VERSION \
 -t hudi-ci-bundle-validation:$IMAGE_TAG \
 .
-docker run -v ${GITHUB_WORKSPACE}/jars:/opt/hudi-bundles/jars -i hudi-ci-bundle-validation:$IMAGE_TAG bash validate.sh
+
+#run script in docker
+docker run -v ${GITHUB_WORKSPACE}/bundle-validation:/opt/bundle-validation -i hudi-ci-bundle-validation:$IMAGE_TAG bash validate.sh

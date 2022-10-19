@@ -21,10 +21,82 @@
 # $WORKDIR/jars/ is supposed to be mounted to a host directory where bundle jars are placed
 # TODO: $JAR_COMBINATIONS should have different orders for different jars to detect class loading issues
 
-$DERBY_HOME/bin/startNetworkServer -h 0.0.0.0 &
-$HIVE_HOME/bin/hiveserver2 &
 WORKDIR=/opt/hudi-bundles
-JAR_COMBINATIONS=$(echo $WORKDIR/jars/*.jar | tr ' ' ',')
-$SPARK_HOME/bin/spark-shell --jars $JAR_COMBINATIONS < $WORKDIR/validate.scala
 
-exit $?
+run_hive_sync () {
+    echo "::warning::validate.sh setting up hive sync"
+    #put config files in correct place
+    cp $WORKDIR/hive/spark-defaults.conf $SPARK_HOME/conf/
+    cp $WORKDIR/hive/hive-site.xml $HIVE_HOME/conf/
+    ln -sf $HIVE_HOME/conf/hive-site.xml $SPARK_HOME/conf/hive-site.xml
+    cp $DERBY_HOME/lib/derbyclient.jar $SPARK_HOME/jars/
+
+    $DERBY_HOME/bin/startNetworkServer -h 0.0.0.0 &
+    $HIVE_HOME/bin/hiveserver2 &
+    echo "::warning::validate.sh hive setup complete. Testing"
+    $SPARK_HOME/bin/spark-shell --jars $WORKDIR/jars/spark.jar < $WORKDIR/hive/validate.scala
+    if [ "$?" -ne 0 ]; then
+        echo "::error::validate.sh failed hive testing)"
+        exit 1
+    fi
+    echo "::warning::validate.sh hive testing succesfull. Cleaning up hive sync"
+    #remove config files
+    rm -f $SPARK_HOME/jars/derbyclient.jar
+    unlink $SPARK_HOME/conf/hive-site.xml
+    rm -f $HIVE_HOME/conf/hive-site.xml
+    rm -f $SPARK_HOME/conf/spark-defaults.conf
+}
+
+test_utilities_bundle () {
+    $SPARK_HOME/bin/spark-submit --driver-memory 8g --executor-memory 8g \
+    --class org.apache.hudi.utilities.deltastreamer.HoodieDeltaStreamer \
+    $JARS_BEGIN $JARS_ARG \
+    --props $WORKDIR/utilities/parquet-dfs-compact.props \
+    --schemaprovider-class org.apache.hudi.utilities.schema.FilebasedSchemaProvider \
+    --source-class org.apache.hudi.utilities.sources.ParquetDFSSource \
+    --source-ordering-field date_col --table-type MERGE_ON_READ \
+    --target-base-path file://${OUTPUT_DIR} \
+    --target-table ny_hudi_tbl  --op UPSERT
+
+    OUTPUT_SIZE=$(du -s ${OUTPUT_DIR} | awk '{print $1}')
+    if [[ -z $OUTPUT_SIZE || "$OUTPUT_SIZE" -lt "1000" ]]; then
+        echo "::error::validate.sh deltastreamer output folder is much smaller than expected)" 
+        exit 1
+    fi
+
+    SHELL_COMMAND=$SPARK_HOME/bin/spark-shell --jars $JARS_ARG $SHELL_ARGS -i $COMMANDS_FILE
+    LOGFILE="$WORKDIR/submit.log"
+    $SHELL_COMMAND >> $LOGFILE 
+    if [ "$?" -ne 0 ]; then
+        SHELL_RESULT=$(cat $LOGFILE | grep "Counts don't match")
+        echo "::error::validate.sh $SHELL_RESULT)"
+        exit 1
+    fi
+}
+
+
+run_hive_sync
+if [ "$?" -ne 0 ]; then
+    exit 1
+fi
+
+SHELL_ARGS=$(cat $WORKDIR/utilities/shell_args)
+
+JARS_BEGIN=""
+JARS_ARG=$WORKDIR/jars/utilities.jar
+OUTPUT_DIR=/tmp/hudi-deltastreamer-ny/
+COMMANDS_FILE=$WORKDIR/utilities/commands.scala
+test_utilities_bundle
+if [ "$?" -ne 0 ]; then
+    exit 1
+fi
+
+JARS_BEGIN="--jars"
+JARS_ARG="$WORKDIR/jars/spark.jar $WORKDIR/jars/utilities-slim.jar"
+OUTPUT_DIR=/tmp/hudi-deltastreamer-ny-slim/
+COMMANDS_FILE=$WORKDIR/utilities/slimcommands.scala
+test_utilities_bundle
+if [ "$?" -ne 0 ]; then
+    exit 1
+fi
+
