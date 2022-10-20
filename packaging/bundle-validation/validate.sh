@@ -51,10 +51,14 @@ run_hive_sync () {
 }
 
 test_utilities_bundle () {
+    OPT_JARS=""
+    if [[ -n $ADDITIONAL_JARS ]]; then
+        OPT_JARS="--jars $ADDITIONAL_JARS"
+    fi
     echo "::warning::validate.sh running deltastreamer"
     $SPARK_HOME/bin/spark-submit --driver-memory 8g --executor-memory 8g \
     --class org.apache.hudi.utilities.deltastreamer.HoodieDeltaStreamer \
-    $JARS_BEGIN $JARS_ARG \
+    $OPT_JARS $MAIN_JAR \
     --props $UTILITIES_DATA/parquet-dfs-compact.props \
     --schemaprovider-class org.apache.hudi.utilities.schema.FilebasedSchemaProvider \
     --source-class org.apache.hudi.utilities.sources.ParquetDFSSource \
@@ -70,7 +74,7 @@ test_utilities_bundle () {
     fi
 
     echo "::warning::validate.sh validating deltastreamer in spark shell"
-    SHELL_COMMAND="$SPARK_HOME/bin/spark-shell --jars $JARS_ARG $SHELL_ARGS -i $COMMANDS_FILE"
+    SHELL_COMMAND="$SPARK_HOME/bin/spark-shell --jars $ADDITIONAL_JARS $MAIN_JAR $SHELL_ARGS -i $COMMANDS_FILE"
     echo "this is the shell command: $SHELL_COMMAND"
     LOGFILE="$WORKDIR/submit.log"
     $SHELL_COMMAND >> $LOGFILE 
@@ -91,8 +95,8 @@ test_utilities_bundle () {
 SHELL_ARGS=$(cat $UTILITIES_DATA/shell_args)
 
 echo "::warning::validate.sh testing utilities bundle"
-JARS_BEGIN=""
-JARS_ARG=$JAR_DATA/utilities.jar
+MAIN_JAR=$JAR_DATA/utilities.jar
+ADDITIONAL_JARS=""
 OUTPUT_DIR=/tmp/hudi-deltastreamer-ny/
 COMMANDS_FILE=$UTILITIES_DATA/commands.scala
 test_utilities_bundle
@@ -102,8 +106,8 @@ fi
 echo "::warning::validate.sh done testing utilities bundle"
 
 echo "::warning::validate.sh testing utilities slim bundle"
-JARS_BEGIN="--jars"
-JARS_ARG="$JAR_DATA/spark.jar $JAR_DATA/utilities-slim.jar"
+MAIN_JAR=$JAR_DATA/utilities-slim.jar
+ADDITIONAL_JARS=$JAR_DATA/spark.jar
 OUTPUT_DIR=/tmp/hudi-deltastreamer-ny-slim/
 COMMANDS_FILE=$UTILITIES_DATA/slimcommands.scala
 test_utilities_bundle
