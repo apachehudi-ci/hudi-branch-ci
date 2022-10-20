@@ -59,10 +59,10 @@ test_utilities_bundle () {
     $SPARK_HOME/bin/spark-submit --driver-memory 8g --executor-memory 8g \
     --class org.apache.hudi.utilities.deltastreamer.HoodieDeltaStreamer \
     $OPT_JARS $MAIN_JAR \
-    --props $UTILITIES_DATA/parquet-dfs-compact.props \
+    --props $UTILITIES_DATA/newProps.props \
     --schemaprovider-class org.apache.hudi.utilities.schema.FilebasedSchemaProvider \
-    --source-class org.apache.hudi.utilities.sources.ParquetDFSSource \
-    --source-ordering-field date_col --table-type MERGE_ON_READ \
+    --source-class org.apache.hudi.utilities.sources.JsonDFSSource \
+    --source-ordering-field ts --table-type MERGE_ON_READ \
     --target-base-path file://${OUTPUT_DIR} \
     --target-table ny_hudi_tbl  --op UPSERT
     echo "::warning::validate.sh done with deltastreamer"

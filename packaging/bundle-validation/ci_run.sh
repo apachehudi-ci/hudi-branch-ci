@@ -70,6 +70,7 @@ cp -r ${GITHUB_WORKSPACE}/packaging/bundle-validation/hive ${BUNDLE_VALIDATION_D
 
 # Copy utilities data
 cp -r ${GITHUB_WORKSPACE}/packaging/bundle-validation/utilities ${BUNDLE_VALIDATION_DIR}/
+cp -r ${GITHUB_WORKSPACE}/docker/demo/data ${BUNDLE_VALIDATION_DIR}/
 
 # add shell args to utilities data
 SHELL_ARGS=" --conf spark.serializer=org.apache.spark.serializer.KryoSerializer" 

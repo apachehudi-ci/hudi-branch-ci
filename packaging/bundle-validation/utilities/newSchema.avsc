@@ -1,0 +1,54 @@
+{
+    "type" : "record",
+    "name" : "test_struct",
+    "namespace" : "test_namespace",
+    "fields" : [ {
+        "name" : "close",
+        "type" : [ "null", "double" ],
+        "default" : null
+    }, {
+        "name" : "date",
+        "type" : [ "null", "string" ],
+        "default" : null
+    }, {
+        "name" : "day",
+        "type" : [ "null", "string" ],
+        "default" : null
+    }, {
+        "name" : "high",
+        "type" : [ "null", "double" ],
+        "default" : null
+    }, {
+        "name" : "key",
+        "type" : [ "null", "string" ],
+        "default" : null
+    }, {
+        "name" : "low",
+        "type" : [ "null", "double" ],
+        "default" : null
+    }, {
+        "name" : "month",
+        "type" : [ "null", "string" ],
+        "default" : null
+    }, {
+        "name" : "open",
+        "type" : [ "null", "double" ],
+        "default" : null
+    }, {
+        "name" : "symbol",
+        "type" : [ "null", "string" ],
+        "default" : null
+    }, {
+        "name" : "ts",
+        "type" : [ "null", "string" ],
+        "default" : null
+    }, {
+        "name" : "volume",
+        "type" : [ "null", "long" ],
+        "default" : null
+    }, {
+        "name" : "year",
+        "type" : [ "null", "long" ],
+        "default" : null
+    } ]
+}
