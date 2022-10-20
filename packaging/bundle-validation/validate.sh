@@ -107,14 +107,14 @@ if [ "$?" -ne 0 ]; then
 fi
 echo "::warning::validate.sh done testing utilities bundle"
 
-echo "::warning::validate.sh testing utilities slim bundle"
-MAIN_JAR=$JAR_DATA/utilities-slim.jar
-ADDITIONAL_JARS=$JAR_DATA/spark.jar
-OUTPUT_DIR=/tmp/hudi-deltastreamer-ny-slim/
-COMMANDS_FILE=$UTILITIES_DATA/slimcommands.scala
-test_utilities_bundle
-if [ "$?" -ne 0 ]; then
-    exit 1
-fi
-echo "::warning::validate.sh done testing utilities slim bundle"
+# echo "::warning::validate.sh testing utilities slim bundle"
+# MAIN_JAR=$JAR_DATA/utilities-slim.jar
+# ADDITIONAL_JARS=$JAR_DATA/spark.jar
+# OUTPUT_DIR=/tmp/hudi-deltastreamer-ny-slim/
+# COMMANDS_FILE=$UTILITIES_DATA/slimcommands.scala
+# test_utilities_bundle
+# if [ "$?" -ne 0 ]; then
+#     exit 1
+# fi
+# echo "::warning::validate.sh done testing utilities slim bundle"
 
