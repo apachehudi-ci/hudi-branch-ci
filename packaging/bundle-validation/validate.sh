@@ -26,9 +26,9 @@ HIVE_DATA=${WORKDIR}/data/hive
 JAR_DATA=${WORKDIR}/data/jars
 UTILITIES_DATA=${WORKDIR}/data/utilities
 
-run_hive_sync () {
+test_spark_bundle () {
     echo "::warning::validate.sh setting up hive sync"
-    #put config files in correct place
+    # put config files in correct place
     cp $HIVE_DATA/spark-defaults.conf $SPARK_HOME/conf/
     cp $HIVE_DATA/hive-site.xml $HIVE_HOME/conf/
     ln -sf $HIVE_HOME/conf/hive-site.xml $SPARK_HOME/conf/hive-site.xml
@@ -43,7 +43,7 @@ run_hive_sync () {
         exit 1
     fi
     echo "::warning::validate.sh hive testing succesfull. Cleaning up hive sync"
-    #remove config files
+    # remove config files
     rm -f $SPARK_HOME/jars/derbyclient.jar
     unlink $SPARK_HOME/conf/hive-site.xml
     rm -f $HIVE_HOME/conf/hive-site.xml
@@ -87,7 +87,7 @@ test_utilities_bundle () {
 }
 
 
-# run_hive_sync
+# test_spark_bundle
 # if [ "$?" -ne 0 ]; then
 #     exit 1
 # fi
