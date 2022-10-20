@@ -1,5 +1,5 @@
 val hudiDf = spark.read.format("org.apache.hudi").load("/tmp/hudi-deltastreamer-ny/")
-val inputDf = spark.read.format("json").load("/opt/bundle-validation/data/utilities/data/*.json")
+val inputDf = spark.read.format("json").load("/opt/bundle-validation/data/utilities/data/")
 hudiDf.registerTempTable("hudi_tbl")
 inputDf.registerTempTable("src_tbl")
 val hudiCount = spark.sql("select distinct date_col, VendorID from hudi_tbl").count()
