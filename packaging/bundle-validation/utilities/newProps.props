@@ -1,5 +1,5 @@
 hoodie.datasource.write.recordkey.field=key
-hoodie.datasource.write.partitionpath.field=ts
+hoodie.datasource.write.partitionpath.field=date
 hoodie.datasource.write.precombine.field=ts
 hoodie.metadata.enable=true
 hoodie.upsert.shuffle.parallelism=8
