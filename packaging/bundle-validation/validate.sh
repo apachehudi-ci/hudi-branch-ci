@@ -64,7 +64,7 @@ test_utilities_bundle () {
     --source-class org.apache.hudi.utilities.sources.JsonDFSSource \
     --source-ordering-field ts --table-type MERGE_ON_READ \
     --target-base-path file://${OUTPUT_DIR} \
-    --target-table ny_hudi_tbl  --op UPSERT
+    --target-table utilities_tbl  --op UPSERT
     echo "::warning::validate.sh done with deltastreamer"
 
     OUTPUT_SIZE=$(du -s ${OUTPUT_DIR} | awk '{print $1}')
@@ -74,19 +74,15 @@ test_utilities_bundle () {
     fi
 
     echo "::warning::validate.sh validating deltastreamer in spark shell"
-    SHELL_COMMAND="$SPARK_HOME/bin/spark-shell --jars $ADDITIONAL_JARS $MAIN_JAR $SHELL_ARGS"
-    # -i $COMMANDS_FILE"
-    echo "this is the shell command: $SHELL_COMMAND"
+    SHELL_COMMAND="$SPARK_HOME/bin/spark-shell --jars $ADDITIONAL_JARS $MAIN_JAR $SHELL_ARGS -i $COMMANDS_FILE"
+    echo "::debug::this is the shell command: $SHELL_COMMAND"
     LOGFILE="$WORKDIR/submit.log"
-    #$SHELL_COMMAND >> $LOGFILE
-    $SHELL_COMMAND < $COMMANDS_FILE 
+    $SHELL_COMMAND >> $LOGFILE
     if [ "$?" -ne 0 ]; then
         SHELL_RESULT=$(cat $LOGFILE | grep "Counts don't match")
         echo "::error::validate.sh $SHELL_RESULT"
         exit 1
     fi
-    echo "::warning::validate.sh printing log file"
-    cat $LOGFILE
     echo "::warning::validate.sh done validating deltastreamer in spark shell"
 }
 
@@ -101,7 +97,7 @@ SHELL_ARGS=$(cat $UTILITIES_DATA/shell_args)
 echo "::warning::validate.sh testing utilities bundle"
 MAIN_JAR=$JAR_DATA/utilities.jar
 ADDITIONAL_JARS=""
-OUTPUT_DIR=/tmp/hudi-deltastreamer-ny/
+OUTPUT_DIR=/tmp/hudi-utilities-test/
 COMMANDS_FILE=$UTILITIES_DATA/commands.scala
 test_utilities_bundle
 if [ "$?" -ne 0 ]; then
@@ -109,14 +105,14 @@ if [ "$?" -ne 0 ]; then
 fi
 echo "::warning::validate.sh done testing utilities bundle"
 
-# echo "::warning::validate.sh testing utilities slim bundle"
-# MAIN_JAR=$JAR_DATA/utilities-slim.jar
-# ADDITIONAL_JARS=$JAR_DATA/spark.jar
-# OUTPUT_DIR=/tmp/hudi-deltastreamer-ny-slim/
-# COMMANDS_FILE=$UTILITIES_DATA/slimcommands.scala
-# test_utilities_bundle
-# if [ "$?" -ne 0 ]; then
-#     exit 1
-# fi
-# echo "::warning::validate.sh done testing utilities slim bundle"
+echo "::warning::validate.sh testing utilities slim bundle"
+MAIN_JAR=$JAR_DATA/utilities-slim.jar
+ADDITIONAL_JARS=$JAR_DATA/spark.jar
+OUTPUT_DIR=/tmp/hudi-utilities-slim-test/
+COMMANDS_FILE=$UTILITIES_DATA/slimcommands.scala
+test_utilities_bundle
+if [ "$?" -ne 0 ]; then
+    exit 1
+fi
+echo "::warning::validate.sh done testing utilities slim bundle"
 
