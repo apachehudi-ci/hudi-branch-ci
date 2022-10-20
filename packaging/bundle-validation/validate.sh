@@ -74,13 +74,13 @@ test_utilities_bundle () {
     fi
 
     echo "::warning::validate.sh validating deltastreamer in spark shell"
-    SHELL_COMMAND="$SPARK_HOME/bin/spark-shell --jars $ADDITIONAL_JARS $MAIN_JAR $SHELL_ARGS"# -i $COMMANDS_FILE"
+    SHELL_COMMAND="$SPARK_HOME/bin/spark-shell --jars $ADDITIONAL_JARS $MAIN_JAR $SHELL_ARGS -i $COMMANDS_FILE"
     echo "this is the shell command: $SHELL_COMMAND"
     LOGFILE="$WORKDIR/submit.log"
     $SHELL_COMMAND #>> $LOGFILE 
     if [ "$?" -ne 0 ]; then
         SHELL_RESULT=$(cat $LOGFILE | grep "Counts don't match")
-        echo "::error::validate.sh $SHELL_RESULT)"
+        echo "::error::validate.sh $SHELL_RESULT"
         exit 1
     fi
     echo "::warning::validate.sh done validating deltastreamer in spark shell"
