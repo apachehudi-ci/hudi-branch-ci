@@ -69,7 +69,7 @@ test_utilities_bundle () {
 
     OUTPUT_SIZE=$(du -s ${OUTPUT_DIR} | awk '{print $1}')
     if [[ -z $OUTPUT_SIZE || "$OUTPUT_SIZE" -lt "1000" ]]; then
-        echo "::error::validate.sh deltastreamer output folder is much smaller than expected)" 
+        echo "::error::validate.sh deltastreamer output folder is much smaller than expected ($OUTPUT_SIZE))" 
         exit 1
     fi
 
