@@ -59,14 +59,9 @@ BUNDLE_VALIDATION_DIR=${GITHUB_WORKSPACE}/bundle-validation
 mkdir $BUNDLE_VALIDATION_DIR
 JARS_DIR=${BUNDLE_VALIDATION_DIR}/jars
 mkdir $JARS_DIR
-ln -sf ${GITHUB_WORKSPACE}/packaging/hudi-spark-bundle/target/hudi-*-$HUDI_VERSION.jar $JARS_DIR/spark.jar
-ln -sf ${GITHUB_WORKSPACE}/packaging/hudi-utilities-bundle/target/hudi-*-$HUDI_VERSION.jar $JARS_DIR/utilities.jar
-ln -sf ${GITHUB_WORKSPACE}/packaging/hudi-utilities-slim-bundle/target/hudi-*-$HUDI_VERSION.jar $JARS_DIR/utilities-slim.jar
-
-
-#cp ${GITHUB_WORKSPACE}/packaging/hudi-spark-bundle/target/hudi-${SPARK_PROFILE}-bundle_${SCALA_PROFILE#'scala-'}-$HUDI_VERSION.jar $JARS_DIR/spark.jar
-#cp ${GITHUB_WORKSPACE}/packaging/hudi-utilities-bundle/target/hudi-utilities-bundle_${SCALA_PROFILE#'scala-'}-$HUDI_VERSION.jar $JARS_DIR/utilities.jar
-#cp ${GITHUB_WORKSPACE}/packaging/hudi-utilities-slim-bundle/target/hudi-utilities-slim-bundle_${SCALA_PROFILE#'scala-'}-$HUDI_VERSION.jar $JARS_DIR/utilities-slim.jar
+cp ${GITHUB_WORKSPACE}/packaging/hudi-spark-bundle/target/hudi-*-$HUDI_VERSION.jar $JARS_DIR/
+cp ${GITHUB_WORKSPACE}/packaging/hudi-utilities-bundle/target/hudi-*-$HUDI_VERSION.jar $JARS_DIR/
+cp ${GITHUB_WORKSPACE}/packaging/hudi-utilities-slim-bundle/target/hudi-*-$HUDI_VERSION.jar $JARS_DIR/
 echo 'Validating jars below:'
 ls -l $JARS_DIR
 

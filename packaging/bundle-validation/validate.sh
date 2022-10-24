@@ -26,6 +26,10 @@ HIVE_DATA=${WORKDIR}/data/hive
 JAR_DATA=${WORKDIR}/data/jars
 UTILITIES_DATA=${WORKDIR}/data/utilities
 
+ln -s $JAR_DATA/hudi-spark*.jar $JAR_DATA/spark.jar
+ln -s $JAR_DATA/hudi-utilities-bundle*.jar $JAR_DATA/utilities.jar
+ln -s $JAR_DATA/hudi-utilities-slim*.jar $JAR_DATA/utilities-slim.jar
+
 
 # 
 # used to test the spark bundle with hive sync
@@ -93,6 +97,10 @@ test_utilities_bundle () {
     --source-ordering-field ts --table-type MERGE_ON_READ \
     --target-base-path file://${OUTPUT_DIR} \
     --target-table utilities_tbl  --op UPSERT
+    if [ "$?" -ne 0 ]; then
+        echo "::error::validate.sh deltastreamer failed with exit code $?"
+        exit 1
+    fi
     echo "::warning::validate.sh done with deltastreamer"
 
     OUTPUT_SIZE=$(du -s ${OUTPUT_DIR} | awk '{print $1}')
