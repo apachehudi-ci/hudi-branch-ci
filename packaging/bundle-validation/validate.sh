@@ -19,19 +19,22 @@
 
 # NOTE: this script runs inside hudi-ci-bundle-validation container
 # $WORKDIR/jars/ is supposed to be mounted to a host directory where bundle jars are placed
-# TODO: $JAR_COMBINATIONS should have different orders for different jars to detect class loading issues
+# TODO: test_spark_bundle should use more jars and try different orders to
+#   detect class loading issues
 
 WORKDIR=/opt/bundle-validation
 HIVE_DATA=${WORKDIR}/data/hive
 JAR_DATA=${WORKDIR}/data/jars
 UTILITIES_DATA=${WORKDIR}/data/utilities
 
+
+# link the jar names to easier to use names
 ln -s $JAR_DATA/hudi-spark*.jar $JAR_DATA/spark.jar
 ln -s $JAR_DATA/hudi-utilities-bundle*.jar $JAR_DATA/utilities.jar
 ln -s $JAR_DATA/hudi-utilities-slim*.jar $JAR_DATA/utilities-slim.jar
 
 
-# 
+##
 # used to test the spark bundle with hive sync
 # Inputs:
 #   HIVE_DATA: path to the directory where the files used in testing hive-sync
@@ -40,7 +43,7 @@ ln -s $JAR_DATA/hudi-utilities-slim*.jar $JAR_DATA/utilities-slim.jar
 #   SPARK_HOME: path to the spark directory
 #   DERBY_HOME: path to the derby directory
 #   JAR_DATA: path to the directory where our bundle jars to test are located
-#   
+##
 test_spark_bundle () {
     echo "::warning::validate.sh setting up hive sync"
     # put config files in correct place
@@ -66,7 +69,7 @@ test_spark_bundle () {
 }
 
 
-#
+##
 # Runs deltastreamer and then verifies that deltastreamer worked correctly
 # Used to test the utilities bundle and utilities slim bundle + spark bundle
 # Inputs:
@@ -76,12 +79,12 @@ test_spark_bundle () {
 #   MAIN_JAR: path to the main jar to run with spark-shell or spark-submit
 #   ADDITIONAL_JARS: comma seperated list of additional jars to be used
 #   OUTPUT_DIR: directory where delta streamer will output to
-#   SHELL_ARGS: args for spark shell. These are the --conf args from the 
+#   SHELL_ARGS: args for spark shell. These are the --conf args from the
 #       quickstart guide
-#   COMMANDS_FILE: path to file of scala commands that we will run in 
+#   COMMANDS_FILE: path to file of scala commands that we will run in
 #       spark-shell to validate the delta streamer
 # Modifies: OPT_JARS, OUTPUT_SIZE, SHELL_COMMAND, LOGFILE, SHELL_RESULT
-#
+##
 test_utilities_bundle () {
     OPT_JARS=""
     if [[ -n $ADDITIONAL_JARS ]]; then
@@ -123,10 +126,10 @@ test_utilities_bundle () {
 }
 
 
-# test_spark_bundle
-# if [ "$?" -ne 0 ]; then
-#     exit 1
-# fi
+test_spark_bundle
+if [ "$?" -ne 0 ]; then
+    exit 1
+fi
 
 SHELL_ARGS=$(cat $UTILITIES_DATA/shell_args)
 
