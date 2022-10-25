@@ -47,5 +47,18 @@ RUN wget https://archive.apache.org/dist/spark/spark-$SPARK_VERSION/spark-$SPARK
     && tar -xf $WORKDIR/spark-$SPARK_VERSION-bin-hadoop$SPARK_HADOOP_VERSION.tgz -C $WORKDIR/ \
     && rm $WORKDIR/spark-$SPARK_VERSION-bin-hadoop$SPARK_HADOOP_VERSION.tgz
 ENV SPARK_HOME=$WORKDIR/spark-$SPARK_VERSION-bin-hadoop$SPARK_HADOOP_VERSION
-COPY validate.sh .
 
+# TODO: the commands above can be moved to base images
+
+# configure the stack
+ADD . .
+ENV HUDI_CONF_DIR=$WORKDIR/conf
+RUN mkdir jars # for mounting testing bundle jars
+RUN cp conf/hive-site.xml $HIVE_HOME/conf/
+RUN cp conf/hive-site.xml $SPARK_HOME/conf/
+RUN cp $DERBY_HOME/lib/derbyclient.jar $SPARK_HOME/jars/
+RUN cp conf/spark-defaults.conf $SPARK_HOME/conf/
+RUN if [[ $SPARK_VERSION == 3.2* ]] || [[ $SPARK_VERSION == 3.3* ]] \
+    then \
+      printf "\nspark.sql.catalog.spark_catalog org.apache.spark.sql.hudi.catalog.HoodieCatalog\n" >> $SPARK_HOME/conf/spark-defaults.conf \
+    fi
