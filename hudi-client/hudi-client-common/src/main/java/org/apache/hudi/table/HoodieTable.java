@@ -146,7 +146,7 @@ public abstract class HoodieTable<T, I, K, O> implements Serializable, AutoClose
         // NOTE: It's critical we use {@code getContext()} here since {@code context} is
         //       also a transient field
         FileSystemViewManager.createViewManager(getContext(), config.getMetadataConfig(),
-            config.getViewStorageConfig(), config.getCommonConfig(), this::getMetadataTable));
+            config.getViewStorageConfig(), config.getCommonConfig(), this::getMetadataTable), true);
 
     this.metaClient = metaClient;
     this.index = getIndex(config, context);
