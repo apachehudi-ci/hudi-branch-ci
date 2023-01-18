@@ -26,6 +26,7 @@ import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.collection.Pair;
 
 import java.io.Serializable;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -106,7 +107,7 @@ public interface HoodiePairData<K, V> extends Serializable {
    * {@code W}, subsequently flattening returned {@link Iterable} into a new
    * {@link HoodiePairData} container
    */
-  <W> HoodiePairData<K, W> flatMapValues(SerializableFunction<V, Iterable<W>> func);
+  <W> HoodiePairData<K, W> flatMapValues(SerializableFunction<V, Iterator<W>> func);
 
   /**
    * @param mapToPairFunc serializable map function to generate another pair.
