@@ -609,8 +609,8 @@ public abstract class HoodieTable<T, I, K, O> implements Serializable, AutoClose
                                        Function<String, Option<HoodiePendingRollbackInfo>> getPendingRollbackInstantFunc) {
     final String commitTime = getPendingRollbackInstantFunc.apply(inflightInstant.getTimestamp()).map(entry
         -> entry.getRollbackInstant().getTimestamp()).orElse(HoodieActiveTimeline.createNewInstantTime());
-    scheduleRollback(context, commitTime, inflightInstant, false, config.shouldRollbackUsingMarkers());
-    rollback(context, commitTime, inflightInstant, false, false);
+    scheduleRollback(getContext(), commitTime, inflightInstant, false, config.shouldRollbackUsingMarkers());
+    rollback(getContext(), commitTime, inflightInstant, false, false);
     getActiveTimeline().revertInstantFromInflightToRequested(inflightInstant);
   }
 
@@ -623,8 +623,8 @@ public abstract class HoodieTable<T, I, K, O> implements Serializable, AutoClose
   public void rollbackInflightLogCompaction(HoodieInstant inflightInstant, Function<String, Option<HoodiePendingRollbackInfo>> getPendingRollbackInstantFunc) {
     final String commitTime = getPendingRollbackInstantFunc.apply(inflightInstant.getTimestamp()).map(entry
         -> entry.getRollbackInstant().getTimestamp()).orElse(HoodieActiveTimeline.createNewInstantTime());
-    scheduleRollback(context, commitTime, inflightInstant, false, config.shouldRollbackUsingMarkers());
-    rollback(context, commitTime, inflightInstant, true, false);
+    scheduleRollback(getContext(), commitTime, inflightInstant, false, config.shouldRollbackUsingMarkers());
+    rollback(getContext(), commitTime, inflightInstant, true, false);
   }
 
   /**
@@ -664,7 +664,7 @@ public abstract class HoodieTable<T, I, K, O> implements Serializable, AutoClose
    * Returns the possible invalid data file name with given marker files.
    */
   protected Set<String> getInvalidDataPaths(WriteMarkers markers) throws IOException {
-    return markers.createdAndMergedDataPaths(context, config.getFinalizeWriteParallelism());
+    return markers.createdAndMergedDataPaths(getContext(), config.getFinalizeWriteParallelism());
   }
 
   /**
@@ -847,9 +847,7 @@ public abstract class HoodieTable<T, I, K, O> implements Serializable, AutoClose
   }
 
   public HoodieEngineContext getContext() {
-    // This is to handle scenarios where this is called at the executor tasks which do not have access
-    // to engine context, and it ends up being null (as it's not serializable and marked transient here).
-    return context == null ? new HoodieLocalEngineContext(hadoopConfiguration.get()) : context;
+    return context.get();
   }
 
   /**
@@ -909,7 +907,7 @@ public abstract class HoodieTable<T, I, K, O> implements Serializable, AutoClose
     if (shouldExecuteMetadataTableDeletion()) {
       try {
         LOG.info("Deleting metadata table because it is disabled in writer.");
-        deleteMetadataTable(config.getBasePath(), context);
+        deleteMetadataTable(config.getBasePath(), getContext());
         clearMetadataTablePartitionsConfig(Option.empty(), true);
       } catch (HoodieMetadataException e) {
         throw new HoodieException("Failed to delete metadata table.", e);
@@ -925,8 +923,8 @@ public abstract class HoodieTable<T, I, K, O> implements Serializable, AutoClose
       if (shouldDeleteMetadataPartition(partitionType)) {
         try {
           LOG.info("Deleting metadata partition because it is disabled in writer: " + partitionType.name());
-          if (metadataPartitionExists(metaClient.getBasePath(), context, partitionType)) {
-            deleteMetadataPartition(metaClient.getBasePath(), context, partitionType);
+          if (metadataPartitionExists(metaClient.getBasePath(), getContext(), partitionType)) {
+            deleteMetadataPartition(metaClient.getBasePath(), getContext(), partitionType);
           }
           clearMetadataTablePartitionsConfig(Option.of(partitionType), false);
         } catch (HoodieMetadataException e) {
