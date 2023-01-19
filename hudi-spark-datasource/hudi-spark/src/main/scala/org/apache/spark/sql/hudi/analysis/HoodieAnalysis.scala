@@ -57,7 +57,9 @@ object HoodieAnalysis {
         }
 
       val nestedSchemaPruningRule = ReflectionUtils.loadClass(nestedSchemaPruningClass).asInstanceOf[Rule[LogicalPlan]]
-      Seq(_ => nestedSchemaPruningRule)
+      // TODO(HUDI-5443) re-enable
+      //Seq(_ => nestedSchemaPruningRule)
+      Seq.empty
     } else {
       Seq.empty
     }
