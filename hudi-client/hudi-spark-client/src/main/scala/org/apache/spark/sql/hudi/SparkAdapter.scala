@@ -22,7 +22,6 @@ import org.apache.avro.Schema
 import org.apache.hadoop.fs.Path
 import org.apache.hudi.client.utils.SparkRowSerDe
 import org.apache.hudi.common.table.HoodieTableMetaClient
-import org.apache.spark.HoodieRDDUtils
 import org.apache.spark.sql.avro.{HoodieAvroDeserializer, HoodieAvroSchemaConverters, HoodieAvroSerializer}
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation
@@ -54,11 +53,6 @@ trait SparkAdapter extends Serializable {
    * Inject table-valued functions to SparkSessionExtensions
    */
   def injectTableFunctions(extensions : SparkSessionExtensions): Unit = {}
-
-  /**
-   * Returns an instance of [[HoodieRDDUtils]] providing for common utilities operating on Spark's RDDs
-   */
-  def getRDDUtils: HoodieRDDUtils
 
   /**
    * Returns an instance of [[HoodieCatalogUtils]] providing for common utils operating on Spark's

@@ -23,7 +23,6 @@ import org.apache.hadoop.fs.Path
 import org.apache.hudi.client.utils.SparkRowSerDe
 import org.apache.hudi.common.table.HoodieTableMetaClient
 import org.apache.hudi.{AvroConversionUtils, DefaultSource, Spark2HoodieFileScanRDD, Spark2RowSerDe}
-import org.apache.spark.{HoodieRDDUtils, HoodieSpark2RDDUtils}
 import org.apache.spark.sql.avro._
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
@@ -54,8 +53,6 @@ class Spark2Adapter extends SparkAdapter {
     //       for vectorized reads
     r.isInstanceOf[MutableColumnarRow]
   }
-
-  def getRDDUtils: HoodieRDDUtils = HoodieSpark2RDDUtils
 
   override def getCatalogUtils: HoodieCatalogUtils = {
     throw new UnsupportedOperationException("Catalog utilities are not supported in Spark 2.x");
