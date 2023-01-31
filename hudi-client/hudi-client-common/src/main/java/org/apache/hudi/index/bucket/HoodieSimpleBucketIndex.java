@@ -44,7 +44,7 @@ public class HoodieSimpleBucketIndex extends HoodieBucketIndex {
     super(config);
   }
 
-  private Map<Integer, HoodieRecordLocation> loadPartitionBucketIdFileIdMapping(
+  public Map<Integer, HoodieRecordLocation> loadPartitionBucketIdFileIdMapping(
       HoodieTable hoodieTable,
       String partition) {
     // bucketId -> fileIds
@@ -66,6 +66,10 @@ public class HoodieSimpleBucketIndex extends HoodieBucketIndex {
           }
         });
     return bucketIdToFileIdMapping;
+  }
+
+  public int getBucketID(HoodieKey key) {
+    return BucketIdentifier.getBucketId(key, indexKeyFields, numBuckets);
   }
 
   @Override
@@ -91,7 +95,7 @@ public class HoodieSimpleBucketIndex extends HoodieBucketIndex {
 
     @Override
     public Option<HoodieRecordLocation> getRecordLocation(HoodieKey key) {
-      int bucketId = BucketIdentifier.getBucketId(key, indexKeyFields, numBuckets);
+      int bucketId = getBucketID(key);
       Map<Integer, HoodieRecordLocation> bucketIdToFileIdMapping = partitionPathFileIDList.get(key.getPartitionPath());
       return Option.ofNullable(bucketIdToFileIdMapping.getOrDefault(bucketId, null));
     }
