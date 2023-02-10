@@ -18,6 +18,15 @@
 
 package org.apache.hudi.source.stats;
 
+import org.apache.hudi.source.evaluator.EqualTo;
+import org.apache.hudi.source.evaluator.GreaterThan;
+import org.apache.hudi.source.evaluator.GreaterThanOrEqual;
+import org.apache.hudi.source.evaluator.In;
+import org.apache.hudi.source.evaluator.IsNotNull;
+import org.apache.hudi.source.evaluator.IsNull;
+import org.apache.hudi.source.evaluator.LessThan;
+import org.apache.hudi.source.evaluator.LessThanOrEqual;
+import org.apache.hudi.source.evaluator.NotEqualTo;
 import org.apache.hudi.utils.TestData;
 
 import org.apache.flink.table.api.DataTypes;
@@ -35,13 +44,15 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
-import static org.apache.hudi.source.stats.ExpressionEvaluator.Evaluator.bindCall;
+import static org.apache.hudi.source.DataSkipper.convertColumnStats;
+import static org.apache.hudi.util.EvaluatorUtils.fromExpression;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Test cases for {@link ExpressionEvaluator}.
+ * Test cases for {@link org.apache.hudi.source.evaluator.Evaluator}.
  */
 public class TestExpressionEvaluator {
   private static final DataType ROW_DATA_TYPE = DataTypes.ROW(
@@ -77,283 +88,283 @@ public class TestExpressionEvaluator {
 
   @Test
   void testEqualTo() {
-    ExpressionEvaluator.EqualTo equalTo = ExpressionEvaluator.EqualTo.getInstance();
+    EqualTo equalTo = EqualTo.getInstance();
     FieldReferenceExpression rExpr = new FieldReferenceExpression("f_int", DataTypes.INT(), 2, 2);
     ValueLiteralExpression vExpr = new ValueLiteralExpression(12);
 
+    equalTo.bindVal(vExpr)
+        .bindFieldReference(rExpr);
     RowData indexRow1 = intIndexRow(11, 13);
-    equalTo.bindFieldReference(rExpr)
-        .bindVal(vExpr)
-        .bindColStats(indexRow1, queryFields(2), rExpr);
-    assertTrue(equalTo.eval(), "11 < 12 < 13");
+    Map<String, ColumnStats> stats1 = convertColumnStats(indexRow1, queryFields(2));
+    assertTrue(equalTo.eval(stats1), "11 < 12 < 13");
 
     RowData indexRow2 = intIndexRow(12, 13);
-    equalTo.bindColStats(indexRow2, queryFields(2), rExpr);
-    assertTrue(equalTo.eval(), "12 <= 12 < 13");
+    Map<String, ColumnStats> stats2 = convertColumnStats(indexRow2, queryFields(2));
+    assertTrue(equalTo.eval(stats2), "12 <= 12 < 13");
 
     RowData indexRow3 = intIndexRow(11, 12);
-    equalTo.bindColStats(indexRow3, queryFields(2), rExpr);
-    assertTrue(equalTo.eval(), "11 < 12 <= 12");
+    Map<String, ColumnStats> stats3 = convertColumnStats(indexRow3, queryFields(2));
+    assertTrue(equalTo.eval(stats3), "11 < 12 <= 12");
 
     RowData indexRow4 = intIndexRow(10, 11);
-    equalTo.bindColStats(indexRow4, queryFields(2), rExpr);
-    assertFalse(equalTo.eval(), "11 < 12");
+    Map<String, ColumnStats> stats4 = convertColumnStats(indexRow4, queryFields(2));
+    assertFalse(equalTo.eval(stats4), "11 < 12");
 
     RowData indexRow5 = intIndexRow(13, 14);
-    equalTo.bindColStats(indexRow5, queryFields(2), rExpr);
-    assertFalse(equalTo.eval(), "12 < 13");
+    Map<String, ColumnStats> stats5 = convertColumnStats(indexRow5, queryFields(2));
+    assertFalse(equalTo.eval(stats5), "12 < 13");
 
     RowData indexRow6 = intIndexRow(null, null);
-    equalTo.bindColStats(indexRow6, queryFields(2), rExpr);
-    assertFalse(equalTo.eval(), "12 <> null");
+    Map<String, ColumnStats> stats6 = convertColumnStats(indexRow6, queryFields(2));
+    assertFalse(equalTo.eval(stats6), "12 <> null");
 
     equalTo.bindVal(new ValueLiteralExpression(null, DataTypes.INT()));
-    assertFalse(equalTo.eval(), "It is not possible to test for NULL values with '=' operator");
+    assertFalse(equalTo.eval(stats1), "It is not possible to test for NULL values with '=' operator");
   }
 
   @Test
   void testNotEqualTo() {
-    ExpressionEvaluator.NotEqualTo notEqualTo = ExpressionEvaluator.NotEqualTo.getInstance();
+    NotEqualTo notEqualTo = NotEqualTo.getInstance();
     FieldReferenceExpression rExpr = new FieldReferenceExpression("f_int", DataTypes.INT(), 2, 2);
     ValueLiteralExpression vExpr = new ValueLiteralExpression(12);
 
     RowData indexRow1 = intIndexRow(11, 13);
-    notEqualTo.bindFieldReference(rExpr)
-        .bindVal(vExpr)
-        .bindColStats(indexRow1, queryFields(2), rExpr);
-    assertTrue(notEqualTo.eval(), "11 <> 12 && 12 <> 13");
+    notEqualTo.bindVal(vExpr)
+        .bindFieldReference(rExpr);
+    Map<String, ColumnStats> stats1 = convertColumnStats(indexRow1, queryFields(2));
+    assertTrue(notEqualTo.eval(stats1), "11 <> 12 && 12 <> 13");
 
     RowData indexRow2 = intIndexRow(12, 13);
-    notEqualTo.bindColStats(indexRow2, queryFields(2), rExpr);
-    assertTrue(notEqualTo.eval(), "12 <> 13");
+    Map<String, ColumnStats> stats2 = convertColumnStats(indexRow2, queryFields(2));
+    assertTrue(notEqualTo.eval(stats2), "12 <> 13");
 
     RowData indexRow3 = intIndexRow(11, 12);
-    notEqualTo.bindColStats(indexRow3, queryFields(2), rExpr);
-    assertTrue(notEqualTo.eval(), "11 <> 12");
+    Map<String, ColumnStats> stats3 = convertColumnStats(indexRow3, queryFields(2));
+    assertTrue(notEqualTo.eval(stats3), "11 <> 12");
 
     RowData indexRow4 = intIndexRow(10, 11);
-    notEqualTo.bindColStats(indexRow4, queryFields(2), rExpr);
-    assertTrue(notEqualTo.eval(), "10 <> 12 and 11 < 12");
+    Map<String, ColumnStats> stats4 = convertColumnStats(indexRow4, queryFields(2));
+    assertTrue(notEqualTo.eval(stats4), "10 <> 12 and 11 < 12");
 
     RowData indexRow5 = intIndexRow(13, 14);
-    notEqualTo.bindColStats(indexRow5, queryFields(2), rExpr);
-    assertTrue(notEqualTo.eval(), "12 <> 13 and 12 <> 14");
+    Map<String, ColumnStats> stats5 = convertColumnStats(indexRow5, queryFields(2));
+    assertTrue(notEqualTo.eval(stats5), "12 <> 13 and 12 <> 14");
 
     RowData indexRow6 = intIndexRow(null, null);
-    notEqualTo.bindColStats(indexRow6, queryFields(2), rExpr);
-    assertTrue(notEqualTo.eval(), "12 <> null");
+    Map<String, ColumnStats> stats6 = convertColumnStats(indexRow6, queryFields(2));
+    assertTrue(notEqualTo.eval(stats6), "12 <> null");
 
     notEqualTo.bindVal(new ValueLiteralExpression(null, DataTypes.INT()));
-    assertFalse(notEqualTo.eval(), "It is not possible to test for NULL values with '<>' operator");
+    assertFalse(notEqualTo.eval(stats1), "It is not possible to test for NULL values with '<>' operator");
   }
 
   @Test
   void testIsNull() {
-    ExpressionEvaluator.IsNull isNull = ExpressionEvaluator.IsNull.getInstance();
+    IsNull isNull = IsNull.getInstance();
     FieldReferenceExpression rExpr = new FieldReferenceExpression("f_int", DataTypes.INT(), 2, 2);
 
     RowData indexRow1 = intIndexRow(11, 13);
-    isNull.bindFieldReference(rExpr)
-        .bindColStats(indexRow1, queryFields(2), rExpr);
-    assertTrue(isNull.eval(), "2 nulls");
+    isNull.bindFieldReference(rExpr);
+    Map<String, ColumnStats> stats1 = convertColumnStats(indexRow1, queryFields(2));
+    assertTrue(isNull.eval(stats1), "2 nulls");
 
     RowData indexRow2 = intIndexRow(12, 13, 0L);
-    isNull.bindColStats(indexRow2, queryFields(2), rExpr);
-    assertFalse(isNull.eval(), "0 nulls");
+    Map<String, ColumnStats> stats2 = convertColumnStats(indexRow2, queryFields(2));
+    assertFalse(isNull.eval(stats2), "0 nulls");
   }
 
   @Test
   void testIsNotNull() {
-    ExpressionEvaluator.IsNotNull isNotNull = ExpressionEvaluator.IsNotNull.getInstance();
+    IsNotNull isNotNull = IsNotNull.getInstance();
     FieldReferenceExpression rExpr = new FieldReferenceExpression("f_int", DataTypes.INT(), 2, 2);
 
     RowData indexRow1 = intIndexRow(11, 13);
-    isNotNull.bindFieldReference(rExpr)
-        .bindColStats(indexRow1, queryFields(2), rExpr);
-    assertTrue(isNotNull.eval(), "min 11 is not null");
+    isNotNull.bindFieldReference(rExpr);
+    Map<String, ColumnStats> stats1 = convertColumnStats(indexRow1, queryFields(2));
+    assertTrue(isNotNull.eval(stats1), "min 11 is not null");
 
     RowData indexRow2 = intIndexRow(null, null, 0L);
-    isNotNull.bindColStats(indexRow2, queryFields(2), rExpr);
-    assertTrue(isNotNull.eval(), "min is null and 0 nulls");
+    Map<String, ColumnStats> stats2 = convertColumnStats(indexRow2, queryFields(2));
+    assertTrue(isNotNull.eval(stats2), "min is null and 0 nulls");
   }
 
   @Test
   void testLessThan() {
-    ExpressionEvaluator.LessThan lessThan = ExpressionEvaluator.LessThan.getInstance();
+    LessThan lessThan = LessThan.getInstance();
     FieldReferenceExpression rExpr = new FieldReferenceExpression("f_int", DataTypes.INT(), 2, 2);
     ValueLiteralExpression vExpr = new ValueLiteralExpression(12);
 
     RowData indexRow1 = intIndexRow(11, 13);
-    lessThan.bindFieldReference(rExpr)
-        .bindVal(vExpr)
-        .bindColStats(indexRow1, queryFields(2), rExpr);
-    assertTrue(lessThan.eval(), "12 < 13");
+    lessThan.bindVal(vExpr)
+        .bindFieldReference(rExpr);
+    Map<String, ColumnStats> stats1 = convertColumnStats(indexRow1, queryFields(2));
+    assertTrue(lessThan.eval(stats1), "12 < 13");
 
     RowData indexRow2 = intIndexRow(12, 13);
-    lessThan.bindColStats(indexRow2, queryFields(2), rExpr);
-    assertFalse(lessThan.eval(), "min 12 = 12");
+    Map<String, ColumnStats> stats2 = convertColumnStats(indexRow2, queryFields(2));
+    assertFalse(lessThan.eval(stats2), "min 12 = 12");
 
     RowData indexRow3 = intIndexRow(11, 12);
-    lessThan.bindColStats(indexRow3, queryFields(2), rExpr);
-    assertTrue(lessThan.eval(), "11 < 12");
+    Map<String, ColumnStats> stats3 = convertColumnStats(indexRow3, queryFields(2));
+    assertTrue(lessThan.eval(stats3), "11 < 12");
 
     RowData indexRow4 = intIndexRow(10, 11);
-    lessThan.bindColStats(indexRow4, queryFields(2), rExpr);
-    assertTrue(lessThan.eval(), "11 < 12");
+    Map<String, ColumnStats> stats4 = convertColumnStats(indexRow4, queryFields(2));
+    assertTrue(lessThan.eval(stats4), "11 < 12");
 
     RowData indexRow5 = intIndexRow(13, 14);
-    lessThan.bindColStats(indexRow5, queryFields(2), rExpr);
-    assertFalse(lessThan.eval(), "12 < min 13");
+    Map<String, ColumnStats> stats5 = convertColumnStats(indexRow5, queryFields(2));
+    assertFalse(lessThan.eval(stats5), "12 < min 13");
 
     RowData indexRow6 = intIndexRow(null, null);
-    lessThan.bindColStats(indexRow6, queryFields(2), rExpr);
-    assertFalse(lessThan.eval(), "12 <> null");
+    Map<String, ColumnStats> stats6 = convertColumnStats(indexRow6, queryFields(2));
+    assertFalse(lessThan.eval(stats6), "12 <> null");
 
     lessThan.bindVal(new ValueLiteralExpression(null, DataTypes.INT()));
-    assertFalse(lessThan.eval(), "It is not possible to test for NULL values with '<' operator");
+    assertFalse(lessThan.eval(stats1), "It is not possible to test for NULL values with '<' operator");
   }
 
   @Test
   void testGreaterThan() {
-    ExpressionEvaluator.GreaterThan greaterThan = ExpressionEvaluator.GreaterThan.getInstance();
+    GreaterThan greaterThan = GreaterThan.getInstance();
     FieldReferenceExpression rExpr = new FieldReferenceExpression("f_int", DataTypes.INT(), 2, 2);
     ValueLiteralExpression vExpr = new ValueLiteralExpression(12);
 
     RowData indexRow1 = intIndexRow(11, 13);
-    greaterThan.bindFieldReference(rExpr)
-        .bindVal(vExpr)
-        .bindColStats(indexRow1, queryFields(2), rExpr);
-    assertTrue(greaterThan.eval(), "12 < 13");
+    greaterThan.bindVal(vExpr)
+        .bindFieldReference(rExpr);
+    Map<String, ColumnStats> stats1 = convertColumnStats(indexRow1, queryFields(2));
+    assertTrue(greaterThan.eval(stats1), "12 < 13");
 
     RowData indexRow2 = intIndexRow(12, 13);
-    greaterThan.bindColStats(indexRow2, queryFields(2), rExpr);
-    assertTrue(greaterThan.eval(), "12 < 13");
+    Map<String, ColumnStats> stats2 = convertColumnStats(indexRow2, queryFields(2));
+    assertTrue(greaterThan.eval(stats2), "12 < 13");
 
     RowData indexRow3 = intIndexRow(11, 12);
-    greaterThan.bindColStats(indexRow3, queryFields(2), rExpr);
-    assertFalse(greaterThan.eval(), "max 12 = 12");
+    Map<String, ColumnStats> stats3 = convertColumnStats(indexRow3, queryFields(2));
+    assertFalse(greaterThan.eval(stats3), "max 12 = 12");
 
     RowData indexRow4 = intIndexRow(10, 11);
-    greaterThan.bindColStats(indexRow4, queryFields(2), rExpr);
-    assertFalse(greaterThan.eval(), "max 11 < 12");
+    Map<String, ColumnStats> stats4 = convertColumnStats(indexRow4, queryFields(2));
+    assertFalse(greaterThan.eval(stats4), "max 11 < 12");
 
     RowData indexRow5 = intIndexRow(13, 14);
-    greaterThan.bindColStats(indexRow5, queryFields(2), rExpr);
-    assertTrue(greaterThan.eval(), "12 < 13");
+    Map<String, ColumnStats> stats5 = convertColumnStats(indexRow5, queryFields(2));
+    assertTrue(greaterThan.eval(stats5), "12 < 13");
 
     RowData indexRow6 = intIndexRow(null, null);
-    greaterThan.bindColStats(indexRow6, queryFields(2), rExpr);
-    assertFalse(greaterThan.eval(), "12 <> null");
+    Map<String, ColumnStats> stats6 = convertColumnStats(indexRow6, queryFields(2));
+    assertFalse(greaterThan.eval(stats6), "12 <> null");
 
     greaterThan.bindVal(new ValueLiteralExpression(null, DataTypes.INT()));
-    assertFalse(greaterThan.eval(), "It is not possible to test for NULL values with '>' operator");
+    assertFalse(greaterThan.eval(stats1), "It is not possible to test for NULL values with '>' operator");
   }
 
   @Test
   void testLessThanOrEqual() {
-    ExpressionEvaluator.LessThanOrEqual lessThanOrEqual = ExpressionEvaluator.LessThanOrEqual.getInstance();
+    LessThanOrEqual lessThanOrEqual = LessThanOrEqual.getInstance();
     FieldReferenceExpression rExpr = new FieldReferenceExpression("f_int", DataTypes.INT(), 2, 2);
     ValueLiteralExpression vExpr = new ValueLiteralExpression(12);
 
     RowData indexRow1 = intIndexRow(11, 13);
-    lessThanOrEqual.bindFieldReference(rExpr)
-        .bindVal(vExpr)
-        .bindColStats(indexRow1, queryFields(2), rExpr);
-    assertTrue(lessThanOrEqual.eval(), "11 < 12");
+    lessThanOrEqual.bindVal(vExpr)
+        .bindFieldReference(rExpr);
+    Map<String, ColumnStats> stats1 = convertColumnStats(indexRow1, queryFields(2));
+    assertTrue(lessThanOrEqual.eval(stats1), "11 < 12");
 
     RowData indexRow2 = intIndexRow(12, 13);
-    lessThanOrEqual.bindColStats(indexRow2, queryFields(2), rExpr);
-    assertTrue(lessThanOrEqual.eval(), "min 12 = 12");
+    Map<String, ColumnStats> stats2 = convertColumnStats(indexRow2, queryFields(2));
+    assertTrue(lessThanOrEqual.eval(stats2), "min 12 = 12");
 
     RowData indexRow3 = intIndexRow(11, 12);
-    lessThanOrEqual.bindColStats(indexRow3, queryFields(2), rExpr);
-    assertTrue(lessThanOrEqual.eval(), "max 12 = 12");
+    Map<String, ColumnStats> stats3 = convertColumnStats(indexRow3, queryFields(2));
+    assertTrue(lessThanOrEqual.eval(stats3), "max 12 = 12");
 
     RowData indexRow4 = intIndexRow(10, 11);
-    lessThanOrEqual.bindColStats(indexRow4, queryFields(2), rExpr);
-    assertTrue(lessThanOrEqual.eval(), "max 11 < 12");
+    Map<String, ColumnStats> stats4 = convertColumnStats(indexRow4, queryFields(2));
+    assertTrue(lessThanOrEqual.eval(stats4), "max 11 < 12");
 
     RowData indexRow5 = intIndexRow(13, 14);
-    lessThanOrEqual.bindColStats(indexRow5, queryFields(2), rExpr);
-    assertFalse(lessThanOrEqual.eval(), "12 < 13");
+    Map<String, ColumnStats> stats5 = convertColumnStats(indexRow5, queryFields(2));
+    assertFalse(lessThanOrEqual.eval(stats5), "12 < 13");
 
     RowData indexRow6 = intIndexRow(null, null);
-    lessThanOrEqual.bindColStats(indexRow6, queryFields(2), rExpr);
-    assertFalse(lessThanOrEqual.eval(), "12 <> null");
+    Map<String, ColumnStats> stats6 = convertColumnStats(indexRow6, queryFields(2));
+    assertFalse(lessThanOrEqual.eval(stats6), "12 <> null");
 
     lessThanOrEqual.bindVal(new ValueLiteralExpression(null, DataTypes.INT()));
-    assertFalse(lessThanOrEqual.eval(), "It is not possible to test for NULL values with '<=' operator");
+    assertFalse(lessThanOrEqual.eval(stats1), "It is not possible to test for NULL values with '<=' operator");
   }
 
   @Test
   void testGreaterThanOrEqual() {
-    ExpressionEvaluator.GreaterThanOrEqual greaterThanOrEqual = ExpressionEvaluator.GreaterThanOrEqual.getInstance();
+    GreaterThanOrEqual greaterThanOrEqual = GreaterThanOrEqual.getInstance();
     FieldReferenceExpression rExpr = new FieldReferenceExpression("f_int", DataTypes.INT(), 2, 2);
     ValueLiteralExpression vExpr = new ValueLiteralExpression(12);
 
     RowData indexRow1 = intIndexRow(11, 13);
-    greaterThanOrEqual.bindFieldReference(rExpr)
-        .bindVal(vExpr)
-        .bindColStats(indexRow1, queryFields(2), rExpr);
-    assertTrue(greaterThanOrEqual.eval(), "12 < 13");
+    greaterThanOrEqual.bindVal(vExpr)
+        .bindFieldReference(rExpr);
+    Map<String, ColumnStats> stats1 = convertColumnStats(indexRow1, queryFields(2));
+    assertTrue(greaterThanOrEqual.eval(stats1), "12 < 13");
 
     RowData indexRow2 = intIndexRow(12, 13);
-    greaterThanOrEqual.bindColStats(indexRow2, queryFields(2), rExpr);
-    assertTrue(greaterThanOrEqual.eval(), "min 12 = 12");
+    Map<String, ColumnStats> stats2 = convertColumnStats(indexRow2, queryFields(2));
+    assertTrue(greaterThanOrEqual.eval(stats2), "min 12 = 12");
 
     RowData indexRow3 = intIndexRow(11, 12);
-    greaterThanOrEqual.bindColStats(indexRow3, queryFields(2), rExpr);
-    assertTrue(greaterThanOrEqual.eval(), "max 12 = 12");
+    Map<String, ColumnStats> stats3 = convertColumnStats(indexRow3, queryFields(2));
+    assertTrue(greaterThanOrEqual.eval(stats3), "max 12 = 12");
 
     RowData indexRow4 = intIndexRow(10, 11);
-    greaterThanOrEqual.bindColStats(indexRow4, queryFields(2), rExpr);
-    assertFalse(greaterThanOrEqual.eval(), "max 11 < 12");
+    Map<String, ColumnStats> stats4 = convertColumnStats(indexRow4, queryFields(2));
+    assertFalse(greaterThanOrEqual.eval(stats4), "max 11 < 12");
 
     RowData indexRow5 = intIndexRow(13, 14);
-    greaterThanOrEqual.bindColStats(indexRow5, queryFields(2), rExpr);
-    assertTrue(greaterThanOrEqual.eval(), "12 < 13");
+    Map<String, ColumnStats> stats5 = convertColumnStats(indexRow5, queryFields(2));
+    assertTrue(greaterThanOrEqual.eval(stats5), "12 < 13");
 
     RowData indexRow6 = intIndexRow(null, null);
-    greaterThanOrEqual.bindColStats(indexRow6, queryFields(2), rExpr);
-    assertFalse(greaterThanOrEqual.eval(), "12 <> null");
+    Map<String, ColumnStats> stats6 = convertColumnStats(indexRow6, queryFields(2));
+    assertFalse(greaterThanOrEqual.eval(stats6), "12 <> null");
 
     greaterThanOrEqual.bindVal(new ValueLiteralExpression(null, DataTypes.INT()));
-    assertFalse(greaterThanOrEqual.eval(), "It is not possible to test for NULL values with '>=' operator");
+    assertFalse(greaterThanOrEqual.eval(stats1), "It is not possible to test for NULL values with '>=' operator");
   }
 
   @Test
   void testIn() {
-    ExpressionEvaluator.In in = ExpressionEvaluator.In.getInstance();
+    In in = In.getInstance();
     FieldReferenceExpression rExpr = new FieldReferenceExpression("f_int", DataTypes.INT(), 2, 2);
 
     RowData indexRow1 = intIndexRow(11, 13);
-    in.bindFieldReference(rExpr)
-        .bindColStats(indexRow1, queryFields(2), rExpr);
-    in.bindVals(12);
-    assertTrue(in.eval(), "11 < 12 < 13");
+    in.bindFieldReference(rExpr);
+    in.bindVals(11, 12);
+    Map<String, ColumnStats> stats1 = convertColumnStats(indexRow1, queryFields(2));
+    assertTrue(in.eval(stats1), "11 < 12 < 13");
 
     RowData indexRow2 = intIndexRow(12, 13);
-    in.bindColStats(indexRow2, queryFields(2), rExpr);
-    assertTrue(in.eval(), "min 12 = 12");
+    Map<String, ColumnStats> stats2 = convertColumnStats(indexRow2, queryFields(2));
+    assertTrue(in.eval(stats2), "min 12 = 12");
 
     RowData indexRow3 = intIndexRow(11, 12);
-    in.bindColStats(indexRow3, queryFields(2), rExpr);
-    assertTrue(in.eval(), "max 12 = 12");
+    Map<String, ColumnStats> stats3 = convertColumnStats(indexRow3, queryFields(2));
+    assertTrue(in.eval(stats3), "max 12 = 12");
 
     RowData indexRow4 = intIndexRow(10, 11);
-    in.bindColStats(indexRow4, queryFields(2), rExpr);
-    assertFalse(in.eval(), "max 11 < 12");
+    Map<String, ColumnStats> stats4 = convertColumnStats(indexRow4, queryFields(2));
+    assertTrue(in.eval(stats4), "max 11 = 11");
 
     RowData indexRow5 = intIndexRow(13, 14);
-    in.bindColStats(indexRow5, queryFields(2), rExpr);
-    assertFalse(in.eval(), "12 < 13");
+    Map<String, ColumnStats> stats5 = convertColumnStats(indexRow5, queryFields(2));
+    assertFalse(in.eval(stats5), "12 < 13");
 
     RowData indexRow6 = intIndexRow(null, null);
-    in.bindColStats(indexRow6, queryFields(2), rExpr);
-    assertFalse(in.eval(), "12 <> null");
+    Map<String, ColumnStats> stats6 = convertColumnStats(indexRow6, queryFields(2));
+    assertFalse(in.eval(stats6), "12 <> null");
 
     in.bindVals((Object) null);
-    assertFalse(in.eval(), "It is not possible to test for NULL values with 'in' operator");
+    assertFalse(in.eval(stats1), "It is not possible to test for NULL values with 'in' operator");
   }
 
   @Test
@@ -361,7 +372,7 @@ public class TestExpressionEvaluator {
     FieldReferenceExpression ref = new FieldReferenceExpression("f_int", DataTypes.INT(), 2, 2);
     ValueLiteralExpression nullLiteral = new ValueLiteralExpression(null, DataTypes.INT());
     RowData indexRow = intIndexRow(11, 13);
-    RowType.RowField[] queryFields = queryFields(2);
+    Map<String, ColumnStats> stats = convertColumnStats(indexRow, queryFields(2));
     FunctionDefinition[] funDefs = new FunctionDefinition[] {
         BuiltInFunctionDefinitions.EQUALS,
         BuiltInFunctionDefinitions.NOT_EQUALS,
@@ -377,7 +388,7 @@ public class TestExpressionEvaluator {
               Arrays.asList(ref, nullLiteral),
               DataTypes.BOOLEAN());
       // always return false if the literal value is null
-      assertFalse(bindCall(expr, indexRow, queryFields).eval());
+      assertFalse(fromExpression(expr).eval(stats));
     }
   }
 
