@@ -58,7 +58,7 @@ stages:
               mavenPomFile: 'pom.xml'
               goals: 'test'
               options: -Pazp-unit-tests -pl hudi-client/hudi-spark-client
-              publishJUnitResults: false
+              publishJUnitResults: true
               testResultsFiles: '**/surefire-reports/TEST-*.xml'
               testRunTitle: 'unit tests spark client'
               javaHomeOption: 'JDKVersion'
@@ -90,7 +90,7 @@ stages:
               mavenPomFile: 'pom.xml'
               goals: 'test'
               options: -Pazp-unit-tests -pl hudi-utilities
-              publishJUnitResults: false
+              publishJUnitResults: true
               testResultsFiles: '**/surefire-reports/TEST-*.xml'
               testRunTitle: 'unit tests utilities'
               javaHomeOption: 'JDKVersion'
@@ -122,7 +122,7 @@ stages:
               mavenPomFile: 'pom.xml'
               goals: 'test'
               options: -Pazp-unit-tests -pl !hudi-utilities,!hudi-client/hudi-spark-client
-              publishJUnitResults: false
+              publishJUnitResults: true
               testResultsFiles: '**/surefire-reports/TEST-*.xml'
               testRunTitle: 'unit tests other modules'
               javaHomeOption: 'JDKVersion'
@@ -136,7 +136,7 @@ stages:
               mavenPomFile: 'pom.xml'
               goals: 'test'
               options: -Pfunctional-tests
-              publishJUnitResults: false
+              publishJUnitResults: true
               testResultsFiles: '**/surefire-reports/TEST-*.xml'
               testRunTitle: 'functional tests'
               javaHomeOption: 'JDKVersion'
@@ -156,7 +156,7 @@ stages:
               mavenPomFile: 'pom.xml'
               goals: 'verify'
               options: -Pintegration-tests
-              publishJUnitResults: false
+              publishJUnitResults: true
               testResultsFiles: '**/surefire-reports/TEST-*.xml'
               testRunTitle: 'unit tests utilities'
               javaHomeOption: 'JDKVersion'
