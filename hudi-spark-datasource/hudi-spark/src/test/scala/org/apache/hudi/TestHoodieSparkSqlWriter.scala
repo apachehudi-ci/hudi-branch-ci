@@ -960,8 +960,8 @@ class TestHoodieSparkSqlWriter {
    * Test upsert for CoW table without precombine field and combine before upsert disabled.
    */
   @Test
-  def testUpsertWithoutPrecombineFieldAndCombineBeforeUpsertDisabled(tableType: HoodieTableType): Unit = {
-    val options = Map(DataSourceWriteOptions.TABLE_TYPE.key -> tableType.name,
+  def testUpsertWithoutPrecombineFieldAndCombineBeforeUpsertDisabled(): Unit = {
+    val options = Map(DataSourceWriteOptions.TABLE_TYPE.key -> HoodieTableType.COPY_ON_WRITE,
       DataSourceWriteOptions.RECORDKEY_FIELD.key -> "keyid",
       DataSourceWriteOptions.PARTITIONPATH_FIELD.key -> "",
       DataSourceWriteOptions.KEYGENERATOR_CLASS_NAME.key -> "org.apache.hudi.keygen.NonpartitionedKeyGenerator",
@@ -997,8 +997,8 @@ class TestHoodieSparkSqlWriter {
    * Test upsert for CoW table with combine before upsert disabled.
    */
   @Test
-  def testUpsertWithCombineBeforeUpsertDisabled(tableType: HoodieTableType): Unit = {
-    val options = Map(DataSourceWriteOptions.TABLE_TYPE.key -> tableType.name,
+  def testUpsertWithCombineBeforeUpsertDisabled(): Unit = {
+    val options = Map(DataSourceWriteOptions.TABLE_TYPE.key -> HoodieTableType.COPY_ON_WRITE,
       DataSourceWriteOptions.PRECOMBINE_FIELD.key -> "col3",
       DataSourceWriteOptions.RECORDKEY_FIELD.key -> "keyid",
       DataSourceWriteOptions.PARTITIONPATH_FIELD.key -> "",
