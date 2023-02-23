@@ -961,15 +961,16 @@ class TestHoodieSparkSqlWriter {
    */
   @Test
   def testUpsertWithoutPrecombineFieldAndCombineBeforeUpsertDisabled(): Unit = {
-    val options = Map(DataSourceWriteOptions.TABLE_TYPE.key -> HoodieTableType.COPY_ON_WRITE,
+    val options = Map(DataSourceWriteOptions.TABLE_TYPE.key -> HoodieTableType.COPY_ON_WRITE.name(),
       DataSourceWriteOptions.RECORDKEY_FIELD.key -> "keyid",
       DataSourceWriteOptions.PARTITIONPATH_FIELD.key -> "",
       DataSourceWriteOptions.KEYGENERATOR_CLASS_NAME.key -> "org.apache.hudi.keygen.NonpartitionedKeyGenerator",
       HoodieWriteConfig.TBL_NAME.key -> "hoodie_test",
+      HoodieWriteConfig.COMBINE_BEFORE_UPSERT.key -> "false",
       "hoodie.insert.shuffle.parallelism" -> "1",
-      "hoodie.upsert.shuffle.parallelism" -> "1",
-      "hoodie.combine.before.upsert" -> "false"
-      )
+      "hoodie.upsert.shuffle.parallelism" -> "1"
+    )
+
     val df = spark.range(0, 10).toDF("keyid")
       .withColumn("age", expr("keyid + 1000"))
     df.write.format("hudi")
@@ -998,16 +999,17 @@ class TestHoodieSparkSqlWriter {
    */
   @Test
   def testUpsertWithCombineBeforeUpsertDisabled(): Unit = {
-    val options = Map(DataSourceWriteOptions.TABLE_TYPE.key -> HoodieTableType.COPY_ON_WRITE,
+    val options = Map(
+      DataSourceWriteOptions.TABLE_TYPE.key -> HoodieTableType.COPY_ON_WRITE.name(),
       DataSourceWriteOptions.PRECOMBINE_FIELD.key -> "col3",
       DataSourceWriteOptions.RECORDKEY_FIELD.key -> "keyid",
       DataSourceWriteOptions.PARTITIONPATH_FIELD.key -> "",
       DataSourceWriteOptions.KEYGENERATOR_CLASS_NAME.key -> "org.apache.hudi.keygen.NonpartitionedKeyGenerator",
       HoodieWriteConfig.TBL_NAME.key -> "hoodie_test",
+      HoodieWriteConfig.COMBINE_BEFORE_UPSERT.key -> "false",
       "hoodie.insert.shuffle.parallelism" -> "1",
-      "hoodie.upsert.shuffle.parallelism" -> "1",
-      "hoodie.combine.before.upsert" -> "false"
-    )
+      "hoodie.upsert.shuffle.parallelism" -> "1")
+
     val df = spark.range(0, 10).toDF("keyid")
       .withColumn("col3", expr("keyid"))
       .withColumn("age", expr("keyid + 1000"))
