@@ -1011,10 +1011,11 @@ class TestHoodieSparkSqlWriter {
   /**
    * Test upsert for CoW table with combine before upsert disabled.
    */
-  @Test
-  def testUpsertWithCombineBeforeUpsertDisabled(): Unit = {
+  @ParameterizedTest
+  @EnumSource(value = classOf[HoodieTableType])
+  def testUpsertWithCombineBeforeUpsertDisabled(tableType: HoodieTableType): Unit = {
     val options = Map(
-      DataSourceWriteOptions.TABLE_TYPE.key -> HoodieTableType.COPY_ON_WRITE.name(),
+      DataSourceWriteOptions.TABLE_TYPE.key -> tableType.name,
       DataSourceWriteOptions.PRECOMBINE_FIELD.key -> "col3",
       DataSourceWriteOptions.RECORDKEY_FIELD.key -> "keyid",
       DataSourceWriteOptions.PARTITIONPATH_FIELD.key -> "",
