@@ -1009,7 +1009,7 @@ class TestHoodieSparkSqlWriter {
   }
 
   /**
-   * Test upsert for CoW table with combine before upsert disabled.
+   * Test upsert with combine before upsert disabled.
    */
   @ParameterizedTest
   @EnumSource(value = classOf[HoodieTableType])
