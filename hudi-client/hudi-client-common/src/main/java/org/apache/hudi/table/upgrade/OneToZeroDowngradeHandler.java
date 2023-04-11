@@ -18,10 +18,13 @@
 
 package org.apache.hudi.table.upgrade;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.hudi.common.config.ConfigProperty;
 import org.apache.hudi.common.engine.HoodieEngineContext;
+import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
+import org.apache.hudi.common.util.FileIOUtils;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.table.HoodieTable;
 import org.apache.hudi.table.marker.WriteMarkers;
@@ -42,8 +45,18 @@ public class OneToZeroDowngradeHandler implements DowngradeHandler {
       HoodieWriteConfig config, HoodieEngineContext context, String instantTime,
       SupportsUpgradeDowngrade upgradeDowngradeHelper) {
     HoodieTable table = upgradeDowngradeHelper.getTable(config, context);
+    HoodieTableMetaClient metaClient = table.getMetaClient();
+    // sync compaction requested file to .aux
+    HoodieTimeline compactionTimeline = metaClient.getActiveTimeline().filterPendingCompactionTimeline()
+            .filter(instant -> instant.getState() == HoodieInstant.State.REQUESTED);
+    compactionTimeline.getInstants().stream().forEach(instant -> {
+      String fileName = instant.getFileName();
+      FileIOUtils.copy(metaClient.getFs(),
+              new Path(metaClient.getMetaPath(), fileName),
+              new Path(metaClient.getMetaAuxiliaryPath(), fileName));
+    });
     // fetch pending commit info
-    HoodieTimeline inflightTimeline = table.getMetaClient().getCommitsTimeline().filterPendingExcludingMajorAndMinorCompaction();
+    HoodieTimeline inflightTimeline = metaClient.getCommitsTimeline().filterPendingExcludingMajorAndMinorCompaction();
     List<HoodieInstant> commits = inflightTimeline.getReverseOrderedInstants().collect(Collectors.toList());
     for (HoodieInstant inflightInstant : commits) {
       // delete existing markers
