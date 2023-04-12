@@ -45,18 +45,8 @@ public class OneToZeroDowngradeHandler implements DowngradeHandler {
       HoodieWriteConfig config, HoodieEngineContext context, String instantTime,
       SupportsUpgradeDowngrade upgradeDowngradeHelper) {
     HoodieTable table = upgradeDowngradeHelper.getTable(config, context);
-    HoodieTableMetaClient metaClient = table.getMetaClient();
-    // sync compaction requested file to .aux
-    HoodieTimeline compactionTimeline = metaClient.getActiveTimeline().filterPendingCompactionTimeline()
-            .filter(instant -> instant.getState() == HoodieInstant.State.REQUESTED);
-    compactionTimeline.getInstants().stream().forEach(instant -> {
-      String fileName = instant.getFileName();
-      FileIOUtils.copy(metaClient.getFs(),
-              new Path(metaClient.getMetaPath(), fileName),
-              new Path(metaClient.getMetaAuxiliaryPath(), fileName));
-    });
     // fetch pending commit info
-    HoodieTimeline inflightTimeline = metaClient.getCommitsTimeline().filterPendingExcludingMajorAndMinorCompaction();
+    HoodieTimeline inflightTimeline = table.getMetaClient().getCommitsTimeline().filterPendingExcludingMajorAndMinorCompaction();
     List<HoodieInstant> commits = inflightTimeline.getReverseOrderedInstants().collect(Collectors.toList());
     for (HoodieInstant inflightInstant : commits) {
       // delete existing markers
