@@ -441,6 +441,8 @@ public class HoodieTimelineArchiver<T extends HoodieAvroPayload, I, K, O> {
       Option<HoodieInstant> oldestInstantToRetainForClustering =
           ClusteringUtils.getOldestInstantToRetainForClustering(table.getActiveTimeline(), table.getMetaClient());
 
+      table.getIndex().updateMetadata(table);
+
       // Actually do the commits
       Stream<HoodieInstant> instantToArchiveStream = commitTimeline.getInstantsAsStream()
           .filter(s -> {
