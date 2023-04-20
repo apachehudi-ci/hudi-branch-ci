@@ -1234,6 +1234,10 @@ public abstract class BaseHoodieWriteClient<T, I, K, O> extends BaseHoodieClient
     // do nothing here
   }
 
+  public void waitForAsyncServiceCompletion() {
+    this.tableServiceClient.waitForAsyncServiceCompletion();
+  }
+
   @Override
   public void close() {
     // Stop timeline-server if running
