@@ -291,25 +291,24 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
     hoodieTimeline.getInstants().forEach(instant -> {
       Option<Pair<HoodieInstant, HoodieClusteringPlan>> instantPlanPair =
           ClusteringUtils.getClusteringPlan(table.getMetaClient(), HoodieTimeline.getReplaceCommitRequestedInstant(instant.getTimestamp()));
-      if (!instantPlanPair.isPresent()) {
-        return;
-      }
-      HoodieClusteringPlan plan = instantPlanPair.get().getRight();
-      List<Map<String, String>> partitionMapList = plan.getInputGroups().stream().map(HoodieClusteringGroup::getExtraMetadata).collect(Collectors.toList());
-      partitionMapList.stream().forEach(partitionMap -> {
-        String partition = partitionMap.get(SparkConsistentBucketClusteringPlanStrategy.METADATA_PARTITION_KEY);
-        if (!partitionVisiteddMap.containsKey(partition)) {
-          Option<HoodieConsistentHashingMetadata> hoodieConsistentHashingMetadataOption = loadMetadata(table, partition);
-          if (hoodieConsistentHashingMetadataOption.isPresent()) {
-            try {
-              overWriteMetadata(table, hoodieConsistentHashingMetadataOption.get(), HoodieTimeline.INIT_INSTANT_TS + HASHING_METADATA_FILE_SUFFIX);
-            } catch (IOException e) {
-              throw new RuntimeException(e);
+      if (instantPlanPair.isPresent()) {
+        HoodieClusteringPlan plan = instantPlanPair.get().getRight();
+        List<Map<String, String>> partitionMapList = plan.getInputGroups().stream().map(HoodieClusteringGroup::getExtraMetadata).collect(Collectors.toList());
+        partitionMapList.stream().forEach(partitionMap -> {
+          String partition = partitionMap.get(SparkConsistentBucketClusteringPlanStrategy.METADATA_PARTITION_KEY);
+          if (!partitionVisiteddMap.containsKey(partition)) {
+            Option<HoodieConsistentHashingMetadata> hoodieConsistentHashingMetadataOption = loadMetadata(table, partition);
+            if (hoodieConsistentHashingMetadataOption.isPresent()) {
+              try {
+                overWriteMetadata(table, hoodieConsistentHashingMetadataOption.get(), HoodieTimeline.INIT_INSTANT_TS + HASHING_METADATA_FILE_SUFFIX);
+              } catch (IOException e) {
+                throw new RuntimeException(e);
+              }
             }
+            partitionVisiteddMap.put(partition, Boolean.TRUE);
           }
-          partitionVisiteddMap.put(partition, Boolean.TRUE);
-        }
-      });
+        });
+      }
     });
   }
 
