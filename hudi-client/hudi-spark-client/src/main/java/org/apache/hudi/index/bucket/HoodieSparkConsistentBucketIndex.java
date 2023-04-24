@@ -331,7 +331,10 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
     HoodieWrapperFileSystem fs = table.getMetaClient().getFs();
     Path dir = FSUtils.getPartitionPath(table.getMetaClient().getHashingMetadataPath(), metadata.getPartitionPath());
     Path fullPath = new Path(dir, fileName);
-    FSDataOutputStream fsOut = fs.create(fullPath, true);
+    try (FSDataOutputStream fsOut = fs.create(fullPath, true)) {
+       byte[] bytes = metadata.toBytes();
+       fsOut.write(bytes);
+    }
     byte[] bytes = metadata.toBytes();
     fsOut.write(bytes);
     fsOut.close();
