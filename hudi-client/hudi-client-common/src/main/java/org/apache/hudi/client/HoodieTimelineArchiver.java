@@ -450,7 +450,7 @@ public class HoodieTimelineArchiver<T extends HoodieAvroPayload, I, K, O> {
       // to check whether the file slice generated in pending clustering after archive isn't committed.
       Option<HoodieInstant> oldestInstantToRetainForClustering =
           ClusteringUtils.getOldestInstantToRetainForClustering(table.getActiveTimeline(), table.getMetaClient());
-      table.getIndex().updateMetadata(table);
+      table.getIndex().updateMetadata(table,oldestInstantToRetainForClustering);
 
       // Actually do the commits
       Stream<HoodieInstant> instantToArchiveStream = commitTimeline.getInstantsAsStream()

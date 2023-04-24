@@ -30,6 +30,8 @@ import org.apache.hudi.common.model.FileSlice;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.WriteOperationType;
+import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.exception.HoodieIndexException;
 import org.apache.hudi.exception.HoodieNotSupportedException;
@@ -157,8 +159,9 @@ public abstract class HoodieIndex<I, O> implements Serializable {
   /**
    * Update index metadata that needs to be updated to keep index in sync
    * @param table
+   * @param hoodieInstant
    */
-  public void updateMetadata(HoodieTable table) {
+  public void updateMetadata(HoodieTable table, Option<HoodieInstant> hoodieInstant) {
   }
 
   @EnumDescription("Determines how input records are indexed, i.e., looked up based on the key "
