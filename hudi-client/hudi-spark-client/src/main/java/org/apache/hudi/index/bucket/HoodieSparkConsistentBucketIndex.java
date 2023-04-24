@@ -291,6 +291,9 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
     hoodieTimeline.getInstants().forEach(instant -> {
       Option<Pair<HoodieInstant, HoodieClusteringPlan>> instantPlanPair =
           ClusteringUtils.getClusteringPlan(table.getMetaClient(), HoodieTimeline.getReplaceCommitRequestedInstant(instant.getTimestamp()));
+      if (!instantPlanPair.isPresent()) {
+        return;
+      }
       HoodieClusteringPlan plan = instantPlanPair.get().getRight();
       List<Map<String, String>> partitionMapList = plan.getInputGroups().stream().map(HoodieClusteringGroup::getExtraMetadata).collect(Collectors.toList());
       partitionMapList.stream().forEach(partitionMap -> {
