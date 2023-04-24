@@ -269,6 +269,10 @@ public class HoodieCompactor {
         }
       }
       HoodieWriteMetadata<JavaRDD<WriteStatus>> compactionMetadata = client.compact(cfg.compactionInstantTime);
+      if (client.getConfig().isAutoClean() && !client.getConfig().isAsyncClean()) {
+        LOG.info("Start to clean synchronously.");
+        client.clean();
+      }
       return UtilHelpers.handleErrors(compactionMetadata.getCommitMetadata().get(), cfg.compactionInstantTime);
     }
   }

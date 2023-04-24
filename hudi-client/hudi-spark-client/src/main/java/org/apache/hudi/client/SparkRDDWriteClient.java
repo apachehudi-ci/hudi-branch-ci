@@ -292,9 +292,7 @@ public class SparkRDDWriteClient<T> extends
   protected HoodieWriteMetadata<JavaRDD<WriteStatus>> compact(String compactionInstantTime, boolean shouldComplete) {
     HoodieSparkTable<T> table = HoodieSparkTable.create(config, context);
     preWrite(compactionInstantTime, WriteOperationType.COMPACT, table.getMetaClient());
-    HoodieWriteMetadata<JavaRDD<WriteStatus>> compactionMetadata = tableServiceClient.compact(compactionInstantTime, shouldComplete);
-    autoCleanOnCommit();
-    return compactionMetadata;
+    return tableServiceClient.compact(compactionInstantTime, shouldComplete);
   }
 
   @Override
@@ -322,9 +320,7 @@ public class SparkRDDWriteClient<T> extends
   public HoodieWriteMetadata<JavaRDD<WriteStatus>> cluster(String clusteringInstant, boolean shouldComplete) {
     HoodieSparkTable<T> table = HoodieSparkTable.create(config, context);
     preWrite(clusteringInstant, WriteOperationType.CLUSTER, table.getMetaClient());
-    HoodieWriteMetadata<JavaRDD<WriteStatus>> clusteringMetadata = tableServiceClient.cluster(clusteringInstant, shouldComplete);
-    autoCleanOnCommit();
-    return clusteringMetadata;
+    return tableServiceClient.cluster(clusteringInstant, shouldComplete);
   }
 
   @Override
