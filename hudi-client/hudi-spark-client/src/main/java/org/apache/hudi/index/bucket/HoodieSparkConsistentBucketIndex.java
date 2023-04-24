@@ -286,9 +286,8 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
    *
    * @param table
    */
-  public void updateMetadata(HoodieTable table) {
+  public void updateMetadata(HoodieTable table,Option<HoodieInstant> hoodieOldestReplaceInstantToKeep) {
     Map<String, Boolean> partitionVisiteddMap = new HashMap<>();
-    Option<HoodieInstant> hoodieOldestReplaceInstantToKeep = getOldestInstantToRetain(table);
     // Update metadata for replace commit which are going to get archived.
     HoodieTimeline hoodieTimeline = table.getActiveTimeline().getCompletedReplaceTimeline().filter(instant ->
             hoodieOldestReplaceInstantToKeep.map(replaceInstantToKeep -> HoodieTimeline.compareTimestamps(instant.getTimestamp(), LESSER_THAN, replaceInstantToKeep.getTimestamp())).orElse(true));
@@ -304,7 +303,7 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
             Option<HoodieConsistentHashingMetadata> hoodieConsistentHashingMetadataOption = loadMetadata(table, partition);
             if (hoodieConsistentHashingMetadataOption.isPresent()) {
               try {
-                overWriteMetadata(table, hoodieConsistentHashingMetadataOption.get(), HoodieTimeline.INIT_INSTANT_TS + HASHING_METADATA_FILE_SUFFIX);
+                overwriteMetadata(table, hoodieConsistentHashingMetadataOption.get(), HoodieTimeline.INIT_INSTANT_TS + HASHING_METADATA_FILE_SUFFIX);
               } catch (IOException e) {
                 throw new RuntimeException(e);
               }
@@ -316,28 +315,14 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
     });
   }
 
-  private Option<HoodieInstant> getOldestInstantToRetain(HoodieTable table) {
-    try {
-      Option<HoodieInstant> oldestInstantToRetainForClustering =
-              ClusteringUtils.getOldestInstantToRetainForClustering(table.getActiveTimeline(), table.getMetaClient());
-      return oldestInstantToRetainForClustering;
-    } catch (IOException e) {
-      LOG.error("Error while getting oldest instant to retain info: ", e);
-      return Option.empty();
-    }
-  }
-
   private boolean overwriteMetadata(HoodieTable table, HoodieConsistentHashingMetadata metadata, String fileName) throws IOException {
     HoodieWrapperFileSystem fs = table.getMetaClient().getFs();
     Path dir = FSUtils.getPartitionPath(table.getMetaClient().getHashingMetadataPath(), metadata.getPartitionPath());
     Path fullPath = new Path(dir, fileName);
     try (FSDataOutputStream fsOut = fs.create(fullPath, true)) {
-       byte[] bytes = metadata.toBytes();
-       fsOut.write(bytes);
+      byte[] bytes = metadata.toBytes();
+      fsOut.write(bytes);
     }
-    byte[] bytes = metadata.toBytes();
-    fsOut.write(bytes);
-    fsOut.close();
     return true;
   }
 }
