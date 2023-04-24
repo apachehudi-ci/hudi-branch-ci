@@ -134,6 +134,7 @@ public class SparkRDDTableServiceClient<T> extends BaseHoodieTableServiceClient<
           metrics.updateCommitMetrics(parsedInstant.getTime(), durationInMs, metadata, HoodieActiveTimeline.COMPACTION_ACTION)
       );
     }
+    waitForAsyncServiceCompletion();
     LOG.info("Compacted successfully on commit " + compactionCommitTime);
   }
 
@@ -245,6 +246,7 @@ public class SparkRDDTableServiceClient<T> extends BaseHoodieTableServiceClient<
           metrics.updateCommitMetrics(parsedInstant.getTime(), durationInMs, metadata, HoodieActiveTimeline.REPLACE_COMMIT_ACTION)
       );
     }
+    waitForAsyncServiceCompletion();
     LOG.info("Clustering successfully on commit " + clusteringCommitTime);
   }
 
