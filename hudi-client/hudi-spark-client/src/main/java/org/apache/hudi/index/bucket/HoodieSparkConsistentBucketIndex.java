@@ -327,7 +327,7 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
     }
   }
 
-  private boolean overWriteMetadata(HoodieTable table, HoodieConsistentHashingMetadata metadata, String fileName) throws IOException {
+  private boolean overwriteMetadata(HoodieTable table, HoodieConsistentHashingMetadata metadata, String fileName) throws IOException {
     HoodieWrapperFileSystem fs = table.getMetaClient().getFs();
     Path dir = FSUtils.getPartitionPath(table.getMetaClient().getHashingMetadataPath(), metadata.getPartitionPath());
     Path fullPath = new Path(dir, fileName);
