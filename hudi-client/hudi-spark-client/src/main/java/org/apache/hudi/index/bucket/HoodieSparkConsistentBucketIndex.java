@@ -63,7 +63,7 @@ import java.util.stream.Collectors;
 import scala.Tuple2;
 
 import static org.apache.hudi.common.model.HoodieConsistentHashingMetadata.HASHING_METADATA_FILE_SUFFIX;
-import static org.apache.hudi.common.table.timeline.HoodieTimeline.LESSER_THAN;
+import static org.apache.hudi.common.table.timeline.HoodieTimeline.LESSER_THAN_OR_EQUALS;
 
 /**
  * Consistent hashing bucket index implementation, with auto-adjust bucket number.
@@ -290,7 +290,8 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
     Map<String, Boolean> partitionVisiteddMap = new HashMap<>();
     // Update metadata for replace commit which are going to get archived.
     HoodieTimeline hoodieTimeline = table.getActiveTimeline().getCompletedReplaceTimeline().filter(instant ->
-            hoodieOldestReplaceInstantToKeep.map(replaceInstantToKeep -> HoodieTimeline.compareTimestamps(instant.getTimestamp(), LESSER_THAN, replaceInstantToKeep.getTimestamp())).orElse(true));
+            hoodieOldestReplaceInstantToKeep.map(replaceInstantToKeep -> HoodieTimeline.compareTimestamps(instant.getTimestamp(), LESSER_THAN_OR_EQUALS, replaceInstantToKeep.getTimestamp()))
+                    .orElse(true));
     hoodieTimeline.getInstants().forEach(instant -> {
       Option<Pair<HoodieInstant, HoodieClusteringPlan>> instantPlanPair =
           ClusteringUtils.getClusteringPlan(table.getMetaClient(), HoodieTimeline.getReplaceCommitRequestedInstant(instant.getTimestamp()));
