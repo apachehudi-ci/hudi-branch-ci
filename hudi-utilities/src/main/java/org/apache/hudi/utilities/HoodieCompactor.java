@@ -269,10 +269,7 @@ public class HoodieCompactor {
         }
       }
       HoodieWriteMetadata<JavaRDD<WriteStatus>> compactionMetadata = client.compact(cfg.compactionInstantTime);
-      if (client.getConfig().isAutoClean() && !client.getConfig().isAsyncClean()) {
-        LOG.info("Start to clean synchronously.");
-        client.clean();
-      }
+      cleanAfterCompact(client);
       return UtilHelpers.handleErrors(compactionMetadata.getCommitMetadata().get(), cfg.compactionInstantTime);
     }
   }
@@ -298,5 +295,13 @@ public class HoodieCompactor {
     }
     Schema schema = schemaUtil.getTableAvroSchema(false);
     return schema.toString();
+  }
+
+  private void cleanAfterCompact(SparkRDDWriteClient client) {
+    client.waitForAsyncServiceCompletion();
+    if (client.getConfig().isAutoClean() && !client.getConfig().isAsyncClean()) {
+      LOG.info("Start to clean synchronously.");
+      client.clean();
+    }
   }
 }

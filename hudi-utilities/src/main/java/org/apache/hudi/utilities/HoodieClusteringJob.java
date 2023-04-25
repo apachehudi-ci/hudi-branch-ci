@@ -198,10 +198,7 @@ public class HoodieClusteringJob {
         }
       }
       Option<HoodieCommitMetadata> commitMetadata = client.cluster(cfg.clusteringInstantTime).getCommitMetadata();
-      if (client.getConfig().isAutoClean() && !client.getConfig().isAsyncClean()) {
-        LOG.info("Start to clean synchronously.");
-        client.clean();
-      }
+      cleanAfterCluster(client);
       return UtilHelpers.handleErrors(commitMetadata.get(), cfg.clusteringInstantTime);
     }
   }
@@ -259,11 +256,16 @@ public class HoodieClusteringJob {
       LOG.info("The schedule instant time is " + instantTime.get());
       LOG.info("Step 2: Do cluster");
       Option<HoodieCommitMetadata> metadata = client.cluster(instantTime.get()).getCommitMetadata();
-      if (client.getConfig().isAutoClean() && !client.getConfig().isAsyncClean()) {
-        LOG.info("Start to clean synchronously.");
-        client.clean();
-      }
+      cleanAfterCluster(client);
       return UtilHelpers.handleErrors(metadata.get(), instantTime.get());
+    }
+  }
+
+  private void cleanAfterCluster(SparkRDDWriteClient client) {
+    client.waitForAsyncServiceCompletion();
+    if (client.getConfig().isAutoClean() && !client.getConfig().isAsyncClean()) {
+      LOG.info("Start to clean synchronously.");
+      client.clean();
     }
   }
 }
