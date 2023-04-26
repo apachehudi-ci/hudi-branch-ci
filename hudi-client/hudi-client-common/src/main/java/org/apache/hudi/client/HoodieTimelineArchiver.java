@@ -509,10 +509,15 @@ public class HoodieTimelineArchiver<T extends HoodieAvroPayload, I, K, O> {
   }
 
   private Stream<HoodieInstant> getInstantsToArchive() throws IOException {
-    Stream<HoodieInstant> commitInstantsToArchive = getCommitInstantsToArchive();
-    Stream<HoodieInstant> instants = Stream.concat(getCleanInstantsToArchive(), commitInstantsToArchive);
-    HoodieInstant hoodieOldestInstantToRetain = commitInstantsToArchive.max(Comparator.comparing(maxInstant -> maxInstant.getTimestamp())).orElse(null);
-    table.getIndex().updateMetadata(table, Option.of(hoodieOldestInstantToRetain));
+    List<HoodieInstant> commitInstantsToArchive = getCommitInstantsToArchive().collect(Collectors.toList());
+    Stream<HoodieInstant> instants = Stream.concat(getCleanInstantsToArchive(), commitInstantsToArchive.stream());
+    HoodieInstant hoodieOldestInstantToArchive = commitInstantsToArchive.stream().max(Comparator.comparing(maxInstant -> maxInstant.getTimestamp())).orElse(null);
+    /**
+     * if hoodieOldestInstantToArchive is null that means nothing is getting archived, so no need to update metadata
+     */
+    if (hoodieOldestInstantToArchive != null) {
+      table.getIndex().updateMetadata(table, Option.of(hoodieOldestInstantToArchive));
+    }
     if (config.isMetaserverEnabled()) {
       return Stream.empty();
     }
