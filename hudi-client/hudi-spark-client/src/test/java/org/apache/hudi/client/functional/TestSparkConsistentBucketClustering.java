@@ -18,6 +18,7 @@
 
 package org.apache.hudi.client.functional;
 
+import org.apache.hudi.client.HoodieTimelineArchiver;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.clustering.plan.strategy.SparkConsistentBucketClusteringPlanStrategy;
 import org.apache.hudi.client.clustering.run.strategy.SparkConsistentBucketClusteringExecutionStrategy;
@@ -33,6 +34,8 @@ import org.apache.hudi.common.table.view.FileSystemViewStorageType;
 import org.apache.hudi.common.testutils.HoodieTestDataGenerator;
 import org.apache.hudi.common.testutils.HoodieTestUtils;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.config.HoodieArchivalConfig;
+import org.apache.hudi.config.HoodieCleanConfig;
 import org.apache.hudi.config.HoodieClusteringConfig;
 import org.apache.hudi.config.HoodieCompactionConfig;
 import org.apache.hudi.config.HoodieIndexConfig;
@@ -147,6 +150,45 @@ public class TestSparkConsistentBucketClustering extends HoodieClientTestHarness
         Assertions.assertTrue(fs.getLogFiles().count() == 0);
       });
     });
+  }
+
+  /***
+   * Test running archival after clustering
+   * @param isArchive
+   * @throws IOException
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testUpdateIndexMetadata(boolean isArchive) throws IOException {
+    final int maxFileSize = 5120;
+    final int targetBucketNum =  14;
+    setup(maxFileSize);
+    writeClient.getConfig().setValue(HoodieCleanConfig.CLEANER_COMMITS_RETAINED.key(),"1");
+    writeClient.getConfig().setValue(HoodieArchivalConfig.MIN_COMMITS_TO_KEEP.key(),"4");
+    writeClient.getConfig().setValue(HoodieArchivalConfig.MAX_COMMITS_TO_KEEP.key(),"5");
+    writeData(HoodieActiveTimeline.createNewInstantTime(), 2000, true);
+    String clusteringTime = (String) writeClient.scheduleClustering(Option.empty()).get();
+    writeClient.cluster(clusteringTime, true);
+    writeData(HoodieActiveTimeline.createNewInstantTime(), 10, true);
+    writeData(HoodieActiveTimeline.createNewInstantTime(), 10, true);
+    writeData(HoodieActiveTimeline.createNewInstantTime(), 10, true);
+    writeData(HoodieActiveTimeline.createNewInstantTime(), 10, true);
+    writeData(HoodieActiveTimeline.createNewInstantTime(), 10, true);
+    writeData(HoodieActiveTimeline.createNewInstantTime(), 10, true);
+    writeData(HoodieActiveTimeline.createNewInstantTime(), 10, true);
+    writeData(HoodieActiveTimeline.createNewInstantTime(), 10, true);
+    metaClient = HoodieTableMetaClient.reload(metaClient);
+    final HoodieTable table = HoodieSparkTable.create(config, context, metaClient);
+    if (isArchive) {
+      writeClient.clean();
+      HoodieTimelineArchiver hoodieTimelineArchiver = new HoodieTimelineArchiver(writeClient.getConfig(),table);
+      hoodieTimelineArchiver.archiveIfRequired(context);
+    }
+    Arrays.stream(dataGen.getPartitionPaths()).forEach(p -> {
+      HoodieConsistentHashingMetadata metadata = HoodieSparkConsistentBucketIndex.loadMetadata(table, p).get();
+      Assertions.assertEquals(targetBucketNum, metadata.getNodes().size());
+    });
+    Assertions.assertEquals(2080, readRecords(dataGen.getPartitionPaths()).size());
   }
 
   /**
