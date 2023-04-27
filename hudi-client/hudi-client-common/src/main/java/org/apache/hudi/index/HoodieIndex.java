@@ -154,6 +154,13 @@ public abstract class HoodieIndex<I, O> implements Serializable {
   public void close() {
   }
 
+  /**
+   * Update index metadata that needs to be updated to keep index in sync
+   * @param table
+   */
+  public void updateMetadata(HoodieTable table) {
+  }
+
   @EnumDescription("Determines how input records are indexed, i.e., looked up based on the key "
       + "for the location in the existing table. Default is SIMPLE on Spark engine, and INMEMORY "
       + "on Flink and Java engines.")
