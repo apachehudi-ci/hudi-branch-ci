@@ -59,11 +59,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import scala.Tuple2;
 
 import static org.apache.hudi.common.model.HoodieConsistentHashingMetadata.HASHING_METADATA_FILE_SUFFIX;
-import static org.apache.hudi.common.table.timeline.HoodieTimeline.LESSER_THAN_OR_EQUALS;
+import static org.apache.hudi.common.table.timeline.HoodieTimeline.REPLACE_COMMIT_ACTION;
 
 /**
  * Consistent hashing bucket index implementation, with auto-adjust bucket number.
@@ -286,13 +287,11 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
    *
    * @param table
    */
-  public void updateMetadata(HoodieTable table,Option<HoodieInstant> hoodieOldestReplaceInstantToKeep) {
+  public void updateArchivalDependentIndexMetadata(HoodieTable table,List<HoodieInstant> hoodieArchivalInstants) {
     Map<String, Boolean> partitionVisiteddMap = new HashMap<>();
     // Update metadata for replace commit which are going to get archived.
-    HoodieTimeline hoodieTimeline = table.getActiveTimeline().getCompletedReplaceTimeline().filter(instant ->
-            hoodieOldestReplaceInstantToKeep.map(replaceInstantToKeep -> HoodieTimeline.compareTimestamps(instant.getTimestamp(), LESSER_THAN_OR_EQUALS, replaceInstantToKeep.getTimestamp()))
-                    .orElse(true));
-    hoodieTimeline.getInstants().forEach(instant -> {
+    Stream<HoodieInstant> hoodieListOfReplacedInstants = hoodieArchivalInstants.stream().filter(instane -> instane.getAction().equals(REPLACE_COMMIT_ACTION));
+    hoodieListOfReplacedInstants.forEach(instant -> {
       Option<Pair<HoodieInstant, HoodieClusteringPlan>> instantPlanPair =
           ClusteringUtils.getClusteringPlan(table.getMetaClient(), HoodieTimeline.getReplaceCommitRequestedInstant(instant.getTimestamp()));
       if (instantPlanPair.isPresent()) {

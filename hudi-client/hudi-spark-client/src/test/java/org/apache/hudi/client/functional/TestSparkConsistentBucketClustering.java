@@ -154,12 +154,10 @@ public class TestSparkConsistentBucketClustering extends HoodieClientTestHarness
 
   /***
    * Test running archival after clustering
-   * @param isArchive
    * @throws IOException
    */
-  @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  public void testUpdateIndexMetadata(boolean isArchive) throws IOException {
+  @Test
+  public void testUpdateArchivalDependentIndexMetadata() throws IOException {
     final int maxFileSize = 5120;
     final int targetBucketNum =  14;
     setup(maxFileSize);
@@ -179,11 +177,9 @@ public class TestSparkConsistentBucketClustering extends HoodieClientTestHarness
     writeData(HoodieActiveTimeline.createNewInstantTime(), 10, true);
     metaClient = HoodieTableMetaClient.reload(metaClient);
     final HoodieTable table = HoodieSparkTable.create(config, context, metaClient);
-    if (isArchive) {
-      writeClient.clean();
-      HoodieTimelineArchiver hoodieTimelineArchiver = new HoodieTimelineArchiver(writeClient.getConfig(),table);
-      hoodieTimelineArchiver.archiveIfRequired(context);
-    }
+    writeClient.clean();
+    HoodieTimelineArchiver hoodieTimelineArchiver = new HoodieTimelineArchiver(writeClient.getConfig(),table);
+    hoodieTimelineArchiver.archiveIfRequired(context);
     Arrays.stream(dataGen.getPartitionPaths()).forEach(p -> {
       HoodieConsistentHashingMetadata metadata = HoodieSparkConsistentBucketIndex.loadMetadata(table, p).get();
       Assertions.assertEquals(targetBucketNum, metadata.getNodes().size());

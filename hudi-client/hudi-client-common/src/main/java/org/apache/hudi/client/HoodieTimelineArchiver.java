@@ -174,6 +174,9 @@ public class HoodieTimelineArchiver<T extends HoodieAvroPayload, I, K, O> {
         txnManager.beginTransaction(Option.empty(), Option.empty());
       }
       List<HoodieInstant> instantsToArchive = getInstantsToArchive().collect(Collectors.toList());
+      if (!instantsToArchive.isEmpty()) {
+        table.getIndex().updateArchivalDependentIndexMetadata(table,instantsToArchive);
+      }
       verifyLastMergeArchiveFilesIfNecessary(context);
       boolean success = true;
       if (!instantsToArchive.isEmpty()) {
@@ -509,17 +512,10 @@ public class HoodieTimelineArchiver<T extends HoodieAvroPayload, I, K, O> {
   }
 
   private Stream<HoodieInstant> getInstantsToArchive() throws IOException {
-    List<HoodieInstant> commitInstantsToArchive = getCommitInstantsToArchive().collect(Collectors.toList());
-    Stream<HoodieInstant> instants = Stream.concat(getCleanInstantsToArchive(), commitInstantsToArchive.stream());
-    HoodieInstant hoodieOldestInstantToArchive = commitInstantsToArchive.stream().max(Comparator.comparing(maxInstant -> maxInstant.getTimestamp())).orElse(null);
-    // if hoodieOldestInstantToArchive is null that means nothing is getting archived, so no need to update metadata
-    if (hoodieOldestInstantToArchive != null) {
-      table.getIndex().updateMetadata(table, Option.of(hoodieOldestInstantToArchive));
-    }
+    Stream<HoodieInstant> instants = Stream.concat(getCleanInstantsToArchive(), getCommitInstantsToArchive());
     if (config.isMetaserverEnabled()) {
       return Stream.empty();
     }
-
     // For archiving and cleaning instants, we need to include intermediate state files if they exist
     HoodieActiveTimeline rawActiveTimeline = new HoodieActiveTimeline(metaClient, false);
     Map<Pair<String, String>, List<HoodieInstant>> groupByTsAction = rawActiveTimeline.getInstantsAsStream()

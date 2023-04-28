@@ -31,13 +31,13 @@ import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.WriteOperationType;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
-import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.exception.HoodieIndexException;
 import org.apache.hudi.exception.HoodieNotSupportedException;
 import org.apache.hudi.table.HoodieTable;
 
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * Base class for different types of indexes to determine the mapping from uuid.
@@ -157,11 +157,11 @@ public abstract class HoodieIndex<I, O> implements Serializable {
   }
 
   /**
-   * Update index metadata that needs to be updated to keep index in sync
+   * Update index metadata that is dependent on archival and needs to be updated to keep index in sync
    * @param table
-   * @param hoodieInstant
+   * @param listOfarchivalInstant list of commits that are going to be archived
    */
-  public void updateMetadata(HoodieTable table, Option<HoodieInstant> hoodieInstant) {
+  public void updateArchivalDependentIndexMetadata(HoodieTable table, List<HoodieInstant> listOfarchivalInstant) {
   }
 
   @EnumDescription("Determines how input records are indexed, i.e., looked up based on the key "
