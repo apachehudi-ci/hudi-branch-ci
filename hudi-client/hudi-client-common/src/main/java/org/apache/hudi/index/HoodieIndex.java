@@ -157,7 +157,8 @@ public abstract class HoodieIndex<I, O> implements Serializable {
   }
 
   /**
-   * Update index metadata that is dependent on archival and needs to be updated to keep index in sync
+   * Update index metadata that is dependent on active timeline commits and those commits are
+   * going to get archived.
    * @param table
    * @param listOfarchivalInstant list of commits that are going to be archived
    */
