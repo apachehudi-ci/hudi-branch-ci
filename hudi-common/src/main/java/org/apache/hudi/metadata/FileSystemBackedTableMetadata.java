@@ -24,6 +24,7 @@ import org.apache.hudi.common.config.SerializableConfiguration;
 import org.apache.hudi.common.data.HoodieData;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.fs.FSUtils;
+import org.apache.hudi.common.fs.HoodieSerializableFileStatus;
 import org.apache.hudi.common.model.HoodiePartitionMetadata;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
@@ -106,9 +107,9 @@ public class FileSystemBackedTableMetadata implements HoodieTableMetadata {
       int listingParallelism = Math.min(DEFAULT_LISTING_PARALLELISM, pathsToList.size());
 
       // List all directories in parallel
-      List<Pair<Path, Boolean>> dirToFileListing = engineContext.flatMap(pathsToList, path -> {
+      List<HoodieSerializableFileStatus> dirToFileListing = engineContext.flatMap(pathsToList, path -> {
         FileSystem fileSystem = path.getFileSystem(hadoopConf.get());
-        return Arrays.stream(fileSystem.listStatus(path)).map(fileStatus -> Pair.of(fileStatus.getPath(), fileStatus.isDirectory()));
+        return Arrays.stream(HoodieSerializableFileStatus.fromFileStatuses(fileSystem.listStatus(path)));
       }, listingParallelism);
       pathsToList.clear();
 
@@ -118,11 +119,10 @@ public class FileSystemBackedTableMetadata implements HoodieTableMetadata {
       if (!dirToFileListing.isEmpty()) {
         // result below holds a list of pair. first entry in the pair optionally holds the deduced list of partitions.
         // and second entry holds optionally a directory path to be processed further.
-        List<Pair<Option<String>, Option<Path>>> result = engineContext.map(dirToFileListing, pair -> {
-          Path path = pair.getLeft();
-          boolean isDirectory = pair.getRight();
+        List<Pair<Option<String>, Option<Path>>> result = engineContext.map(dirToFileListing, fileStatus -> {
+          Path path = fileStatus.getPath();
           FileSystem fileSystem = path.getFileSystem(hadoopConf.get());
-          if (isDirectory) {
+          if (fileStatus.isDirectory()) {
             if (HoodiePartitionMetadata.hasPartitionMetadata(fileSystem, path)) {
               return Pair.of(Option.of(FSUtils.getRelativePartitionPath(new Path(datasetBasePath), path)), Option.empty());
             } else if (!path.getName().equals(HoodieTableMetaClient.METAFOLDER_NAME)) {
