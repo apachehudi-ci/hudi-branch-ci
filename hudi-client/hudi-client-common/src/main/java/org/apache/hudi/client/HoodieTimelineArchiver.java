@@ -177,7 +177,6 @@ public class HoodieTimelineArchiver<T extends HoodieAvroPayload, I, K, O> {
       verifyLastMergeArchiveFilesIfNecessary(context);
       boolean success = true;
       if (!instantsToArchive.isEmpty()) {
-        // update index metadata dependent on active timeline commits which will get archived
         this.writer = openWriter();
         LOG.info("Archiving instants " + instantsToArchive);
         archive(context, instantsToArchive);
