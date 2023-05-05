@@ -212,7 +212,7 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
           .collect(Collectors.toCollection(TreeSet::new));
       final FileStatus[] hashingMetaFiles = Arrays.stream(metaFiles).filter(hashingMetadataFilePredicate)
           .sorted(Comparator.comparing(f -> f.getPath().getName()))
-          .toArray(FileStatus[]::new);
+              .toArray(FileStatus[]::new);
       // max committed metadata file
       final String maxCommitMetaFileTs = commitMetaTss.isEmpty() ? null : commitMetaTss.last();
       // max updated metadata file
@@ -222,8 +222,8 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
         return loadMetadataFromGivenFile(table, maxMetadataFile);
       }
       // if max updated metadata file and committed metadata file are same then return
-      if (maxCommitMetaFileTs != null && maxMetadataFile != null &&
-          maxCommitMetaFileTs.equals(HoodieConsistentHashingMetadata.getTimestampFromFile(maxMetadataFile.getPath().getName()))) {
+      if (maxCommitMetaFileTs != null && maxMetadataFile != null
+              && maxCommitMetaFileTs.equals(HoodieConsistentHashingMetadata.getTimestampFromFile(maxMetadataFile.getPath().getName()))) {
         return loadMetadataFromGivenFile(table, maxMetadataFile);
       }
       HoodieTimeline completedCommits = table.getMetaClient().getActiveTimeline().getCommitTimeline().filterCompletedInstants();
