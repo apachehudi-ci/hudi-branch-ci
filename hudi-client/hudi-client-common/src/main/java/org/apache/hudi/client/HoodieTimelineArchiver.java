@@ -513,6 +513,7 @@ public class HoodieTimelineArchiver<T extends HoodieAvroPayload, I, K, O> {
     if (config.isMetaserverEnabled()) {
       return Stream.empty();
     }
+    
     // For archiving and cleaning instants, we need to include intermediate state files if they exist
     HoodieActiveTimeline rawActiveTimeline = new HoodieActiveTimeline(metaClient, false);
     Map<Pair<String, String>, List<HoodieInstant>> groupByTsAction = rawActiveTimeline.getInstantsAsStream()
