@@ -157,7 +157,7 @@ public abstract class HoodieIndex<I, O> implements Serializable {
   /***
    * Updates index metadata of the given table and instant if needed.
    * @param table The committed table.
-   * @param hoodieInstant
+   * @param hoodieInstant The instant to commit.
    */
   public void commitIndexMetadataIfNeeded(HoodieTable table, String hoodieInstant) {
   }
