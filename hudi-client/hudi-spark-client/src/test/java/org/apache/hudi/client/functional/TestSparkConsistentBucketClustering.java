@@ -154,7 +154,7 @@ public class TestSparkConsistentBucketClustering extends HoodieClientTestHarness
     });
   }
 
-  /***
+  /**
    * Test running archival after clustering
    * @throws IOException
    */
