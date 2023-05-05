@@ -178,7 +178,6 @@ public class HoodieTimelineArchiver<T extends HoodieAvroPayload, I, K, O> {
       boolean success = true;
       if (!instantsToArchive.isEmpty()) {
         // update index metadata dependent on active timeline commits which will get archived
-        table.getIndex().updateArchivalDependentIndexMetadata(table,instantsToArchive);
         this.writer = openWriter();
         LOG.info("Archiving instants " + instantsToArchive);
         archive(context, instantsToArchive);

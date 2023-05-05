@@ -30,14 +30,12 @@ import org.apache.hudi.common.model.FileSlice;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.WriteOperationType;
-import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.exception.HoodieIndexException;
 import org.apache.hudi.exception.HoodieNotSupportedException;
 import org.apache.hudi.table.HoodieTable;
 
 import java.io.Serializable;
-import java.util.List;
 
 /**
  * Base class for different types of indexes to determine the mapping from uuid.
@@ -156,13 +154,12 @@ public abstract class HoodieIndex<I, O> implements Serializable {
   public void close() {
   }
 
-  /**
-   * Update index metadata that is dependent on active timeline commits and those commits are
-   * going to get archived.
+  /***
+   * Update index metadata
    * @param table
-   * @param listOfarchivalInstant list of commits that are going to be archived
+   * @param hoodieInstant
    */
-  public void updateArchivalDependentIndexMetadata(HoodieTable table, List<HoodieInstant> listOfarchivalInstant) {
+  public void commitIndexMetadataIfNeeded(HoodieTable table, String hoodieInstant) {
   }
 
   @EnumDescription("Determines how input records are indexed, i.e., looked up based on the key "

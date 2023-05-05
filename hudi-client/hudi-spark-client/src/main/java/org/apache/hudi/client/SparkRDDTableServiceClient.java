@@ -232,6 +232,7 @@ public class SparkRDDTableServiceClient<T> extends BaseHoodieTableServiceClient<
       table.getActiveTimeline().transitionReplaceInflightToComplete(
           clusteringInstant,
           Option.of(metadata.toJsonString().getBytes(StandardCharsets.UTF_8)));
+      table.getIndex().commitIndexMetadataIfNeeded(table, clusteringCommitTime);
     } catch (Exception e) {
       throw new HoodieClusteringException("unable to transition clustering inflight to complete: " + clusteringCommitTime, e);
     } finally {
