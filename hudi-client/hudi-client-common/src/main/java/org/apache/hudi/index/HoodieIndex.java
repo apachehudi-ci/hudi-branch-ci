@@ -155,7 +155,7 @@ public abstract class HoodieIndex<I, O> implements Serializable {
   }
 
   /***
-   * Update index metadata
+   * Updates index metadata of the given table and instant if needed.
    * @param table
    * @param hoodieInstant
    */
