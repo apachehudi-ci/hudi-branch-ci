@@ -57,6 +57,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -196,78 +197,62 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
     Path metadataPath = FSUtils.getPartitionPath(table.getMetaClient().getHashingMetadataPath(), partition);
     Path partitionPath = FSUtils.getPartitionPath(table.getMetaClient().getBasePathV2(), partition);
     try {
-      Predicate<FileStatus> commitMetaFilePredicate = fileStatus -> {
+      Predicate<FileStatus> hashingMetaCommitFilePredicate = fileStatus -> {
         String filename = fileStatus.getPath().getName();
-        if (!filename.contains(HoodieConsistentHashingMetadata.HASHING_METADATA_COMMIT_FILE_SUFFIX)) {
-          return false;
-        }
-        return true;
+        return filename.contains(HoodieConsistentHashingMetadata.HASHING_METADATA_COMMIT_FILE_SUFFIX);
       };
-      Predicate<FileStatus> listOfAllMetadataFilesInPartitionPredicate = fileStatus -> {
+      Predicate<FileStatus> hashingMetadataFilePredicate = fileStatus -> {
         String filename = fileStatus.getPath().getName();
-        if (!filename.contains(HASHING_METADATA_FILE_SUFFIX)) {
-          return false;
-        }
-        return true;
+        return filename.contains(HASHING_METADATA_FILE_SUFFIX);
       };
-      FileStatus[] commitMetaFiles = Arrays.stream(table.getMetaClient().getFs().listStatus(metadataPath)).filter(commitMetaFilePredicate)
-              .toArray(FileStatus[]::new);
-      FileStatus[] metaFiles = table.getMetaClient().getFs().listStatus(metadataPath);
+      final FileStatus[] metaFiles = table.getMetaClient().getFs().listStatus(metadataPath);
+      final TreeSet<String> commitMetaTss = Arrays.stream(metaFiles).filter(hashingMetaCommitFilePredicate)
+          .map(commitFile -> HoodieConsistentHashingMetadata.getTimestampFromFile(commitFile.getPath().getName()))
+          .sorted()
+          .collect(Collectors.toCollection(TreeSet::new));
+      final FileStatus[] hashingMetaFiles = Arrays.stream(metaFiles).filter(hashingMetadataFilePredicate)
+          .sorted(Comparator.comparing(f -> f.getPath().getName()))
+          .toArray(FileStatus[]::new);
       // max committed metadata file
-      FileStatus maxCommittedFile = Arrays.stream(commitMetaFiles)
-              .max(Comparator.comparing(commitMarkerFile -> commitMarkerFile.getPath().getName())).orElse(null);
-      // max updated metdata file
-      FileStatus maxUpdatedMetadatFile = Arrays.stream(metaFiles).filter(listOfAllMetadataFilesInPartitionPredicate)
-              .max(Comparator.comparing(metaFile -> metaFile.getPath().getName())).orElse(null);
+      final String maxCommitMetaFileTs = commitMetaTss.isEmpty() ? null : commitMetaTss.last();
+      // max updated metadata file
+      FileStatus maxMetadataFile = hashingMetaFiles.length > 0 ? hashingMetaFiles[hashingMetaFiles.length - 1] : null;
       // If single file present in metadata and if its default file return it
-      if (maxUpdatedMetadatFile != null && HoodieConsistentHashingMetadata.getTimestampFromFile(maxUpdatedMetadatFile.getPath().getName()).equals(HoodieTimeline.INIT_INSTANT_TS)) {
-        return loadMetadataFromGivenFile(table, maxUpdatedMetadatFile);
+      if (maxMetadataFile != null && HoodieConsistentHashingMetadata.getTimestampFromFile(maxMetadataFile.getPath().getName()).equals(HoodieTimeline.INIT_INSTANT_TS)) {
+        return loadMetadataFromGivenFile(table, maxMetadataFile);
       }
-      // if max updated metdata file and committed metadta file are same then return
-      if (maxCommittedFile != null && maxUpdatedMetadatFile != null && HoodieConsistentHashingMetadata
-              .getTimestampFromFile(maxCommittedFile.getPath().getName()).equals(HoodieConsistentHashingMetadata.getTimestampFromFile(maxUpdatedMetadatFile.getPath().getName()))) {
-        return loadMetadataFromGivenFile(table, maxUpdatedMetadatFile);
+      // if max updated metadata file and committed metadata file are same then return
+      if (maxCommitMetaFileTs != null && maxMetadataFile != null &&
+          maxCommitMetaFileTs.equals(HoodieConsistentHashingMetadata.getTimestampFromFile(maxMetadataFile.getPath().getName()))) {
+        return loadMetadataFromGivenFile(table, maxMetadataFile);
       }
       HoodieTimeline completedCommits = table.getMetaClient().getActiveTimeline().getCommitTimeline().filterCompletedInstants();
-      Predicate<FileStatus> metaFilePredicate = fileStatus -> {
-        String filename = fileStatus.getPath().getName();
-        if (!filename.contains(HASHING_METADATA_FILE_SUFFIX)) {
-          return false;
+
+      // fix the in-consistency between un-committed and committed hashing metadata files.
+      List<FileStatus> fixed = new ArrayList<>();
+      Arrays.stream(hashingMetaFiles).forEach(hashingMetaFile -> {
+        Path path = hashingMetaFile.getPath();
+        String timestamp = HoodieConsistentHashingMetadata.getTimestampFromFile(path.getName());
+        if (maxCommitMetaFileTs != null && timestamp.compareTo(maxCommitMetaFileTs) <= 0) {
+          // only fix the metadata with greater timestamp than max committed timestamp
+          return;
         }
-        String timestamp = HoodieConsistentHashingMetadata.getTimestampFromFile(filename);
-        boolean isPresentOnreplaceTimeline = completedCommits.containsInstant(timestamp) || timestamp.equals(HoodieTimeline.INIT_INSTANT_TS);
-        if (isPresentOnreplaceTimeline) {
-          if (Arrays.stream(commitMetaFiles).anyMatch(commitFile -> HoodieConsistentHashingMetadata.getTimestampFromFile(commitFile.getPath().getName())
-                  .equals(timestamp))) {
+        boolean isRehashingCommitted = completedCommits.containsInstant(timestamp) || timestamp.equals(HoodieTimeline.INIT_INSTANT_TS);
+        if (isRehashingCommitted) {
+          if (commitMetaTss.contains(timestamp)) {
             try {
-              createCommitMarker(table, fileStatus.getPath(), partitionPath);
+              createCommitMarker(table, path, partitionPath);
+              fixed.add(hashingMetaFile);
             } catch (IOException e) {
-              throw new HoodieIOException("Exception while creating marker file " + fileStatus.getPath().getName() + " for partition " + partition, e);
+              throw new HoodieIOException("Exception while creating marker file " + path.getName() + " for partition " + partition, e);
             }
           }
-          return true;
-        } else {
-          return checkIfMetadatCanBeCommitted(table, fileStatus, partition);
+        } else if (recommitMetadataFile(table, hashingMetaFile, partition)) {
+          fixed.add(hashingMetaFile);
         }
-      };
-      Predicate<FileStatus> filterForAlreadyCommittedFiles = fileStatus -> {
-        String timestamp = getTimestampFromFile(fileStatus.getPath().getName());
-        if (maxCommittedFile == null) {
-          return true;
-        } else if (timestamp.compareTo(getTimestampFromFile(maxCommittedFile.getPath().getName())) > 0) {
-          return true;
-        }
-        return false;
-      };
-      // Get a valid hashing metadata with the largest (latest) timestamp
-      FileStatus metaFile = Arrays.stream(metaFiles).filter(listOfAllMetadataFilesInPartitionPredicate)
-              .filter(filterForAlreadyCommittedFiles).filter(metaFilePredicate)
-              .max(Comparator.comparing(a -> a.getPath().getName())).orElse(null);
+      });
 
-      if (metaFile == null) {
-        return Option.empty();
-      }
-      return loadMetadataFromGivenFile(table, metaFile);
+      return fixed.isEmpty() ? Option.empty() : loadMetadataFromGivenFile(table, fixed.get(fixed.size() - 1));
     } catch (FileNotFoundException e) {
       return Option.empty();
     } catch (IOException e) {
@@ -333,10 +318,8 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
   }
 
   /***
-   * Create commit marker -> hoodieinstant.commit in metadata folder, consistent hashing metadata reader will use it to
-   * identify latest commited file which will have updated commit metadata
-   * @param table
-   * @param hoodieInstant
+   * Create commit marker -> hoodie_instant.commit in metadata folder, consistent hashing metadata reader will use it to
+   * identify the latest committed file which had updated commit metadata.
    */
   public void commitIndexMetadataIfNeeded(HoodieTable table, String hoodieInstant) {
     Option<Pair<HoodieInstant, HoodieClusteringPlan>> instantPlanPair =
@@ -346,7 +329,7 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
     }
     HoodieClusteringPlan plan = instantPlanPair.get().getRight();
     List<Map<String, String>> partitionMapList = plan.getInputGroups().stream().map(HoodieClusteringGroup::getExtraMetadata).collect(Collectors.toList());
-    partitionMapList.stream().forEach(partitionMap -> {
+    partitionMapList.forEach(partitionMap -> {
       String partition = partitionMap.get(SparkConsistentBucketClusteringPlanStrategy.METADATA_PARTITION_KEY);
       Path metadataPartitionPath = FSUtils.getPartitionPath(table.getMetaClient().getHashingMetadataPath(), partition);
       Path metadataFilePath = new Path(metadataPartitionPath, hoodieInstant + HASHING_METADATA_FILE_SUFFIX);
@@ -362,10 +345,6 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
 
   /***
    * Create commit marker corresponding to hashing metadata file after post commit clustering operation
-   * @param table
-   * @param fileStatus
-   * @param partitionPath
-   * @throws IOException
    */
   private static void createCommitMarker(HoodieTable table, Path fileStatus, Path partitionPath) throws IOException {
     HoodieWrapperFileSystem fs = table.getMetaClient().getFs();
@@ -378,10 +357,7 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
   }
 
   /***
-   * Load consistent hashing metadata from given file
-   * @param table
-   * @param metaFile
-   * @return
+   * Load consistent hashing metadata from given file.
    */
   private static Option<HoodieConsistentHashingMetadata> loadMetadataFromGivenFile(HoodieTable table, FileStatus metaFile) {
     try {
@@ -406,12 +382,8 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
    * Note : we will end up calling this method if there is no marker file and no replace commit on active timeline, if replace commit is not present on
    * active timeline that means old file group id's before clustering operation got cleaned and only new file group id's  of current clustering operation
    * are present on the disk.
-   * @param table
-   * @param metaFile
-   * @param partition
-   * @return
    */
-  private static boolean checkIfMetadatCanBeCommitted(HoodieTable table, FileStatus metaFile, String partition) {
+  private static boolean recommitMetadataFile(HoodieTable table, FileStatus metaFile, String partition) {
     Path partitionPath = FSUtils.getPartitionPath(table.getMetaClient().getBasePathV2(), partition);
     String timestamp = getTimestampFromFile(metaFile.getPath().getName());
     if (table.getPendingCommitTimeline().containsInstant(timestamp)) {
@@ -423,9 +395,7 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
     }
     HoodieConsistentHashingMetadata hoodieConsistentHashingMetadata = hoodieConsistentHashingMetadataOption.get();
 
-    Predicate<String> hoodieFileGroupIdPredicate = hoodieBaseFile -> {
-      return hoodieConsistentHashingMetadata.getNodes().stream().anyMatch(node -> node.getFileIdPrefix().equals(hoodieBaseFile));
-    };
+    Predicate<String> hoodieFileGroupIdPredicate = hoodieBaseFile -> hoodieConsistentHashingMetadata.getNodes().stream().anyMatch(node -> node.getFileIdPrefix().equals(hoodieBaseFile));
     if (table.getBaseFileOnlyView().getLatestBaseFiles(partition)
             .map(fileIdPrefix -> FSUtils.getFileIdPfxFromFileId(fileIdPrefix.getFileId())).anyMatch(hoodieFileGroupIdPredicate)) {
       try {
