@@ -320,6 +320,8 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
   /***
    * Create commit marker -> hoodie_instant.commit in metadata folder, consistent hashing metadata reader will use it to
    * identify the latest committed file which had updated commit metadata.
+   * @param table The committed table.
+   * @param hoodieInstant The instant to commit.
    */
   public void commitIndexMetadataIfNeeded(HoodieTable table, String hoodieInstant) {
     Option<Pair<HoodieInstant, HoodieClusteringPlan>> instantPlanPair =
@@ -345,6 +347,10 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
 
   /***
    * Creates commit marker corresponding to hashing metadata file after post commit clustering operation.
+   * @param table hoodie table
+   * @param fileStatus file for which commit marker should be created
+   * @param partitionPath partition path the file belongs to
+   * @throws IOException
    */
   private static void createCommitMarker(HoodieTable table, Path fileStatus, Path partitionPath) throws IOException {
     HoodieWrapperFileSystem fs = table.getMetaClient().getFs();
@@ -357,7 +363,10 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
   }
 
   /***
-   * Load consistent hashing metadata from given file.
+   * Loads consistent hashing metadata of table from the given meta file
+   * @param table hoodie table
+   * @param metaFile hashing metadata file
+   * @return HoodieConsistentHashingMetadata object
    */
   private static Option<HoodieConsistentHashingMetadata> loadMetadataFromGivenFile(HoodieTable table, FileStatus metaFile) {
     try {
@@ -382,6 +391,10 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
    * Note : we will end up calling this method if there is no marker file and no replace commit on active timeline, if replace commit is not present on
    * active timeline that means old file group id's before clustering operation got cleaned and only new file group id's  of current clustering operation
    * are present on the disk.
+   * @param table hoodie table
+   * @param metaFile metadata file on which sync check needs to be performed
+   * @param partition partition metadata file belongs to
+   * @return true if hashing metadata file is latest else false
    */
   private static boolean recommitMetadataFile(HoodieTable table, FileStatus metaFile, String partition) {
     Path partitionPath = FSUtils.getPartitionPath(table.getMetaClient().getBasePathV2(), partition);
