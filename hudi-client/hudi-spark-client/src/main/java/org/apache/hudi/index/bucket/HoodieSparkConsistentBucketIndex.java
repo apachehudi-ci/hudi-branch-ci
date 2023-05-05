@@ -247,13 +247,7 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
           }
           return true;
         } else {
-          boolean isCommitMarkerPresent = Arrays.stream(commitMetaFiles)
-                  .anyMatch(commitFile -> timestamp.equals(HoodieConsistentHashingMetadata.getTimestampFromFile(commitFile.getPath().getName())));
-          if (isCommitMarkerPresent) {
-            return true;
-          } else {
-            return checkIfMetadatCanBeCommitted(table, fileStatus, partition);
-          }
+          return checkIfMetadatCanBeCommitted(table, fileStatus, partition);
         }
       };
       Predicate<FileStatus> filterForAlreadyCommittedFiles = fileStatus -> {
