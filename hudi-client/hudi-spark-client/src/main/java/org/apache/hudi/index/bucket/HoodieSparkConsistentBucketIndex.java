@@ -344,7 +344,7 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
   }
 
   /***
-   * Create commit marker corresponding to hashing metadata file after post commit clustering operation
+   * Creates commit marker corresponding to hashing metadata file after post commit clustering operation.
    */
   private static void createCommitMarker(HoodieTable table, Path fileStatus, Path partitionPath) throws IOException {
     HoodieWrapperFileSystem fs = table.getMetaClient().getFs();
