@@ -353,7 +353,7 @@ public class HoodieSparkConsistentBucketIndex extends HoodieBucketIndex {
       return;
     }
     String metadata = "";
-    FileIOUtils.createFileInPath(fs, fullPath, Option.of(metadata.getBytes()));
+    FileIOUtils.createFileInPath(fs, fullPath, Option.of(StringUtils.EMPTY_STRING.getBytes()));
   }
 
   /***
