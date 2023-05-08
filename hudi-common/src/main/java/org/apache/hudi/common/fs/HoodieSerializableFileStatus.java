@@ -23,6 +23,13 @@ import org.apache.hadoop.fs.FileStatus;
 import java.io.IOException;
 import java.io.Serializable;
 
+/**
+ * A serializable wrapper for FileStatus.
+ *
+ * Hadoop 2.x FileStatus does not implement Serializable and can cause issues. (HUDI-5936)
+ * This class is supposed to make sure FileStatus can be safely serialized by wrapping FileStatus
+ * with it, and it should be only used when we absolutely need to serialize FileStatus
+ */
 public class HoodieSerializableFileStatus extends FileStatus implements Serializable {
   FileStatus status;
 
