@@ -62,6 +62,7 @@ import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -427,6 +428,30 @@ public class TestStreamWriteOperatorCoordinator {
       String lastCompleted = TestUtils.getLastCompleteInstant(tempFile.getAbsolutePath());
       assertThat("Commits the instant with empty batch anyway", lastCompleted, is(instant));
       assertNull(coordinator.getEventBuffer()[0]);
+    }
+  }
+
+  @Test
+  public void testReusePendingInstant() throws Exception {
+    Configuration conf = TestConfigurations.getDefaultConf(tempFile.getAbsolutePath());
+    MockOperatorCoordinatorContext context = new MockOperatorCoordinatorContext(new OperatorID(), 2);
+    NonThrownExecutor executor = new MockCoordinatorExecutor(context);
+    try (StreamWriteOperatorCoordinator coordinator = new StreamWriteOperatorCoordinator(conf, context)) {
+      coordinator.start();
+      coordinator.setExecutor(executor);
+
+      // trigger a new instant
+      coordinator.handleEventFromOperator(0, WriteMetadataEvent.emptyBootstrap(0));
+      coordinator.handleEventFromOperator(1, WriteMetadataEvent.emptyBootstrap(1));
+
+      // Coordinator start the instant
+      String instant = coordinator.getInstant();
+
+      coordinator.handleEventFromOperator(0, WriteMetadataEvent.emptyBootstrap(0));
+      coordinator.handleEventFromOperator(1, WriteMetadataEvent.emptyBootstrap(1));
+      String instantAfterBoostrap = coordinator.getInstant();
+
+      assertEquals(instant, instantAfterBoostrap, "should reuse pending instant");
     }
   }
 

@@ -422,8 +422,13 @@ public class StreamWriteOperatorCoordinator
         LOG.info("Recommit instant {}", instant);
         commitInstant(instant);
       }
-      // starts a new instant
-      startInstant();
+      String pendingInstant = ckpMetadata.lastPendingInstant();
+      if (pendingInstant == null) {
+        // starts a new instant
+        startInstant();
+      } else { // reuse pending instant if exists, depend on [HUDI-5223]
+        LOG.info("Reuse pending instant " + pendingInstant);
+      }
       // upgrade downgrade
       this.writeClient.upgradeDowngrade(this.instant, this.metaClient);
     }, "initialize instant %s", instant);
