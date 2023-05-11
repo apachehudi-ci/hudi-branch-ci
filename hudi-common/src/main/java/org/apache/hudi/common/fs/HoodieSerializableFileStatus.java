@@ -19,8 +19,8 @@
 package org.apache.hudi.common.fs;
 
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.Path;
 
-import java.io.IOException;
 import java.io.Serializable;
 
 /**
@@ -31,18 +31,32 @@ import java.io.Serializable;
  * with it, and it should be only used when we absolutely need to serialize FileStatus
  */
 public class HoodieSerializableFileStatus extends FileStatus implements Serializable {
-  FileStatus status;
 
-  public HoodieSerializableFileStatus(FileStatus status) throws IOException {
-    super(status);
-    this.status = status;
+  Path path;
+  long length;
+  boolean isDirectory;
+  short blockReplication;
+  long blockSize;
+  long modificationTime;
+
+  public HoodieSerializableFileStatus(FileStatus status) {
+    this(status.getLen(), status.isDirectory(), status.getReplication(), status.getBlockSize(), status.getModificationTime(), status.getPath());
   }
 
-  public static HoodieSerializableFileStatus fromFileStatus(FileStatus status) throws IOException {
+  public HoodieSerializableFileStatus(long length, boolean isdir, int blockReplication, long blocksize, long modificationTime, Path path) {
+    this.path = path;
+    this.length = length;
+    this.isDirectory = isdir;
+    this.blockReplication = (short) blockReplication;
+    this.blockSize = blocksize;
+    this.modificationTime = modificationTime;
+  }
+
+  public static HoodieSerializableFileStatus fromFileStatus(FileStatus status) {
     return new HoodieSerializableFileStatus(status);
   }
 
-  public static HoodieSerializableFileStatus[] fromFileStatuses(FileStatus[] statuses) throws IOException {
+  public static HoodieSerializableFileStatus[] fromFileStatuses(FileStatus[] statuses) {
     HoodieSerializableFileStatus[] hoodieFileStatuses = new HoodieSerializableFileStatus[statuses.length];
 
     // using for loop here to make throwing exception easier
@@ -53,6 +67,6 @@ public class HoodieSerializableFileStatus extends FileStatus implements Serializ
   }
 
   public FileStatus toFileStatus() {
-    return this.status;
+    return new FileStatus(this.length, this.isDirectory, this.blockReplication, this.blockSize, this.modificationTime, this.path);
   }
 }
