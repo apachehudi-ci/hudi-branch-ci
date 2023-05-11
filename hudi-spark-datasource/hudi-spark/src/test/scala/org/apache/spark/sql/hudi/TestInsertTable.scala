@@ -365,7 +365,10 @@ class TestInsertTable extends HoodieSparkSqlTestBase {
            |  ts long,
            |  dt string
            |) using hudi
-           | tblproperties (primaryKey = 'id')
+           | tblproperties (
+           |  primaryKey = 'id',
+           |  preCombineField = 'ts'
+           |  )
            | partitioned by (dt)
            | location '${tmp.getCanonicalPath}/$tableName'
        """.stripMargin)
@@ -411,7 +414,10 @@ class TestInsertTable extends HoodieSparkSqlTestBase {
            |  price double,
            |  ts long
            | ) using hudi
-           | tblproperties (primaryKey = 'id')
+           | tblproperties (
+           |  primaryKey = 'id',
+           |  preCombineField = 'ts'
+           |  )
            | location '${tmp.getCanonicalPath}/$tblNonPartition'
          """.stripMargin)
       spark.sql(s"insert into $tblNonPartition select 1, 'a1', 10, 1000")
