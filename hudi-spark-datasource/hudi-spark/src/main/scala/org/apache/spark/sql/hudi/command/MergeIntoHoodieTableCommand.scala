@@ -41,7 +41,6 @@ import org.apache.spark.sql.hudi.ProvidesHoodieConfig
 import org.apache.spark.sql.hudi.ProvidesHoodieConfig.combineOptions
 import org.apache.spark.sql.hudi.analysis.HoodieAnalysis.failAnalysis
 import org.apache.spark.sql.hudi.command.MergeIntoHoodieTableCommand.{CoercedAttributeReference, encodeAsBase64String, stripCasting, toStructType}
-import org.apache.spark.sql.hudi.command.PartialAssignmentMode.PartialAssignmentMode
 import org.apache.spark.sql.hudi.command.payload.ExpressionPayload
 import org.apache.spark.sql.hudi.command.payload.ExpressionPayload._
 import org.apache.spark.sql.types.{BooleanType, StructField, StructType}
@@ -368,11 +367,10 @@ case class MergeIntoHoodieTableCommand(mergeInto: MergeIntoTable) extends Hoodie
         // NOTE: For updating clause we allow partial assignments, where only some of the fields of the target
         //       table's records are updated (w/ the missing ones keeping their existing values)
         serializeConditionalAssignments(updatingActions.map(a => (a.condition, a.assignments)),
-          partialAssigmentMode = Some(PartialAssignmentMode.ORIGINAL_VALUE)),
+          allowPartialAssignments = true),
       // Append (encoded) inserting actions
       PAYLOAD_INSERT_CONDITION_AND_ASSIGNMENTS ->
         serializeConditionalAssignments(insertingActions.map(a => (a.condition, a.assignments)),
-          partialAssigmentMode = Some(PartialAssignmentMode.NULL_VALUE),
           validator = validateInsertingAssignmentExpression)
     )
 
@@ -418,7 +416,7 @@ case class MergeIntoHoodieTableCommand(mergeInto: MergeIntoTable) extends Hoodie
    * </ol>
    */
   private def serializeConditionalAssignments(conditionalAssignments: Seq[(Option[Expression], Seq[Assignment])],
-                                              partialAssigmentMode: Option[PartialAssignmentMode] = None,
+                                              allowPartialAssignments: Boolean = false,
                                               validator: Expression => Unit = scalaFunction1Noop): String = {
     val boundConditionalAssignments =
       conditionalAssignments.map {
@@ -428,7 +426,7 @@ case class MergeIntoHoodieTableCommand(mergeInto: MergeIntoTable) extends Hoodie
           //       All other actions are expected to provide assignments correspondent to every field
           //       of the [[targetTable]] being assigned
           val reorderedAssignments = if (assignments.nonEmpty) {
-            alignAssignments(assignments, partialAssigmentMode)
+            alignAssignments(assignments, allowPartialAssignments)
           } else {
             Seq.empty
           }
@@ -453,9 +451,7 @@ case class MergeIntoHoodieTableCommand(mergeInto: MergeIntoTable) extends Hoodie
   /**
    * Re-orders assignment expressions to adhere to the ordering of that of [[targetTable]]
    */
-  private def alignAssignments(
-              assignments: Seq[Assignment],
-              partialAssigmentMode: Option[PartialAssignmentMode]): Seq[Assignment] = {
+  private def alignAssignments(assignments: Seq[Assignment], allowPartialAssignments: Boolean): Seq[Assignment] = {
     val attr2Assignments = assignments.map {
       case assign @ Assignment(attr: Attribute, _) => attr -> assign
       case a =>
@@ -471,19 +467,11 @@ case class MergeIntoHoodieTableCommand(mergeInto: MergeIntoTable) extends Hoodie
           case None =>
             // In case partial assignments are allowed and there's no corresponding conditional assignment,
             // create a self-assignment for the target table's attribute
-            partialAssigmentMode match {
-              case Some(mode) =>
-                mode match {
-                  case PartialAssignmentMode.NULL_VALUE =>
-                    Assignment(attr, Literal(null))
-                  case PartialAssignmentMode.ORIGINAL_VALUE =>
-                    Assignment(attr, attr)
-                  case PartialAssignmentMode.DEFAULT_VALUE =>
-                    Assignment(attr, Literal.default(attr.dataType))
-                }
-              case _ =>
-                throw new AnalysisException(s"Assignment expressions have to assign every attribute of target table " +
-                  s"(provided: `${assignments.map(_.sql).mkString(",")}`")
+            if (allowPartialAssignments) {
+              Assignment(attr, attr)
+            } else {
+              throw new AnalysisException(s"Assignment expressions have to assign every attribute of target table " +
+                s"(provided: `${assignments.map(_.sql).mkString(",")}`")
             }
         }
       }
@@ -628,8 +616,8 @@ case class MergeIntoHoodieTableCommand(mergeInto: MergeIntoTable) extends Hoodie
 
   private def checkInsertingActions(insertActions: Seq[InsertAction]): Unit = {
     insertActions.foreach(insert =>
-      assert(insert.assignments.length <= targetTableSchema.length,
-        s"The number of insert assignments[${insert.assignments.length}] must less than or equal to the " +
+      assert(insert.assignments.length == targetTableSchema.length,
+        s"The number of insert assignments[${insert.assignments.length}] must equal to the " +
           s"targetTable field size[${targetTableSchema.length}]"))
 
   }
@@ -680,7 +668,3 @@ object MergeIntoHoodieTableCommand {
     Base64.getEncoder.encodeToString(Serializer.toBytes(any))
 }
 
-object PartialAssignmentMode extends Enumeration {
-  type PartialAssignmentMode = Value
-  val ORIGINAL_VALUE, DEFAULT_VALUE, NULL_VALUE = Value
-}
