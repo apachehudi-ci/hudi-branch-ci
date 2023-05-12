@@ -27,6 +27,8 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types._
 
 abstract class BaseProcedure extends Procedure {
+  val INVALID_ARG_INDEX: Int = -1
+
   val spark: SparkSession = SparkSession.active
   val jsc = new JavaSparkContext(spark.sparkContext)
 
@@ -39,31 +41,41 @@ abstract class BaseProcedure extends Procedure {
       .build
   }
 
-  protected def getParamKey(parameter: ProcedureParameter, isNamedArgs: Boolean): String = {
-    if (isNamedArgs) {
-      parameter.name
-    } else {
-      parameter.index.toString
-    }
-  }
-
-  protected def checkArgs(parameters: Array[ProcedureParameter], args: ProcedureArgs): Unit = {
-    for (parameter <- parameters) {
-      if (parameter.required) {
-        val paramKey = getParamKey(parameter, args.isNamedArgs)
-        assert(args.map.containsKey(paramKey) &&
-          args.internalRow.get(args.map.get(paramKey), parameter.dataType) != null,
-          s"Argument: ${parameter.name} is required")
+  protected def checkArgs(target: Array[ProcedureParameter], args: ProcedureArgs): Unit = {
+    val internalRow = args.internalRow
+    for (i <- target.indices) {
+      if (target(i).required) {
+        var argsIndex: Integer = null
+        if (args.isNamedArgs) {
+          argsIndex = getArgsIndex(target(i).name, args)
+        } else {
+          argsIndex = getArgsIndex(i.toString, args)
+        }
+        assert(-1 != argsIndex && internalRow.get(argsIndex, target(i).dataType) != null,
+          s"Argument: ${target(i).name} is required")
       }
     }
   }
 
+  protected def getArgsIndex(key: String, args: ProcedureArgs): Integer = {
+    args.map.getOrDefault(key, INVALID_ARG_INDEX)
+  }
+
   protected def getArgValueOrDefault(args: ProcedureArgs, parameter: ProcedureParameter): Option[Any] = {
-    val paramKey = getParamKey(parameter, args.isNamedArgs)
-    if (args.map.containsKey(paramKey)) {
-      Option.apply(getInternalRowValue(args.internalRow, args.map.get(paramKey), parameter.dataType))
+    var argsIndex: Int = INVALID_ARG_INDEX
+    if (args.isNamedArgs) {
+      argsIndex = getArgsIndex(parameter.name, args)
     } else {
-      Option.apply(parameter.default)
+      argsIndex = getArgsIndex(parameter.index.toString, args)
+    }
+
+    if (argsIndex.equals(INVALID_ARG_INDEX)) {
+      parameter.default match {
+        case option: Option[Any] => option
+        case _ => Option.apply(parameter.default)
+      }
+    } else {
+      Option.apply(getInternalRowValue(args.internalRow, argsIndex, parameter.dataType))
     }
   }
 

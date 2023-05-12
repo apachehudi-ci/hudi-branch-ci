@@ -27,7 +27,7 @@ import java.util.function.Supplier
 
 class ShowBootstrapPartitionsProcedure extends BaseProcedure with ProcedureBuilder {
   private val PARAMETERS = Array[ProcedureParameter](
-    ProcedureParameter.required(0, "table", DataTypes.StringType)
+    ProcedureParameter.required(0, "table", DataTypes.StringType, None)
   )
 
   private val OUTPUT_TYPE = new StructType(Array[StructField](

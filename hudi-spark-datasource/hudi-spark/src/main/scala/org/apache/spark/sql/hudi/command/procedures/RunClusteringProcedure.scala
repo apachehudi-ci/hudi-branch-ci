@@ -48,17 +48,17 @@ class RunClusteringProcedure extends BaseProcedure
    * [ORDER BY (col_name1 [, ...] ) ]
    */
   private val PARAMETERS = Array[ProcedureParameter](
-    ProcedureParameter.optional(0, "table", DataTypes.StringType),
-    ProcedureParameter.optional(1, "path", DataTypes.StringType),
-    ProcedureParameter.optional(2, "predicate", DataTypes.StringType),
-    ProcedureParameter.optional(3, "order", DataTypes.StringType),
+    ProcedureParameter.optional(0, "table", DataTypes.StringType, None),
+    ProcedureParameter.optional(1, "path", DataTypes.StringType, None),
+    ProcedureParameter.optional(2, "predicate", DataTypes.StringType, None),
+    ProcedureParameter.optional(3, "order", DataTypes.StringType, None),
     ProcedureParameter.optional(4, "show_involved_partition", DataTypes.BooleanType, false),
-    ProcedureParameter.optional(5, "op", DataTypes.StringType),
-    ProcedureParameter.optional(6, "order_strategy", DataTypes.StringType),
+    ProcedureParameter.optional(5, "op", DataTypes.StringType, None),
+    ProcedureParameter.optional(6, "order_strategy", DataTypes.StringType, None),
     // params => key=value, key2=value2
-    ProcedureParameter.optional(7, "options", DataTypes.StringType),
-    ProcedureParameter.optional(8, "instants", DataTypes.StringType),
-    ProcedureParameter.optional(9, "selected_partitions", DataTypes.StringType)
+    ProcedureParameter.optional(7, "options", DataTypes.StringType, None),
+    ProcedureParameter.optional(8, "instants", DataTypes.StringType, None),
+    ProcedureParameter.optional(9, "selected_partitions", DataTypes.StringType, None)
   )
 
   private val OUTPUT_TYPE = new StructType(Array[StructField](
@@ -88,7 +88,7 @@ class RunClusteringProcedure extends BaseProcedure
 
     val basePath: String = getBasePath(tableName, tablePath)
     val metaClient = HoodieTableMetaClient.builder.setConf(jsc.hadoopConfiguration()).setBasePath(basePath).build
-    var confs: Map[String, String] = Map.empty
+    var conf: Map[String, String] = Map.empty
 
     val selectedPartitions: String = (parts, predicate) match {
       case (_, Some(p)) => prunePartition(metaClient, p.asInstanceOf[String])
@@ -102,7 +102,7 @@ class RunClusteringProcedure extends BaseProcedure
       logInfo("No partition matched")
       return Seq()
     } else {
-      confs = confs ++ Map(
+      conf = conf ++ Map(
         HoodieClusteringConfig.PLAN_PARTITION_FILTER_MODE_NAME.key() -> "SELECTED_PARTITIONS",
         HoodieClusteringConfig.PARTITION_SELECTED.key() -> selectedPartitions
       )
@@ -113,7 +113,7 @@ class RunClusteringProcedure extends BaseProcedure
     orderColumns match {
       case Some(o) =>
         validateOrderColumns(o.asInstanceOf[String], metaClient)
-        confs = confs ++ Map(
+        conf = conf ++ Map(
           HoodieClusteringConfig.PLAN_STRATEGY_SORT_COLUMNS.key() -> o.asInstanceOf[String]
         )
         logInfo(s"Order columns: $o")
@@ -124,7 +124,7 @@ class RunClusteringProcedure extends BaseProcedure
     orderStrategy match {
       case Some(o) =>
         val strategy = LayoutOptimizationStrategy.fromValue(o.asInstanceOf[String])
-        confs = confs ++ Map(
+        conf = conf ++ Map(
           HoodieClusteringConfig.LAYOUT_OPTIMIZE_STRATEGY.key() -> strategy.getValue
         )
       case _ =>
@@ -133,7 +133,11 @@ class RunClusteringProcedure extends BaseProcedure
 
     options match {
       case Some(p) =>
-        confs = confs ++ HoodieCLIUtils.extractOptions(p.asInstanceOf[String])
+        val paramPairs = StringUtils.split(p.asInstanceOf[String], ",").asScala
+        paramPairs.foreach{ pair =>
+          val values = StringUtils.split(pair, "=")
+          conf = conf ++ Map(values.get(0) -> values.get(1))
+        }
       case _ =>
         logInfo("No options")
     }
@@ -170,7 +174,7 @@ class RunClusteringProcedure extends BaseProcedure
 
     var client: SparkRDDWriteClient[_] = null
     try {
-      client = HoodieCLIUtils.createHoodieWriteClient(sparkSession, basePath, confs,
+      client = HoodieCLIUtils.createHoodieWriteClient(sparkSession, basePath, conf,
         tableName.asInstanceOf[Option[String]])
       if (operator.isSchedule) {
         val instantTime = HoodieActiveTimeline.createNewInstantTime

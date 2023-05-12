@@ -22,7 +22,6 @@ package org.apache.hudi
 import org.apache.hudi.avro.model.HoodieClusteringGroup
 import org.apache.hudi.client.SparkRDDWriteClient
 import org.apache.hudi.common.table.{HoodieTableMetaClient, TableSchemaResolver}
-import org.apache.hudi.common.util.StringUtils
 import org.apache.spark.SparkException
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.sql.SparkSession
@@ -90,12 +89,5 @@ object HoodieCLIUtils {
       case _ =>
         throw new SparkException(s"Unsupported identifier $table")
     }
-  }
-
-  def extractOptions(s: String): Map[String, String] = {
-    StringUtils.split(s, ",").asScala
-      .map(split => StringUtils.split(split, "="))
-      .map(pair => pair.get(0) -> pair.get(1))
-      .toMap
   }
 }
