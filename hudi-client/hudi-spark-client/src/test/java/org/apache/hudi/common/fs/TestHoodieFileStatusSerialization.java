@@ -44,7 +44,7 @@ import java.util.List;
  * Test the if {@link HoodieFileStatus} is serializable
  */
 @TestInstance(Lifecycle.PER_CLASS)
-public class TestHoodieSerializableFileStatus extends HoodieClientTestHarness {
+public class TestHoodieFileStatusSerialization extends HoodieClientTestHarness {
 
   HoodieEngineContext engineContext;
   List<Path> testPaths;
