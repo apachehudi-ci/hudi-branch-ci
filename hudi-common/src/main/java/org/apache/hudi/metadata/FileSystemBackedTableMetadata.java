@@ -18,13 +18,14 @@
 
 package org.apache.hudi.metadata;
 
+import org.apache.hudi.avro.model.HoodieFileStatus;
 import org.apache.hudi.avro.model.HoodieMetadataColumnStats;
 import org.apache.hudi.common.bloom.BloomFilter;
+import org.apache.hudi.common.bootstrap.FileStatusUtils;
 import org.apache.hudi.common.config.SerializableConfiguration;
 import org.apache.hudi.common.data.HoodieData;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.fs.FSUtils;
-import org.apache.hudi.common.fs.HoodieSerializableFileStatus;
 import org.apache.hudi.common.model.HoodiePartitionMetadata;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
@@ -107,9 +108,9 @@ public class FileSystemBackedTableMetadata implements HoodieTableMetadata {
       int listingParallelism = Math.min(DEFAULT_LISTING_PARALLELISM, pathsToList.size());
 
       // List all directories in parallel
-      List<HoodieSerializableFileStatus> dirToFileListing = engineContext.flatMap(pathsToList, path -> {
+      List<HoodieFileStatus> dirToFileListing = engineContext.flatMap(pathsToList, path -> {
         FileSystem fileSystem = path.getFileSystem(hadoopConf.get());
-        return Arrays.stream(HoodieSerializableFileStatus.fromFileStatuses(fileSystem.listStatus(path)));
+        return Arrays.stream(FileStatusUtils.fromFileStatuses(fileSystem.listStatus(path)));
       }, listingParallelism);
       pathsToList.clear();
 
@@ -120,9 +121,9 @@ public class FileSystemBackedTableMetadata implements HoodieTableMetadata {
         // result below holds a list of pair. first entry in the pair optionally holds the deduced list of partitions.
         // and second entry holds optionally a directory path to be processed further.
         List<Pair<Option<String>, Option<Path>>> result = engineContext.map(dirToFileListing, fileStatus -> {
-          Path path = fileStatus.getPath();
+          Path path = FileStatusUtils.toPath(fileStatus.getPath());
           FileSystem fileSystem = path.getFileSystem(hadoopConf.get());
-          if (fileStatus.isDirectory()) {
+          if (fileStatus.getIsDir()) {
             if (HoodiePartitionMetadata.hasPartitionMetadata(fileSystem, path)) {
               return Pair.of(Option.of(FSUtils.getRelativePartitionPath(new Path(datasetBasePath), path)), Option.empty());
             } else if (!path.getName().equals(HoodieTableMetaClient.METAFOLDER_NAME)) {

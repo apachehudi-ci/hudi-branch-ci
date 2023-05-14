@@ -18,14 +18,17 @@
 
 package org.apache.hudi.common.fs;
 
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
+import org.apache.hudi.avro.model.HoodieFileStatus;
 import org.apache.hudi.client.common.HoodieSparkEngineContext;
+import org.apache.hudi.common.bootstrap.FileStatusUtils;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.util.ValidationUtils;
 import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.testutils.HoodieClientTestHarness;
+
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -38,7 +41,7 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Test the function of {@link HoodieSerializableFileStatus}
+ * Test the if {@link HoodieFileStatus} is serializable
  */
 @TestInstance(Lifecycle.PER_CLASS)
 public class TestHoodieSerializableFileStatus extends HoodieClientTestHarness {
@@ -65,18 +68,18 @@ public class TestHoodieSerializableFileStatus extends HoodieClientTestHarness {
         return Arrays.stream(fileSystem.listStatus(path));
       }, 5);
     } catch (Exception e) {
-      System.out.println(e.getMessage());
+      System.out.println("Exception message:" + e.getMessage());
       ValidationUtils.checkArgument(e.getMessage().contains("com.esotericsoftware.kryo.KryoException: java.util.ConcurrentModificationException"));
+      return;
     }
-
     throw new HoodieException("Serialization is supposed to fail!");
   }
 
   @Test
-  public void testHoodieSerializableFileStatus() {
-    List<HoodieSerializableFileStatus> statuses = engineContext.flatMap(testPaths, path -> {
+  public void testHoodieFileStatusSerialization() {
+    List<HoodieFileStatus> statuses = engineContext.flatMap(testPaths, path -> {
       FileSystem fileSystem = new NonSerializableFileSystem();
-      return Arrays.stream(HoodieSerializableFileStatus.fromFileStatuses(fileSystem.listStatus(path)));
+      return Arrays.stream(FileStatusUtils.fromFileStatuses(fileSystem.listStatus(path)));
     }, 5);
   }
 }
