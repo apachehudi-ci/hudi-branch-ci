@@ -22,14 +22,14 @@ import org.apache.hudi.avro.model.HoodieFileStatus;
 import org.apache.hudi.client.common.HoodieSparkEngineContext;
 import org.apache.hudi.common.bootstrap.FileStatusUtils;
 import org.apache.hudi.common.engine.HoodieEngineContext;
-import org.apache.hudi.common.util.ValidationUtils;
-import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.testutils.HoodieClientTestHarness;
 
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.spark.SparkException;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -61,18 +61,15 @@ public class TestHoodieFileStatusSerialization extends HoodieClientTestHarness {
 
   @Test
   public void testNonSerializableFileStatus() {
-    try {
-      // this is supposed to throw exception
-      List<FileStatus> statuses = engineContext.flatMap(testPaths, path -> {
-        FileSystem fileSystem = new NonSerializableFileSystem();
-        return Arrays.stream(fileSystem.listStatus(path));
-      }, 5);
-    } catch (Exception e) {
-      System.out.println("Exception message:" + e.getMessage());
-      ValidationUtils.checkArgument(e.getMessage().contains("com.esotericsoftware.kryo.KryoException: java.util.ConcurrentModificationException"));
-      return;
-    }
-    throw new HoodieException("Serialization is supposed to fail!");
+    Exception e = Assertions.assertThrows(SparkException.class,
+        () -> {
+          List<FileStatus> statuses = engineContext.flatMap(testPaths, path -> {
+            FileSystem fileSystem = new NonSerializableFileSystem();
+            return Arrays.stream(fileSystem.listStatus(path));
+          }, 5);
+        },
+        "Serialization is supposed to fail!");
+    Assertions.assertTrue(e.getMessage().contains("com.esotericsoftware.kryo.KryoException: java.util.ConcurrentModificationException"));
   }
 
   @Test
