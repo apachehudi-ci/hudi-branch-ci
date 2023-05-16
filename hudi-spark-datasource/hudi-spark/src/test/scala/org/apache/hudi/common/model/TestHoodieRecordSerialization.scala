@@ -131,8 +131,8 @@ class TestHoodieRecordSerialization extends SparkClientFunctionalTestHarness {
     val key = new HoodieKey("rec-key", "part-path")
 
     Seq(
-      (new HoodieEmptyRecord[GenericRecord](key, HoodieOperation.INSERT, 1, HoodieRecordType.AVRO), 27),
-      (new HoodieEmptyRecord[GenericRecord](key, HoodieOperation.INSERT, 2, HoodieRecordType.SPARK), 30)
+      (new HoodieEmptyRecord[GenericRecord](key, HoodieOperation.INSERT, 1, HoodieRecordType.AVRO), 30),
+      (new HoodieEmptyRecord[GenericRecord](key, HoodieOperation.INSERT, 2, HoodieRecordType.SPARK), 27)
     ) foreach { case (record, expectedSize) => routine(record, expectedSize) }
   }
 
