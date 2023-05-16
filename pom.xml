@@ -2162,6 +2162,7 @@
         <pulsar.spark.version>${pulsar.spark.scala11.version}</pulsar.spark.version>
         <skip.hudi-spark3.unit.tests>true</skip.hudi-spark3.unit.tests>
         <avro.version>1.8.2</avro.version>
+        <skipITs>true</skipITs>
       </properties>
       <activation>
         <property>
@@ -2188,6 +2189,7 @@
         <pulsar.spark.version>${pulsar.spark.scala11.version}</pulsar.spark.version>
         <skip.hudi-spark3.unit.tests>true</skip.hudi-spark3.unit.tests>
         <avro.version>1.8.2</avro.version>
+        <skipITs>true</skipITs>
       </properties>
       <activation>
         <property>
@@ -2360,7 +2362,7 @@
         <fasterxml.jackson.dataformat.yaml.version>${fasterxml.spark3.version}</fasterxml.jackson.dataformat.yaml.version>
         <pulsar.spark.version>${pulsar.spark.scala12.version}</pulsar.spark.version>
         <skip.hudi-spark2.unit.tests>true</skip.hudi-spark2.unit.tests>
-        <skipITs>true</skipITs>
+        <skipITs>false</skipITs>
       </properties>
       <modules>
         <module>hudi-spark-datasource/hudi-spark3.2.x</module>
