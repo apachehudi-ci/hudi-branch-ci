@@ -27,7 +27,6 @@ env:
 
 jobs:
   validate-source:
-    if: ${{ false }}  # temp disable
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -48,7 +47,6 @@ jobs:
         run: ./scripts/release/validate_source_rat.sh
 
   test-spark:
-    if: ${{ false }}  # temp disable
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -111,7 +109,6 @@ jobs:
           mvn test -Pfunctional-tests -D"$SCALA_PROFILE" -D"$SPARK_PROFILE" -pl "$SPARK_COMMON_MODULES,$SPARK_MODULES" $MVN_ARGS
 
   test-flink:
-    if: ${{ false }}  # temp disable
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -143,7 +140,6 @@ jobs:
           mvn test -Punit-tests -D"$SCALA_PROFILE" -D"$FLINK_PROFILE" -pl hudi-examples/hudi-examples-flink $MVN_ARGS
 
   validate-bundles:
-    if: ${{ false }}  # temp disable
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -230,14 +226,14 @@ jobs:
         env:
           FLINK_PROFILE: ${{ matrix.flinkProfile }}
           SPARK_PROFILE: ${{ matrix.sparkProfile }}
-          SCALA_PROFILE: '-Dscala-2.11 -Dscala.binary.version=2.11 -Dscala.version=2.11.12 -Dhudi.spark.module=hudi-spark2 -Dhudi.spark.common.modules.1=hudi-spark2-common'
+          SCALA_PROFILE: '-Dscala-2.11'
         run:
           mvn clean install $SCALA_PROFILE -D"$SPARK_PROFILE" -D"$FLINK_PROFILE" -DdeployArtifacts=true -DskipTests=true $MVN_ARGS
       - name: 'UT integ-test'
         env:
           FLINK_PROFILE: ${{ matrix.flinkProfile }}
           SPARK_PROFILE: ${{ matrix.sparkProfile }}
-          SCALA_PROFILE: '-Dscala-2.11 -Dscala.binary.version=2.11 -Dscala.version=2.11.12 -Dhudi.spark.module=hudi-spark2 -Dhudi.spark.common.modules.1=hudi-spark2-common'
+          SCALA_PROFILE: '-Dscala-2.11'
         run:
           mvn test $SCALA_PROFILE -D"$SPARK_PROFILE" -D"$FLINK_PROFILE" -DdeployArtifacts=true -DskipUTs=false -DskipITs=true -pl hudi-integ-test $MVN_ARGS
       - name: 'IT'
@@ -245,7 +241,7 @@ jobs:
           FLINK_PROFILE: ${{ matrix.flinkProfile }}
           SPARK_PROFILE: ${{ matrix.sparkProfile }}
           SPARK_ARCHIVE: ${{ matrix.sparkArchive }}
-          SCALA_PROFILE: '-Dscala-2.11 -Dscala.binary.version=2.11 -Dscala.version=2.11.12 -Dhudi.spark.module=hudi-spark2 -Dhudi.spark.common.modules.1=hudi-spark2-common'
+          SCALA_PROFILE: '-Dscala-2.11'
         run: |
           echo "Downloading $SPARK_ARCHIVE"
           curl https://archive.apache.org/dist/spark/$SPARK_ARCHIVE --create-dirs -o $GITHUB_WORKSPACE/$SPARK_ARCHIVE
@@ -253,4 +249,4 @@ jobs:
           mkdir /tmp/spark-events/
           SPARK_ARCHIVE_BASENAME=$(basename $SPARK_ARCHIVE)
           export SPARK_HOME=$GITHUB_WORKSPACE/${SPARK_ARCHIVE_BASENAME%.*}
-          mvn verify $SCALA_PROFILE -D"$SPARK_PROFILE" -D"$FLINK_PROFILE" -DdeployArtifacts=true -pl hudi-integ-test $MVN_ARGS
+          mvn verify $SCALA_PROFILE -D"$SPARK_PROFILE" -D"$FLINK_PROFILE" -DdeployArtifacts=true $MVN_ARGS
