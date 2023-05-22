@@ -262,10 +262,10 @@ public abstract class TestHoodieReaderWriterBase {
     assertEquals(Integer.toString(index), record.get("time").toString());
     if (schemaPath.equals("/exampleEvolvedSchemaColumnType.avsc")) {
       assertEquals(Integer.toString(index), record.get("number").toString());
-      assertFalse(record.hasField("added_field"));
+      assertNull(record.getSchema().getField("added_field"));
     } else if (schemaPath.equals("/exampleEvolvedSchemaDeleteColumn.avsc")) {
-      assertFalse(record.hasField("number"));
-      assertFalse(record.hasField("added_field"));
+      assertNull(record.getSchema().getField("number"));
+      assertNull(record.getSchema().getField("added_field"));
     } else {
       assertEquals(index, record.get("number"));
       assertNull(record.get("added_field"));
