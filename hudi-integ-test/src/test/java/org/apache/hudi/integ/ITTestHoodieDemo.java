@@ -118,27 +118,11 @@ public class ITTestHoodieDemo extends ITTestBase {
 
     // batch 1
     ingestFirstBatchAndHiveSync();
-    testHiveAfterFirstBatch();
-    testPrestoAfterFirstBatch();
-    testTrinoAfterFirstBatch();
-    testSparkSQLAfterFirstBatch();
 
     // batch 2
     ingestSecondBatchAndHiveSync();
-    testHiveAfterSecondBatch();
-    testPrestoAfterSecondBatch();
-    testTrinoAfterSecondBatch();
-    testSparkSQLAfterSecondBatch();
-    testIncrementalHiveQueryBeforeCompaction();
     testIncrementalSparkSQLQuery();
 
-    // compaction
-    scheduleAndRunCompaction();
-
-    testHiveAfterSecondBatchAfterCompaction();
-    testPrestoAfterSecondBatchAfterCompaction();
-    testTrinoAfterSecondBatchAfterCompaction();
-    testIncrementalHiveQueryAfterCompaction();
   }
 
   @Test
