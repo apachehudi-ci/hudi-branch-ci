@@ -230,14 +230,14 @@ jobs:
         env:
           FLINK_PROFILE: ${{ matrix.flinkProfile }}
           SPARK_PROFILE: ${{ matrix.sparkProfile }}
-          SCALA_PROFILE: '-Dscala-2.11 -Dscala.binary.version=2.11'
+          SCALA_PROFILE: '-Dscala-2.11 -Dscala.binary.version=2.11 -Dscala.version=2.11.12 -Dhudi.spark.module=hudi-spark2 -Dhudi.spark.common.modules.1=hudi-spark2-common'
         run:
           mvn clean install $SCALA_PROFILE -D"$SPARK_PROFILE" -D"$FLINK_PROFILE" -DdeployArtifacts=true -DskipTests=true $MVN_ARGS
       - name: 'UT integ-test'
         env:
           FLINK_PROFILE: ${{ matrix.flinkProfile }}
           SPARK_PROFILE: ${{ matrix.sparkProfile }}
-          SCALA_PROFILE: '-Dscala-2.11 -Dscala.binary.version=2.11'
+          SCALA_PROFILE: '-Dscala-2.11 -Dscala.binary.version=2.11 -Dscala.version=2.11.12 -Dhudi.spark.module=hudi-spark2 -Dhudi.spark.common.modules.1=hudi-spark2-common'
         run:
           mvn test $SCALA_PROFILE -D"$SPARK_PROFILE" -D"$FLINK_PROFILE" -DdeployArtifacts=true -DskipUTs=false -DskipITs=true -pl hudi-integ-test $MVN_ARGS
       - name: 'IT'
@@ -245,7 +245,7 @@ jobs:
           FLINK_PROFILE: ${{ matrix.flinkProfile }}
           SPARK_PROFILE: ${{ matrix.sparkProfile }}
           SPARK_ARCHIVE: ${{ matrix.sparkArchive }}
-          SCALA_PROFILE: '-Dscala-2.11 -Dscala.binary.version=2.11'
+          SCALA_PROFILE: '-Dscala-2.11 -Dscala.binary.version=2.11 -Dscala.version=2.11.12 -Dhudi.spark.module=hudi-spark2 -Dhudi.spark.common.modules.1=hudi-spark2-common'
         run: |
           echo "Downloading $SPARK_ARCHIVE"
           curl https://archive.apache.org/dist/spark/$SPARK_ARCHIVE --create-dirs -o $GITHUB_WORKSPACE/$SPARK_ARCHIVE
@@ -253,4 +253,4 @@ jobs:
           mkdir /tmp/spark-events/
           SPARK_ARCHIVE_BASENAME=$(basename $SPARK_ARCHIVE)
           export SPARK_HOME=$GITHUB_WORKSPACE/${SPARK_ARCHIVE_BASENAME%.*}
-          mvn verify $SCALA_PROFILE -D"$SPARK_PROFILE" -D"$FLINK_PROFILE" -DdeployArtifacts=true $MVN_ARGS
+          mvn verify $SCALA_PROFILE -D"$SPARK_PROFILE" -D"$FLINK_PROFILE" -DdeployArtifacts=true -pl hudi-integ-test $MVN_ARGS
