@@ -274,7 +274,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - flinkProfile: 'flink1.14'
+          - flinkProfile: 'flink1.17'
             sparkProfile: 'spark2.4'
             sparkArchive: 'spark-2.4.4/spark-2.4.4-bin-hadoop2.7.tgz'
     steps:
