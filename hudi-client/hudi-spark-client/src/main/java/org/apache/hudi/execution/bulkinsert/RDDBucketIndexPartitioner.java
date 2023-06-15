@@ -48,8 +48,6 @@ public abstract class RDDBucketIndexPartitioner<T> extends BucketIndexBulkInsert
 
   public RDDBucketIndexPartitioner(HoodieTable table, String sortString, boolean preserveHoodieMetadata) {
     super(table, sortString, preserveHoodieMetadata);
-    ValidationUtils.checkArgument(table.getMetaClient().getTableType().equals(HoodieTableType.MERGE_ON_READ),
-        "CoW table with bucket index doesn't support bulk_insert");
   }
 
   /**
