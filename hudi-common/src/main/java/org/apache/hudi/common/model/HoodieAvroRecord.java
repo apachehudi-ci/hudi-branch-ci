@@ -20,6 +20,7 @@
 package org.apache.hudi.common.model;
 
 import org.apache.hudi.avro.HoodieAvroUtils;
+import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.util.ConfigUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.StringUtils;
@@ -184,16 +185,20 @@ public class HoodieAvroRecord<T extends HoodieRecordPayload> extends HoodieRecor
 
   @Override
   public HoodieRecord wrapIntoHoodieRecordPayloadWithParams(
-      Schema recordSchema, Properties props,
+      Schema recordSchema,
+      Properties props,
       Option<Pair<String, String>> simpleKeyGenFieldsOpt,
       Boolean withOperation,
       Option<String> partitionNameOp,
       Boolean populateMetaFields,
       Option<Schema> schemaWithoutMetaFields) throws IOException {
-    IndexedRecord indexedRecord = (IndexedRecord) data.getInsertValue(recordSchema, props).get();
+    HoodieAvroRecordMerger merger = HoodieAvroRecordMerger.INSTANCE;
+    HoodieAvroIndexedRecord record = (HoodieAvroIndexedRecord) merger.merge(
+        null, null, (HoodieAvroIndexedRecord) data, recordSchema, (TypedProperties) props).get().getLeft();
     String payloadClass = ConfigUtils.getPayloadClass(props);
     String preCombineField = ConfigUtils.getOrderingField(props);
-    return HoodieAvroUtils.createHoodieRecordFromAvro(indexedRecord, payloadClass, preCombineField, simpleKeyGenFieldsOpt, withOperation, partitionNameOp, populateMetaFields, schemaWithoutMetaFields);
+    return HoodieAvroUtils.createHoodieRecordFromAvro(
+        record.data, payloadClass, preCombineField, simpleKeyGenFieldsOpt, withOperation, partitionNameOp, populateMetaFields, schemaWithoutMetaFields);
   }
 
   @Override
