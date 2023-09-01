@@ -22,9 +22,9 @@ import org.apache.hudi.avro.HoodieAvroUtils;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.DeleteRecord;
 import org.apache.hudi.common.model.HoodieArchivedLogFile;
-import org.apache.hudi.common.model.HoodieAvroRecord;
 import org.apache.hudi.common.model.HoodieAvroIndexedRecord;
-import org.apache.hudi.common.model.HoodieAvroRecordMerger;
+import org.apache.hudi.common.model.HoodieAvroRecord;
+import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieLogFile;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType;
@@ -38,6 +38,8 @@ import org.apache.hudi.common.table.log.HoodieLogFormat;
 import org.apache.hudi.common.table.log.HoodieLogFormat.Reader;
 import org.apache.hudi.common.table.log.HoodieLogFormat.Writer;
 import org.apache.hudi.common.table.log.HoodieMergedLogRecordScanner;
+import org.apache.hudi.common.table.log.LogReaderUtils;
+import org.apache.hudi.common.table.log.TestLogReaderUtils;
 import org.apache.hudi.common.table.log.block.HoodieAvroDataBlock;
 import org.apache.hudi.common.table.log.block.HoodieCDCDataBlock;
 import org.apache.hudi.common.table.log.block.HoodieCommandBlock;
@@ -54,9 +56,8 @@ import org.apache.hudi.common.testutils.HoodieCommonTestHarness;
 import org.apache.hudi.common.testutils.HoodieTestUtils;
 import org.apache.hudi.common.testutils.SchemaTestUtil;
 import org.apache.hudi.common.testutils.minicluster.HdfsTestService;
-import org.apache.hudi.common.util.collection.ClosableIterator;
-import org.apache.hudi.common.util.HoodieRecordUtils;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.common.util.collection.ClosableIterator;
 import org.apache.hudi.common.util.collection.ExternalSpillableMap;
 import org.apache.hudi.exception.CorruptedLogFileException;
 import org.apache.hudi.exception.HoodieIOException;
@@ -75,6 +76,7 @@ import org.apache.hadoop.hbase.io.compress.Compression;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.apache.parquet.hadoop.util.counters.BenchmarkCounter;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -88,6 +90,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
 import java.net.URISyntaxException;
@@ -100,10 +103,15 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.util.stream.Collectors.toList;
+import static org.apache.hudi.common.testutils.HoodieTestUtils.getJavaVersion;
+import static org.apache.hudi.common.testutils.HoodieTestUtils.shouldUseExternalHdfs;
+import static org.apache.hudi.common.testutils.HoodieTestUtils.useExternalHdfs;
 import static org.apache.hudi.common.testutils.SchemaTestUtil.getSimpleSchema;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -131,15 +139,21 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
   private String spillableBasePath;
 
   @BeforeAll
-  public static void setUpClass() throws IOException, InterruptedException {
-    // Append is not supported in LocalFileSystem. HDFS needs to be setup.
-    hdfsTestService = new HdfsTestService();
-    fs = hdfsTestService.start(true).getFileSystem();
+  public static void setUpClass() throws IOException {
+    if (shouldUseExternalHdfs()) {
+      fs = useExternalHdfs();
+    } else {
+      // Append is not supported in LocalFileSystem. HDFS needs to be setup.
+      hdfsTestService = new HdfsTestService();
+      fs = hdfsTestService.start(true).getFileSystem();
+    }
   }
 
   @AfterAll
   public static void tearDownClass() {
-    hdfsTestService.stop();
+    if (hdfsTestService != null) {
+      hdfsTestService.stop();
+    }
   }
 
   @BeforeEach
@@ -148,7 +162,15 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     basePath = new Path(workDir.toString(), testInfo.getDisplayName() + System.currentTimeMillis()).toString();
     partitionPath = new Path(basePath, "partition_path");
     spillableBasePath = new Path(workDir.toString(), ".spillable_path").toString();
+    assertTrue(fs.mkdirs(partitionPath));
     HoodieTestUtils.init(fs.getConf(), basePath, HoodieTableType.MERGE_ON_READ);
+  }
+
+  @AfterEach
+  public void tearDown() throws IOException {
+    fs.delete(new Path(basePath), true);
+    fs.delete(partitionPath, true);
+    fs.delete(new Path(spillableBasePath), true);
   }
 
   @Test
@@ -507,7 +529,7 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     HoodieLogBlock nextBlock = reader.next();
     HoodieDataBlock dataBlockRead = (HoodieDataBlock) nextBlock;
     List<IndexedRecord> recordsRead1 = getRecords(dataBlockRead);
-    assertEquals(copyOfRecords1.size(),recordsRead1.size(),
+    assertEquals(copyOfRecords1.size(), recordsRead1.size(),
         "Read records size should be equal to the written records size");
     assertEquals(copyOfRecords1, recordsRead1,
         "Both records lists should be the same. (ordering guaranteed)");
@@ -543,15 +565,15 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
         .withFs(fs)
         .build();
 
-    String dataSchameString = "{\"type\":\"record\",\"name\":\"Record\","
+    String dataSchemaString = "{\"type\":\"record\",\"name\":\"Record\","
         + "\"fields\":["
         + "{\"name\":\"uuid\",\"type\":[\"int\",\"null\"]},"
         + "{\"name\":\"name\",\"type\":[\"string\",\"null\"]},"
         + "{\"name\":\"ts\",\"type\":[\"long\",\"null\"]}"
         + "]}";
-    Schema dataSchema = new Schema.Parser().parse(dataSchameString);
+    Schema dataSchema = new Schema.Parser().parse(dataSchemaString);
     Schema cdcSchema = HoodieCDCUtils.schemaBySupplementalLoggingMode(
-        HoodieCDCSupplementalLoggingMode.data_before_after, dataSchema);
+        HoodieCDCSupplementalLoggingMode.DATA_BEFORE_AFTER, dataSchema);
     GenericRecord insertedRecord = new GenericData.Record(dataSchema);
     insertedRecord.put("uuid", 1);
     insertedRecord.put("name", "apple");
@@ -653,7 +675,6 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
         .withDiskMapType(diskMapType)
         .withBitCaskDiskMapCompressionEnabled(isCompressionEnabled)
         .withOptimizedLogBlocksScan(enableOptimizedLogBlocksScan)
-        .withRecordMerger(HoodieRecordUtils.loadRecordMerger(HoodieAvroRecordMerger.class.getName()))
         .build();
 
     List<IndexedRecord> scannedRecords = new ArrayList<>();
@@ -665,6 +686,108 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     assertEquals(sort(genRecords), sort(scannedRecords),
         "Scanner records count should be the same as appended records");
     scanner.close();
+  }
+
+  @Test
+  public void testBasicAppendsWithBlockSeqNos() throws IOException, URISyntaxException, InterruptedException {
+    testAppendsWithSpruiousLogBlocks(true, (partitionPath, schema, genRecords, numFiles, enableBlockSeqNos) -> {
+      return writeLogFiles(partitionPath, schema, genRecords, numFiles, enableBlockSeqNos);
+    });
+  }
+
+  @Test
+  public void testAppendsWithSpruiousLogBlocksExactDup() throws IOException, URISyntaxException, InterruptedException {
+    testAppendsWithSpruiousLogBlocks(true, (partitionPath, schema, genRecords, numFiles, enableBlockSeqNos) -> {
+      Set<HoodieLogFile> logFiles = writeLogFiles(partitionPath, schema, genRecords, numFiles, enableBlockSeqNos);
+      // re add the same records again
+      logFiles.addAll(writeLogFiles(partitionPath, schema, genRecords, numFiles, enableBlockSeqNos));
+      return logFiles;
+    });
+  }
+
+  @Test
+  public void testAppendsWithSpruiousLogBlocksFirstAttemptPartial() throws IOException, URISyntaxException, InterruptedException {
+    testAppendsWithSpruiousLogBlocks(true, (partitionPath, schema, genRecords, numFiles, enableBlockSeqNos) -> {
+      Set<HoodieLogFile> logFiles = writeLogFiles(partitionPath, schema, genRecords, numFiles, enableBlockSeqNos);
+      // removing 4th log block to simulate partial failure in 1st attempt
+      List<HoodieLogFile> logFileList = new ArrayList<>(logFiles);
+      logFiles.remove(logFileList.get(logFileList.size() - 1));
+      // re add the same records again
+      logFiles.addAll(writeLogFiles(partitionPath, schema, genRecords, numFiles, enableBlockSeqNos));
+      return logFiles;
+    });
+  }
+
+  @Test
+  public void testAppendsWithSpruiousLogBlocksSecondAttemptPartial() throws IOException, URISyntaxException, InterruptedException {
+    testAppendsWithSpruiousLogBlocks(true, (partitionPath, schema, genRecords, numFiles, enableBlockSeqNos) -> {
+      Set<HoodieLogFile> logFiles = writeLogFiles(partitionPath, schema, genRecords, numFiles, enableBlockSeqNos);
+      // re add the same records again
+      Set<HoodieLogFile> logFilesSet2 = writeLogFiles(partitionPath, schema, genRecords, numFiles, enableBlockSeqNos);
+      // removing 4th log block to simular partial failure in 2nd attempt
+      List<HoodieLogFile> logFileList2 = new ArrayList<>(logFilesSet2);
+      logFilesSet2.remove(logFileList2.get(logFileList2.size() - 1));
+      logFiles.addAll(logFilesSet2);
+      return logFiles;
+    });
+  }
+
+  private void testAppendsWithSpruiousLogBlocks(
+      boolean enableOptimizedLogBlocksScan,
+      Function5<Set<HoodieLogFile>, Path, Schema, List<IndexedRecord>, Integer, Boolean> logGenFunc)
+      throws IOException, URISyntaxException, InterruptedException {
+
+    Schema schema = HoodieAvroUtils.addMetadataFields(getSimpleSchema());
+    SchemaTestUtil testUtil = new SchemaTestUtil();
+    List<IndexedRecord> genRecords = testUtil.generateHoodieTestRecords(0, 400);
+    Set<HoodieLogFile> logFiles = logGenFunc.apply(partitionPath, schema, genRecords, 4, true);
+
+    FileCreateUtils.createDeltaCommit(basePath, "100", fs);
+
+    HoodieMergedLogRecordScanner scanner = getLogRecordScanner(logFiles, schema, enableOptimizedLogBlocksScan);
+    // even though we have duplicates records, due to block sequence reconcile, only one set of blocks should be parsed as valid
+    assertRecordsAndCloseScanner(scanner, genRecords, schema);
+  }
+
+  private void assertRecordsAndCloseScanner(HoodieMergedLogRecordScanner scanner, List<IndexedRecord> genRecords, Schema schema) throws IOException {
+    List<IndexedRecord> scannedRecords = new ArrayList<>();
+    for (HoodieRecord record : scanner) {
+      scannedRecords.add((IndexedRecord)
+          ((HoodieAvroRecord) record).getData().getInsertValue(schema).get());
+    }
+
+    assertEquals(sort(genRecords), sort(scannedRecords),
+        "Scanner records count should be the same as appended records");
+    scanner.close();
+  }
+
+  private HoodieMergedLogRecordScanner getLogRecordScanner(Set<HoodieLogFile> logFiles, Schema schema,
+                                                           boolean enableOptimizedLogBlocksScan) {
+
+    // scan all log blocks (across multiple log files)
+    return HoodieMergedLogRecordScanner.newBuilder()
+        .withFileSystem(fs)
+        .withBasePath(basePath)
+        .withLogFilePaths(
+            logFiles.stream().sorted(HoodieLogFile.getLogFileComparator())
+                .map(l -> l.getPath().toString()).collect(toList()))
+        .withReaderSchema(schema)
+        .withLatestInstantTime("100")
+        .withMaxMemorySizeInBytes(10240L)
+        .withReadBlocksLazily(true)
+        .withReverseReader(false)
+        .withBufferSize(BUFFER_SIZE)
+        .withSpillableMapBasePath(spillableBasePath)
+        .withDiskMapType(ExternalSpillableMap.DiskMapType.BITCASK)
+        .withBitCaskDiskMapCompressionEnabled(true)
+        .withOptimizedLogBlocksScan(enableOptimizedLogBlocksScan)
+        .build();
+  }
+
+  @FunctionalInterface
+  public interface Function5<R, T1, T2, T3, T4, T5> {
+
+    R apply(T1 v1, T2 v2, T3 v3, T4 v4, T5 v5) throws IOException, InterruptedException;
   }
 
   @ParameterizedTest
@@ -692,7 +815,7 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
                 .map(logFile -> logFile.getPath().toString()).collect(Collectors.toList()))
         .withReaderSchema(schema)
         .withLatestInstantTime("100")
-        .withMaxMemorySizeInBytes(1024L)
+        .withMaxMemorySizeInBytes(10240L)
         .withReadBlocksLazily(readBlocksLazily)
         .withReverseReader(false)
         .withBufferSize(BUFFER_SIZE)
@@ -700,7 +823,6 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
         .withDiskMapType(diskMapType)
         .withBitCaskDiskMapCompressionEnabled(isCompressionEnabled)
         .withOptimizedLogBlocksScan(enableOptimizedLogBlocksScan)
-        .withRecordMerger(HoodieRecordUtils.loadRecordMerger(HoodieAvroRecordMerger.class.getName()))
         .withForceFullScan(false)
         .build();
 
@@ -783,7 +905,7 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
                 .map(logFile -> logFile.getPath().toString()).collect(Collectors.toList()))
         .withReaderSchema(schema)
         .withLatestInstantTime("100")
-        .withMaxMemorySizeInBytes(1024L)
+        .withMaxMemorySizeInBytes(10240L)
         .withReadBlocksLazily(readBlocksLazily)
         .withReverseReader(false)
         .withBufferSize(BUFFER_SIZE)
@@ -791,7 +913,6 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
         .withDiskMapType(diskMapType)
         .withBitCaskDiskMapCompressionEnabled(isCompressionEnabled)
         .withOptimizedLogBlocksScan(enableOptimizedLogBlocksScan)
-        .withRecordMerger(HoodieRecordUtils.loadRecordMerger(HoodieAvroRecordMerger.class.getName()))
         .withForceFullScan(false)
         .build();
 
@@ -850,7 +971,7 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
   public void testAppendAndReadOnCorruptedLog() throws IOException, URISyntaxException, InterruptedException {
     HoodieLogFile logFile = addValidBlock("test-fileId1", "100", 100);
 
-    // Append some arbit byte[] to the end of the log (mimics a partially written commit)
+    // Append some arbitrary byte[] to the end of the log (mimics a partially written commit)
     fs = FSUtils.getFs(fs.getUri().toString(), fs.getConf());
     FSDataOutputStream outputStream = fs.append(logFile.getPath());
     // create a block with
@@ -1000,7 +1121,7 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     writer.appendBlock(dataBlock);
     writer.close();
 
-    // Append some arbit byte[] to the end of the log (mimics a partially written commit)
+    // Append some arbitrary byte[] to the end of the log (mimics a partially written commit)
     fs = FSUtils.getFs(fs.getUri().toString(), fs.getConf());
     FSDataOutputStream outputStream = fs.append(writer.getLogFile().getPath());
     // create a block with
@@ -1078,38 +1199,14 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     writer.appendBlock(dataBlock);
     writer.close();
 
-    List<String> allLogFiles =
-        FSUtils.getAllLogFiles(fs, partitionPath, "test-fileid1", HoodieLogFile.DELTA_EXTENSION, "100")
-            .map(s -> s.getPath().toString()).collect(Collectors.toList());
-
     FileCreateUtils.createDeltaCommit(basePath, "100", fs);
 
-    HoodieMergedLogRecordScanner scanner = HoodieMergedLogRecordScanner.newBuilder()
-        .withFileSystem(fs)
-        .withBasePath(basePath)
-        .withLogFilePaths(allLogFiles)
-        .withReaderSchema(schema)
-        .withLatestInstantTime("100")
-        .withMaxMemorySizeInBytes(10240L)
-        .withReadBlocksLazily(readBlocksLazily)
-        .withReverseReader(false)
-        .withBufferSize(BUFFER_SIZE)
-        .withSpillableMapBasePath(spillableBasePath)
-        .withDiskMapType(diskMapType)
-        .withBitCaskDiskMapCompressionEnabled(isCompressionEnabled)
-        .withOptimizedLogBlocksScan(enableOptimizedLogBlocksScan)
-        .withRecordMerger(HoodieRecordUtils.loadRecordMerger(HoodieAvroRecordMerger.class.getName()))
-        .build();
-    assertEquals(200, scanner.getTotalLogRecords());
-    Set<String> readKeys = new HashSet<>(200);
-    scanner.forEach(s -> readKeys.add(s.getKey().getRecordKey()));
-    assertEquals(200, readKeys.size(), "Stream collect should return all 200 records");
     copyOfRecords1.addAll(copyOfRecords2);
     Set<String> originalKeys =
         copyOfRecords1.stream().map(s -> ((GenericRecord) s).get(HoodieRecord.RECORD_KEY_METADATA_FIELD).toString())
             .collect(Collectors.toSet());
-    assertEquals(originalKeys, readKeys, "CompositeAvroLogReader should return 200 records from 2 versions");
-    scanner.close();
+    checkLogBlocksAndKeys("100", schema, readBlocksLazily, diskMapType, isCompressionEnabled, enableOptimizedLogBlocksScan,
+        200, 200, Option.of(originalKeys));
   }
 
   @ParameterizedTest
@@ -1165,38 +1262,15 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     writer.appendBlock(dataBlock);
     writer.close();
 
-    List<String> allLogFiles =
-        FSUtils.getAllLogFiles(fs, partitionPath, "test-fileid1", HoodieLogFile.DELTA_EXTENSION, "100")
-            .map(s -> s.getPath().toString()).collect(Collectors.toList());
-
     FileCreateUtils.createDeltaCommit(basePath, "100", fs);
     FileCreateUtils.createDeltaCommit(basePath, "102", fs);
-    HoodieMergedLogRecordScanner scanner = HoodieMergedLogRecordScanner.newBuilder()
-        .withFileSystem(fs)
-        .withBasePath(basePath)
-        .withLogFilePaths(allLogFiles)
-        .withReaderSchema(schema)
-        .withLatestInstantTime("102")
-        .withMaxMemorySizeInBytes(10240L)
-        .withReadBlocksLazily(readBlocksLazily)
-        .withReverseReader(false)
-        .withBufferSize(BUFFER_SIZE)
-        .withSpillableMapBasePath(spillableBasePath)
-        .withDiskMapType(diskMapType)
-        .withBitCaskDiskMapCompressionEnabled(isCompressionEnabled)
-        .withOptimizedLogBlocksScan(enableOptimizedLogBlocksScan)
-        .withRecordMerger(HoodieRecordUtils.loadRecordMerger(HoodieAvroRecordMerger.class.getName()))
-        .build();
-    assertEquals(200, scanner.getTotalLogRecords(), "We read 200 records from 2 write batches");
-    Set<String> readKeys = new HashSet<>(200);
-    scanner.forEach(s -> readKeys.add(s.getKey().getRecordKey()));
-    assertEquals(200, readKeys.size(), "Stream collect should return all 200 records");
+
     copyOfRecords1.addAll(copyOfRecords3);
     Set<String> originalKeys =
         copyOfRecords1.stream().map(s -> ((GenericRecord) s).get(HoodieRecord.RECORD_KEY_METADATA_FIELD).toString())
             .collect(Collectors.toSet());
-    assertEquals(originalKeys, readKeys, "CompositeAvroLogReader should return 200 records from 2 versions");
-    scanner.close();
+    checkLogBlocksAndKeys("102", schema, readBlocksLazily, diskMapType, isCompressionEnabled, enableOptimizedLogBlocksScan,
+        200, 200, Option.of(originalKeys));
   }
 
   @ParameterizedTest
@@ -1225,7 +1299,7 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
 
     // Write 2
     header.put(HoodieLogBlock.HeaderMetadataType.INSTANT_TIME, "101");
-    // Append some arbit byte[] to the end of the log (mimics a partially written commit)
+    // Append some arbitrary byte[] to the end of the log (mimics a partially written commit)
     fs = FSUtils.getFs(fs.getUri().toString(), fs.getConf());
     FSDataOutputStream outputStream = fs.append(writer.getLogFile().getPath());
     // create a block with
@@ -1257,38 +1331,15 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     writer.appendBlock(dataBlock);
     writer.close();
 
-    List<String> allLogFiles =
-        FSUtils.getAllLogFiles(fs, partitionPath, "test-fileid1", HoodieLogFile.DELTA_EXTENSION, "100")
-            .map(s -> s.getPath().toString()).collect(Collectors.toList());
-
     FileCreateUtils.createDeltaCommit(basePath, "100", fs);
     FileCreateUtils.createDeltaCommit(basePath, "103", fs);
-    HoodieMergedLogRecordScanner scanner = HoodieMergedLogRecordScanner.newBuilder()
-        .withFileSystem(fs)
-        .withBasePath(basePath)
-        .withLogFilePaths(allLogFiles)
-        .withReaderSchema(schema)
-        .withLatestInstantTime("103")
-        .withMaxMemorySizeInBytes(10240L)
-        .withReadBlocksLazily(true)
-        .withReverseReader(false)
-        .withBufferSize(BUFFER_SIZE)
-        .withSpillableMapBasePath(spillableBasePath)
-        .withDiskMapType(diskMapType)
-        .withBitCaskDiskMapCompressionEnabled(isCompressionEnabled)
-        .withOptimizedLogBlocksScan(enableOptimizedLogBlocksScan)
-        .withRecordMerger(HoodieRecordUtils.loadRecordMerger(HoodieAvroRecordMerger.class.getName()))
-        .build();
-    assertEquals(200, scanner.getTotalLogRecords(), "We would read 200 records");
-    Set<String> readKeys = new HashSet<>(200);
-    scanner.forEach(s -> readKeys.add(s.getKey().getRecordKey()));
-    assertEquals(200, readKeys.size(), "Stream collect should return all 200 records");
+
     copyOfRecords1.addAll(copyOfRecords3);
     Set<String> originalKeys =
         copyOfRecords1.stream().map(s -> ((GenericRecord) s).get(HoodieRecord.RECORD_KEY_METADATA_FIELD).toString())
             .collect(Collectors.toSet());
-    assertEquals(originalKeys, readKeys, "CompositeAvroLogReader should return 200 records from 2 versions");
-    scanner.close();
+    checkLogBlocksAndKeys("103", schema, true, diskMapType, isCompressionEnabled, enableOptimizedLogBlocksScan,
+        200, 200, Option.of(originalKeys));
   }
 
   @ParameterizedTest
@@ -1360,7 +1411,6 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
         .withDiskMapType(diskMapType)
         .withBitCaskDiskMapCompressionEnabled(isCompressionEnabled)
         .withOptimizedLogBlocksScan(enableOptimizedLogBlocksScan)
-        .withRecordMerger(HoodieRecordUtils.loadRecordMerger(HoodieAvroRecordMerger.class.getName()))
         .build();
 
     assertEquals(200, scanner.getTotalLogRecords(), "We still would read 200 records");
@@ -1369,7 +1419,7 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     scanner.forEach(s -> readKeys.add(s.getKey().getRecordKey()));
     scanner.forEach(s -> {
       try {
-        if (!((HoodieRecordPayload)s.getData()).getInsertValue(schema).isPresent()) {
+        if (!((HoodieRecordPayload) s.getData()).getInsertValue(schema).isPresent()) {
           emptyPayloads.add(true);
         }
       } catch (IOException io) {
@@ -1408,10 +1458,9 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
         .withSpillableMapBasePath(spillableBasePath)
         .withDiskMapType(diskMapType)
         .withBitCaskDiskMapCompressionEnabled(isCompressionEnabled)
-        .withRecordMerger(HoodieRecordUtils.loadRecordMerger(HoodieAvroRecordMerger.class.getName()))
+        .withOptimizedLogBlocksScan(enableOptimizedLogBlocksScan)
         .build();
     scanner.forEach(s -> readKeys.add(s.getKey().getRecordKey()));
-    assertEquals(100, readKeys.size(), "Stream collect should return all 200 records after rollback of delete");
     final List<Boolean> newEmptyPayloads = new ArrayList<>();
     scanner.forEach(s -> {
       try {
@@ -1430,6 +1479,113 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     Collections.sort(firstBlockRecords);
     Collections.sort(readKeys);
     assertEquals(firstBlockRecords, readKeys, "CompositeAvroLogReader should return 150 records from 2 versions");
+    writer.close();
+    scanner.close();
+  }
+
+  @ParameterizedTest
+  @MethodSource("testArguments")
+  public void testAvroLogRecordReaderWithCommitBeforeAndAfterRollback(ExternalSpillableMap.DiskMapType diskMapType,
+                                                                      boolean isCompressionEnabled,
+                                                                      boolean readBlocksLazily,
+                                                                      boolean enableOptimizedLogBlocksScan)
+      throws IOException, URISyntaxException, InterruptedException {
+    Schema schema = HoodieAvroUtils.addMetadataFields(getSimpleSchema());
+    // Set a small threshold so that every block is a new version
+    String fileId = "test-fileid111";
+    Writer writer =
+        HoodieLogFormat.newWriterBuilder().onParentPath(partitionPath).withFileExtension(HoodieLogFile.DELTA_EXTENSION)
+            .withFileId(fileId).overBaseCommit("100").withFs(fs).build();
+
+    // Write 1 -> 100 records are written
+    SchemaTestUtil testUtil = new SchemaTestUtil();
+    List<IndexedRecord> records1 = testUtil.generateHoodieTestRecords(0, 100);
+    List<IndexedRecord> copyOfRecords1 = records1.stream()
+        .map(record -> HoodieAvroUtils.rewriteRecord((GenericRecord) record, schema)).collect(Collectors.toList());
+    Map<HoodieLogBlock.HeaderMetadataType, String> header = new HashMap<>();
+    header.put(HoodieLogBlock.HeaderMetadataType.INSTANT_TIME, "100");
+    header.put(HoodieLogBlock.HeaderMetadataType.SCHEMA, schema.toString());
+    HoodieDataBlock dataBlock = getDataBlock(HoodieLogBlockType.AVRO_DATA_BLOCK, records1, header);
+    writer.appendBlock(dataBlock);
+
+    // Write 2 -> 100 records are written
+    header.put(HoodieLogBlock.HeaderMetadataType.INSTANT_TIME, "101");
+    List<IndexedRecord> records2 = testUtil.generateHoodieTestRecords(0, 100);
+    List<IndexedRecord> allRecordsInserted = records2.stream()
+        .map(record -> HoodieAvroUtils.rewriteRecord((GenericRecord) record, schema)).collect(Collectors.toList());
+    dataBlock = getDataBlock(HoodieLogBlockType.AVRO_DATA_BLOCK, records2, header);
+    writer.appendBlock(dataBlock);
+    allRecordsInserted.addAll(copyOfRecords1);
+
+    // Delete 50 keys from write 1 batch
+    List<HoodieKey> deletedKeys = copyOfRecords1.stream()
+        .map(s -> (new HoodieKey(((GenericRecord) s).get(HoodieRecord.RECORD_KEY_METADATA_FIELD).toString(),
+            ((GenericRecord) s).get(HoodieRecord.PARTITION_PATH_METADATA_FIELD).toString())))
+        .collect(Collectors.toList()).subList(0, 50);
+
+    header.put(HoodieLogBlock.HeaderMetadataType.INSTANT_TIME, "102");
+    HoodieDeleteBlock deleteBlock = new HoodieDeleteBlock(deletedKeys.stream().map(deletedKey ->
+            DeleteRecord.create(deletedKey.getRecordKey(), deletedKey.getPartitionPath()))
+        .collect(Collectors.toList()).toArray(new DeleteRecord[0]), header);
+    writer.appendBlock(deleteBlock);
+
+    List<String> allLogFiles =
+        FSUtils.getAllLogFiles(fs, partitionPath, fileId, HoodieLogFile.DELTA_EXTENSION, "100")
+            .map(s -> s.getPath().toString()).collect(Collectors.toList());
+
+    // Rollback the last block i.e. a data block.
+    header.put(HoodieLogBlock.HeaderMetadataType.INSTANT_TIME, "103");
+    header.put(HoodieLogBlock.HeaderMetadataType.TARGET_INSTANT_TIME, "102");
+    header.put(HoodieLogBlock.HeaderMetadataType.COMMAND_BLOCK_TYPE,
+        String.valueOf(HoodieCommandBlock.HoodieCommandBlockTypeEnum.ROLLBACK_BLOCK.ordinal()));
+    HoodieCommandBlock commandBlock = new HoodieCommandBlock(header);
+    writer.appendBlock(commandBlock);
+
+    // Recreate the delete block which should have been removed from consideration because of rollback block next to it.
+    Map<HoodieLogBlock.HeaderMetadataType, String> deleteBlockHeader = new HashMap<>();
+    deleteBlockHeader.put(HoodieLogBlock.HeaderMetadataType.INSTANT_TIME, "102");
+    deleteBlock = new HoodieDeleteBlock(
+        deletedKeys.stream().map(deletedKey ->
+                DeleteRecord.create(deletedKey.getRecordKey(), deletedKey.getPartitionPath()))
+            .collect(Collectors.toList()).toArray(new DeleteRecord[0]), deleteBlockHeader);
+    writer.appendBlock(deleteBlock);
+
+    FileCreateUtils.createDeltaCommit(basePath, "102", fs);
+
+    final List<String> readKeys = new ArrayList<>();
+    HoodieMergedLogRecordScanner scanner = HoodieMergedLogRecordScanner.newBuilder()
+        .withFileSystem(fs)
+        .withBasePath(basePath)
+        .withLogFilePaths(allLogFiles)
+        .withReaderSchema(schema)
+        .withLatestInstantTime("103")
+        .withMaxMemorySizeInBytes(10240L)
+        .withReadBlocksLazily(readBlocksLazily)
+        .withReverseReader(false)
+        .withBufferSize(BUFFER_SIZE)
+        .withSpillableMapBasePath(spillableBasePath)
+        .withDiskMapType(diskMapType)
+        .withBitCaskDiskMapCompressionEnabled(isCompressionEnabled)
+        .withOptimizedLogBlocksScan(enableOptimizedLogBlocksScan)
+        .build();
+    scanner.forEach(s -> readKeys.add(s.getKey().getRecordKey()));
+    final List<Boolean> newEmptyPayloads = new ArrayList<>();
+    scanner.forEach(s -> {
+      try {
+        if (!((HoodieRecordPayload) s.getData()).getInsertValue(schema).isPresent()) {
+          newEmptyPayloads.add(true);
+        }
+      } catch (IOException io) {
+        throw new UncheckedIOException(io);
+      }
+    });
+    assertEquals(200, readKeys.size(), "Stream collect should return all 200 records");
+    assertEquals(50, newEmptyPayloads.size(), "Stream collect should return 50 records with empty payloads.");
+    List<String> recordKeysInserted = allRecordsInserted.stream().map(s -> ((GenericRecord) s).get(HoodieRecord.RECORD_KEY_METADATA_FIELD).toString())
+        .collect(Collectors.toList());
+    Collections.sort(recordKeysInserted);
+    Collections.sort(readKeys);
+    assertEquals(recordKeysInserted, readKeys, "CompositeAvroLogReader should return 150 records from 2 versions");
     writer.close();
     scanner.close();
   }
@@ -1525,7 +1681,6 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
         .withSpillableMapBasePath(spillableBasePath)
         .withDiskMapType(diskMapType)
         .withBitCaskDiskMapCompressionEnabled(isCompressionEnabled)
-        .withRecordMerger(HoodieRecordUtils.loadRecordMerger(HoodieAvroRecordMerger.class.getName()))
         .build();
 
     assertEquals(200, scanner.getTotalLogRecords(), "We still would read 200 records");
@@ -1534,7 +1689,7 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     scanner.forEach(s -> readKeys.add(s.getRecordKey()));
     scanner.forEach(s -> {
       try {
-        if (!((HoodieRecordPayload)s.getData()).getInsertValue(schema).isPresent()) {
+        if (!((HoodieRecordPayload) s.getData()).getInsertValue(schema).isPresent()) {
           emptyPayloadKeys.add(s.getRecordKey());
         }
       } catch (IOException io) {
@@ -1614,36 +1769,11 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     }
     // Attempt 2 : Write another rollback blocks for a failed write
     writer.appendBlock(commandBlock);
-
-    List<String> allLogFiles =
-        FSUtils.getAllLogFiles(fs, partitionPath, "test-fileid1", HoodieLogFile.DELTA_EXTENSION, "100")
-            .map(s -> s.getPath().toString()).collect(Collectors.toList());
-
-    // all data must be rolled back before merge
-    HoodieMergedLogRecordScanner scanner = HoodieMergedLogRecordScanner.newBuilder()
-        .withFileSystem(fs)
-        .withBasePath(basePath)
-        .withLogFilePaths(allLogFiles)
-        .withReaderSchema(schema)
-        .withLatestInstantTime("100")
-        .withMaxMemorySizeInBytes(10240L)
-        .withReadBlocksLazily(readBlocksLazily)
-        .withReverseReader(false)
-        .withBufferSize(BUFFER_SIZE)
-        .withSpillableMapBasePath(spillableBasePath)
-        .withDiskMapType(diskMapType)
-        .withBitCaskDiskMapCompressionEnabled(isCompressionEnabled)
-        .withOptimizedLogBlocksScan(enableOptimizedLogBlocksScan)
-        .withRecordMerger(HoodieRecordUtils.loadRecordMerger(HoodieAvroRecordMerger.class.getName()))
-        .build();
-    assertEquals(0, scanner.getTotalLogRecords(), "We would have scanned 0 records because of rollback");
-
-    final List<String> readKeys = new ArrayList<>();
-    scanner.forEach(s -> readKeys.add(s.getKey().getRecordKey()));
-    assertEquals(0, readKeys.size(), "Stream collect should return all 0 records");
-    FileCreateUtils.deleteDeltaCommit(basePath, "100", fs);
     writer.close();
-    scanner.close();
+
+    checkLogBlocksAndKeys("100", schema, readBlocksLazily, diskMapType, isCompressionEnabled, enableOptimizedLogBlocksScan,
+        0, 0, Option.empty());
+    FileCreateUtils.deleteDeltaCommit(basePath, "100", fs);
   }
 
   @ParameterizedTest
@@ -1689,31 +1819,11 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     HoodieCommandBlock commandBlock = new HoodieCommandBlock(header);
     writer.appendBlock(commandBlock);
     writer.appendBlock(commandBlock);
-
-    List<String> allLogFiles =
-        FSUtils.getAllLogFiles(fs, partitionPath, "test-fileid1", HoodieLogFile.DELTA_EXTENSION, "100")
-            .map(s -> s.getPath().toString()).collect(Collectors.toList());
-
-    HoodieMergedLogRecordScanner scanner = HoodieMergedLogRecordScanner.newBuilder()
-        .withFileSystem(fs)
-        .withBasePath(basePath)
-        .withLogFilePaths(allLogFiles)
-        .withReaderSchema(schema)
-        .withLatestInstantTime("100")
-        .withMaxMemorySizeInBytes(10240L)
-        .withReadBlocksLazily(readBlocksLazily)
-        .withReverseReader(false)
-        .withBufferSize(BUFFER_SIZE)
-        .withSpillableMapBasePath(spillableBasePath)
-        .withDiskMapType(diskMapType)
-        .withBitCaskDiskMapCompressionEnabled(isCompressionEnabled)
-        .withOptimizedLogBlocksScan(enableOptimizedLogBlocksScan)
-        .withRecordMerger(HoodieRecordUtils.loadRecordMerger(HoodieAvroRecordMerger.class.getName()))
-        .build();
-    assertEquals(0, scanner.getTotalLogRecords(), "We would read 0 records");
-    FileCreateUtils.deleteDeltaCommit(basePath, "100", fs);
     writer.close();
-    scanner.close();
+
+    checkLogBlocksAndKeys("100", schema, readBlocksLazily, diskMapType, isCompressionEnabled, enableOptimizedLogBlocksScan,
+        0, 0, Option.empty());
+    FileCreateUtils.deleteDeltaCommit(basePath, "100", fs);
   }
 
   @ParameterizedTest
@@ -1746,33 +1856,10 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
         String.valueOf(HoodieCommandBlock.HoodieCommandBlockTypeEnum.ROLLBACK_BLOCK.ordinal()));
     HoodieCommandBlock commandBlock = new HoodieCommandBlock(header);
     writer.appendBlock(commandBlock);
-
-    List<String> allLogFiles =
-        FSUtils.getAllLogFiles(fs, partitionPath, "test-fileid1", HoodieLogFile.DELTA_EXTENSION, "100")
-            .map(s -> s.getPath().toString()).collect(Collectors.toList());
-
-    HoodieMergedLogRecordScanner scanner = HoodieMergedLogRecordScanner.newBuilder()
-        .withFileSystem(fs)
-        .withBasePath(basePath)
-        .withLogFilePaths(allLogFiles)
-        .withReaderSchema(schema)
-        .withLatestInstantTime("100")
-        .withMaxMemorySizeInBytes(10240L)
-        .withReadBlocksLazily(readBlocksLazily)
-        .withReverseReader(false)
-        .withBufferSize(BUFFER_SIZE)
-        .withSpillableMapBasePath(spillableBasePath)
-        .withDiskMapType(diskMapType)
-        .withBitCaskDiskMapCompressionEnabled(isCompressionEnabled)
-        .withOptimizedLogBlocksScan(enableOptimizedLogBlocksScan)
-        .withRecordMerger(HoodieRecordUtils.loadRecordMerger(HoodieAvroRecordMerger.class.getName()))
-        .build();
-    assertEquals(100, scanner.getTotalLogRecords(), "We still would read 100 records");
-    final List<String> readKeys = new ArrayList<>(100);
-    scanner.forEach(s -> readKeys.add(s.getKey().getRecordKey()));
-    assertEquals(100, readKeys.size(), "Stream collect should return all 150 records");
     writer.close();
-    scanner.close();
+
+    checkLogBlocksAndKeys("100", schema, readBlocksLazily, diskMapType, isCompressionEnabled, enableOptimizedLogBlocksScan,
+        100, 100, Option.empty());
   }
 
   @ParameterizedTest
@@ -1822,17 +1909,96 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
         String.valueOf(HoodieCommandBlock.HoodieCommandBlockTypeEnum.ROLLBACK_BLOCK.ordinal()));
     HoodieCommandBlock commandBlock = new HoodieCommandBlock(header);
     writer.appendBlock(commandBlock);
+    writer.close();
+
+    checkLogBlocksAndKeys("101", schema, readBlocksLazily, diskMapType, isCompressionEnabled, enableOptimizedLogBlocksScan,
+        0, 0, Option.empty());
+  }
+
+  @ParameterizedTest
+  @MethodSource("testArguments")
+  public void testLogReaderWithDifferentVersionsOfDeleteBlocks(ExternalSpillableMap.DiskMapType diskMapType,
+                                                               boolean isCompressionEnabled,
+                                                               boolean readBlocksLazily,
+                                                               boolean enableOptimizedLogBlocksScan)
+      throws IOException, URISyntaxException, InterruptedException {
+    Schema schema = HoodieAvroUtils.addMetadataFields(getSimpleSchema());
+    // Set a small threshold so that every block is a new version
+    Writer writer =
+        HoodieLogFormat.newWriterBuilder().onParentPath(partitionPath).withFileExtension(HoodieLogFile.DELTA_EXTENSION)
+            .withFileId("test-fileid1").overBaseCommit("100").withFs(fs).build();
+    List<String> deleteKeyListInV2Block = Arrays.asList(
+        "d448e1b8-a0d4-45c0-bf2d-a9e16ff3c8ce",
+        "df3f71cd-5b68-406c-bb70-861179444adb",
+        "cf64885c-af32-463b-8f1b-2f31a39b1afa",
+        "9884e134-0d60-46e8-8a1e-36db0e455c4a",
+        "698544b8-defa-4fa7-ac15-8963f7d0784d",
+        "081c279e-fc6a-4e05-89b7-3136e4cad488",
+        "1041fac7-8a54-47e6-8a2d-d1a650301699",
+        "69c003f8-386d-40a0-9c61-5a903d1d6ac2",
+        "e574d164-f8c4-47cf-b150-264c2364f10e",
+        "d76007d2-9dc8-46ff-bf6f-0789c6ffffc0");
+
+    // Write 1: add 100 records
+    SchemaTestUtil testUtil = new SchemaTestUtil();
+    // Generate 100 records with 10 records to be deleted in V2 delete block in commit 102
+    List<String> recordKeyList = testUtil.genRandomUUID(100, deleteKeyListInV2Block);
+    List<IndexedRecord> records1 =
+        testUtil.generateHoodieTestRecords(0, recordKeyList, "0000/00/00", "100");
+    List<IndexedRecord> copyOfRecords1 = records1.stream()
+        .map(record -> HoodieAvroUtils.rewriteRecord((GenericRecord) record, schema)).collect(Collectors.toList());
+    Map<HoodieLogBlock.HeaderMetadataType, String> header = new HashMap<>();
+    header.put(HoodieLogBlock.HeaderMetadataType.INSTANT_TIME, "100");
+    header.put(HoodieLogBlock.HeaderMetadataType.SCHEMA, schema.toString());
+    HoodieDataBlock dataBlock = getDataBlock(DEFAULT_DATA_BLOCK_TYPE, records1, header);
+    writer.appendBlock(dataBlock);
+
+    // Write 2: add another 100 records
+    header.put(HoodieLogBlock.HeaderMetadataType.INSTANT_TIME, "101");
+    List<IndexedRecord> records2 = testUtil.generateHoodieTestRecords(0, 100);
+    List<IndexedRecord> copyOfRecords2 = records2.stream()
+        .map(record -> HoodieAvroUtils.rewriteRecord((GenericRecord) record, schema)).collect(Collectors.toList());
+    dataBlock = getDataBlock(DEFAULT_DATA_BLOCK_TYPE, records2, header);
+    writer.appendBlock(dataBlock);
+
+    // Delete 10 keys in V2 delete block
+    byte[] contentBytes = new byte[605];
+    InputStream inputStream = TestHoodieLogFormat.class
+        .getResourceAsStream("/format/delete-block-v2-content-10-records.data");
+    inputStream.read(contentBytes);
+
+    header.put(HoodieLogBlock.HeaderMetadataType.INSTANT_TIME, "102");
+    writer.appendBlock(new HoodieDeleteBlock(
+        Option.of(contentBytes), null, true, Option.empty(), header, Collections.EMPTY_MAP));
+
+    // Delete 60 keys in V3 delete block
+    header.put(HoodieLogBlock.HeaderMetadataType.INSTANT_TIME, "103");
+    List<DeleteRecord> deletedRecords = copyOfRecords2.stream()
+        .map(s -> (DeleteRecord.create(((GenericRecord) s).get(HoodieRecord.RECORD_KEY_METADATA_FIELD).toString(),
+            ((GenericRecord) s).get(HoodieRecord.PARTITION_PATH_METADATA_FIELD).toString())))
+        .collect(Collectors.toList()).subList(0, 60);
+    writer.appendBlock(new HoodieDeleteBlock(deletedRecords.toArray(new DeleteRecord[0]), header));
+
+    copyOfRecords2.addAll(copyOfRecords1);
+    List<String> originalKeys =
+        copyOfRecords2.stream().map(s -> ((GenericRecord) s).get(HoodieRecord.RECORD_KEY_METADATA_FIELD).toString())
+            .collect(Collectors.toList());
 
     List<String> allLogFiles =
         FSUtils.getAllLogFiles(fs, partitionPath, "test-fileid1", HoodieLogFile.DELTA_EXTENSION, "100")
             .map(s -> s.getPath().toString()).collect(Collectors.toList());
 
-    HoodieMergedLogRecordScanner scanner = HoodieMergedLogRecordScanner.newBuilder()
+    FileCreateUtils.createDeltaCommit(basePath, "100", fs);
+    FileCreateUtils.createDeltaCommit(basePath, "101", fs);
+    FileCreateUtils.createDeltaCommit(basePath, "102", fs);
+    FileCreateUtils.createDeltaCommit(basePath, "103", fs);
+
+    try (HoodieMergedLogRecordScanner scanner = HoodieMergedLogRecordScanner.newBuilder()
         .withFileSystem(fs)
         .withBasePath(basePath)
         .withLogFilePaths(allLogFiles)
         .withReaderSchema(schema)
-        .withLatestInstantTime("101")
+        .withLatestInstantTime("103")
         .withMaxMemorySizeInBytes(10240L)
         .withReadBlocksLazily(readBlocksLazily)
         .withReverseReader(false)
@@ -1841,11 +2007,91 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
         .withDiskMapType(diskMapType)
         .withBitCaskDiskMapCompressionEnabled(isCompressionEnabled)
         .withOptimizedLogBlocksScan(enableOptimizedLogBlocksScan)
-        .withRecordMerger(HoodieRecordUtils.loadRecordMerger(HoodieAvroRecordMerger.class.getName()))
-        .build();
-    assertEquals(0, scanner.getTotalLogRecords(), "We would read 0 records");
+        .build()) {
+      assertEquals(200, scanner.getTotalLogRecords(), "We still would read 200 records");
+      final List<String> readKeys = new ArrayList<>(200);
+      final List<String> recordKeys = new ArrayList<>(200);
+      final List<Boolean> emptyPayloads = new ArrayList<>();
+      scanner.forEach(s -> readKeys.add(s.getKey().getRecordKey()));
+      scanner.forEach(s -> {
+        try {
+          if (!((HoodieRecordPayload) s.getData()).getInsertValue(schema, new Properties()).isPresent()) {
+            emptyPayloads.add(true);
+          } else {
+            recordKeys.add(s.getKey().getRecordKey());
+          }
+        } catch (IOException io) {
+          throw new UncheckedIOException(io);
+        }
+      });
+      assertEquals(200, readKeys.size(), "Stream collect should return all 200 records");
+      assertEquals(70, emptyPayloads.size(), "Stream collect should return all 70 records with empty payloads");
+      Collections.sort(originalKeys);
+      Collections.sort(readKeys);
+      assertEquals(originalKeys, readKeys, "200 records should be scanned regardless of deletes or not");
+
+      originalKeys.removeAll(deleteKeyListInV2Block);
+      originalKeys.removeAll(
+          deletedRecords.stream().map(DeleteRecord::getRecordKey).collect(Collectors.toList()));
+      Collections.sort(originalKeys);
+      Collections.sort(recordKeys);
+      assertEquals(originalKeys, recordKeys, "Only 130 records should exist after deletion");
+    }
+  }
+
+  @Test
+  public void testAvroLogRecordReaderWithRollbackOlderBlocks()
+      throws IOException, URISyntaxException, InterruptedException {
+    Schema schema = HoodieAvroUtils.addMetadataFields(getSimpleSchema());
+    // Set a small threshold so that every block is a new version
+    Writer writer =
+        HoodieLogFormat.newWriterBuilder().onParentPath(partitionPath).withFileExtension(HoodieLogFile.DELTA_EXTENSION)
+            .withFileId("test-fileid1").overBaseCommit("100").withFs(fs).build();
+
+    // Write 1
+    SchemaTestUtil testUtil = new SchemaTestUtil();
+    List<IndexedRecord> records1 = testUtil.generateHoodieTestRecords(0, 100);
+    Map<HoodieLogBlock.HeaderMetadataType, String> header = new HashMap<>();
+    header.put(HoodieLogBlock.HeaderMetadataType.INSTANT_TIME, "100");
+    header.put(HoodieLogBlock.HeaderMetadataType.SCHEMA, schema.toString());
+    HoodieDataBlock dataBlock = getDataBlock(DEFAULT_DATA_BLOCK_TYPE, records1, header);
+    writer.appendBlock(dataBlock);
+    FileCreateUtils.createDeltaCommit(basePath, "100", fs);
+
+    // Write 2
+    List<IndexedRecord> records2 = testUtil.generateHoodieTestRecords(100, 10);
+    header.put(HoodieLogBlock.HeaderMetadataType.INSTANT_TIME, "101");
+    header.put(HoodieLogBlock.HeaderMetadataType.SCHEMA, schema.toString());
+    dataBlock = getDataBlock(DEFAULT_DATA_BLOCK_TYPE, records2, header);
+    writer.appendBlock(dataBlock);
+    FileCreateUtils.createDeltaCommit(basePath, "101", fs);
+
+    // Should be able to read all 110 records
+    checkLogBlocksAndKeys("101", schema, true, ExternalSpillableMap.DiskMapType.BITCASK, false,
+        false, 110, 110, Option.empty());
+
+    // Write a rollback for commit 100 which is not the latest commit
+    header.put(HoodieLogBlock.HeaderMetadataType.TARGET_INSTANT_TIME, "100");
+    header.put(HoodieLogBlock.HeaderMetadataType.COMMAND_BLOCK_TYPE,
+        String.valueOf(HoodieCommandBlock.HoodieCommandBlockTypeEnum.ROLLBACK_BLOCK.ordinal()));
+    HoodieCommandBlock commandBlock = new HoodieCommandBlock(header);
+    writer.appendBlock(commandBlock);
+
+    // Should only be able to read 10 records from commit 101
+    checkLogBlocksAndKeys("101", schema, true, ExternalSpillableMap.DiskMapType.BITCASK, false,
+        false, 10, 10, Option.empty());
+
+    // Write a rollback for commit 101 which is the latest commit
+    header.put(HoodieLogBlock.HeaderMetadataType.TARGET_INSTANT_TIME, "101");
+    header.put(HoodieLogBlock.HeaderMetadataType.COMMAND_BLOCK_TYPE,
+        String.valueOf(HoodieCommandBlock.HoodieCommandBlockTypeEnum.ROLLBACK_BLOCK.ordinal()));
+    commandBlock = new HoodieCommandBlock(header);
+    writer.appendBlock(commandBlock);
     writer.close();
-    scanner.close();
+
+    // Should not read any records as both commits are rolled back
+    checkLogBlocksAndKeys("101", schema, true, ExternalSpillableMap.DiskMapType.BITCASK, false,
+        false, 0, 0, Option.empty());
   }
 
   @ParameterizedTest
@@ -1877,7 +2123,7 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     writer.close();
     FileCreateUtils.createDeltaCommit(basePath, "100", fs);
 
-    // Append some arbit byte[] to the end of the log (mimics a partially written commit)
+    // Append some arbitrary byte[] to the end of the log (mimics a partially written commit)
     fs = FSUtils.getFs(fs.getUri().toString(), fs.getConf());
     FSDataOutputStream outputStream = fs.append(writer.getLogFile().getPath());
     // create a block with
@@ -1890,7 +2136,7 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     outputStream.flush();
     outputStream.close();
 
-    // Append some arbit byte[] to the end of the log (mimics a partially written commit)
+    // Append some arbitrary byte[] to the end of the log (mimics a partially written commit)
     fs = FSUtils.getFs(fs.getUri().toString(), fs.getConf());
     outputStream = fs.append(writer.getLogFile().getPath());
     // create a block with
@@ -1910,7 +2156,7 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     writer.appendBlock(dataBlock);
     writer.close();
 
-    // Append some arbit byte[] to the end of the log (mimics a partially written commit)
+    // Append some arbitrary byte[] to the end of the log (mimics a partially written commit)
     fs = FSUtils.getFs(fs.getUri().toString(), fs.getConf());
     outputStream = fs.append(writer.getLogFile().getPath());
     // create a block with
@@ -1935,29 +2181,9 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     writer.appendBlock(commandBlock);
     writer.close();
 
-    List<String> allLogFiles =
-        FSUtils.getAllLogFiles(fs, partitionPath, "test-fileid1", HoodieLogFile.DELTA_EXTENSION, "100")
-            .map(s -> s.getPath().toString()).collect(Collectors.toList());
-
-    HoodieMergedLogRecordScanner scanner = HoodieMergedLogRecordScanner.newBuilder()
-        .withFileSystem(fs)
-        .withBasePath(basePath)
-        .withLogFilePaths(allLogFiles)
-        .withReaderSchema(schema)
-        .withLatestInstantTime("101")
-        .withMaxMemorySizeInBytes(10240L)
-        .withReadBlocksLazily(readBlocksLazily)
-        .withReverseReader(false)
-        .withBufferSize(BUFFER_SIZE)
-        .withSpillableMapBasePath(spillableBasePath)
-        .withDiskMapType(diskMapType)
-        .withBitCaskDiskMapCompressionEnabled(isCompressionEnabled)
-        .withOptimizedLogBlocksScan(enableOptimizedLogBlocksScan)
-        .withRecordMerger(HoodieRecordUtils.loadRecordMerger(HoodieAvroRecordMerger.class.getName()))
-        .build();
-    assertEquals(0, scanner.getTotalLogRecords(), "We would read 0 records");
+    checkLogBlocksAndKeys("101", schema, true, ExternalSpillableMap.DiskMapType.BITCASK, false,
+        false, 0, 0, Option.empty());
     FileCreateUtils.deleteDeltaCommit(basePath, "100", fs);
-    scanner.close();
   }
 
   @ParameterizedTest
@@ -2020,7 +2246,7 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     writer.close();
     FileCreateUtils.createDeltaCommit(basePath, "102", fs);
 
-    // Append some arbit byte[] to the end of the log (mimics a partially written commit)
+    // Append some arbitrary byte[] to the end of the log (mimics a partially written commit)
     fs = FSUtils.getFs(fs.getUri().toString(), fs.getConf());
     FSDataOutputStream outputStream = fs.append(writer.getLogFile().getPath());
     // create a block with
@@ -2033,7 +2259,7 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     outputStream.flush();
     outputStream.close();
 
-    // Append some arbit byte[] to the end of the log (mimics a partially written commit)
+    // Append some arbitrary byte[] to the end of the log (mimics a partially written commit)
     fs = FSUtils.getFs(fs.getUri().toString(), fs.getConf());
     outputStream = fs.append(writer.getLogFile().getPath());
     // create a block with
@@ -2135,7 +2361,6 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
         .withDiskMapType(diskMapType)
         .withBitCaskDiskMapCompressionEnabled(isCompressionEnabled)
         .withOptimizedLogBlocksScan(true)
-        .withRecordMerger(HoodieRecordUtils.loadRecordMerger(HoodieAvroRecordMerger.class.getName()))
         .build();
     assertEquals(600, scanner.getTotalLogRecords(), "We would read 600 records from scanner");
     final List<String> readKeys = new ArrayList<>();
@@ -2146,7 +2371,7 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
         .sorted()
         .collect(Collectors.toList());
     List<String> validBlockInstants = scanner.getValidBlockInstants();
-    List<String> expectedBlockInstants = Arrays.asList("108","105", "104");
+    List<String> expectedBlockInstants = Arrays.asList("108", "105", "104");
     assertEquals(expectedBlockInstants, validBlockInstants);
     Collections.sort(readKeys);
     assertEquals(expectedRecords, readKeys, "Record keys read should be exactly same.");
@@ -2225,7 +2450,6 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
           .withDiskMapType(diskMapType)
           .withBitCaskDiskMapCompressionEnabled(isCompressionEnabled)
           .withOptimizedLogBlocksScan(enableOptimizedLogBlocksScan)
-          .withRecordMerger(HoodieRecordUtils.loadRecordMerger(HoodieAvroRecordMerger.class.getName()))
           .build();
 
       assertEquals(Math.max(numRecordsInLog1, numRecordsInLog2), scanner.getNumMergedRecordsInLog(),
@@ -2372,7 +2596,7 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
 
     FileCreateUtils.createDeltaCommit(basePath, "100", fs);
 
-    // Append some arbit byte[] to the end of the log (mimics a partially written commit)
+    // Append some arbitrary byte[] to the end of the log (mimics a partially written commit)
     fs = FSUtils.getFs(fs.getUri().toString(), fs.getConf());
     FSDataOutputStream outputStream = fs.append(writer.getLogFile().getPath());
     // create a block with
@@ -2402,7 +2626,7 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     HoodieLogFile logFile = new HoodieLogFile(writer.getLogFile().getPath(), fs.getFileStatus(writer.getLogFile().getPath()).getLen());
 
     try (HoodieLogFileReader reader =
-        new HoodieLogFileReader(fs, logFile, schema, BUFFER_SIZE, readBlocksLazily, true)) {
+             new HoodieLogFileReader(fs, logFile, schema, BUFFER_SIZE, readBlocksLazily, true)) {
 
       assertTrue(reader.hasPrev(), "Last block should be available");
       HoodieLogBlock block = reader.prev();
@@ -2535,7 +2759,7 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     BenchmarkCounter.initCounterFromReporter(HadoopMapRedUtils.createTestReporter(), fs.getConf());
 
     // NOTE: Have to use this ugly hack since List generic is not covariant in its type param
-    HoodieDataBlock dataBlock = getDataBlock(dataBlockType, (List<IndexedRecord>)(List) records, header);
+    HoodieDataBlock dataBlock = getDataBlock(dataBlockType, (List<IndexedRecord>) (List) records, header);
 
     writer.appendBlock(dataBlock);
     writer.close();
@@ -2555,7 +2779,10 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
           new HashMap<HoodieLogBlockType, Integer>() {{
             put(HoodieLogBlockType.AVRO_DATA_BLOCK, 0); // not supported
             put(HoodieLogBlockType.HFILE_DATA_BLOCK, 0); // not supported
-            put(HoodieLogBlockType.PARQUET_DATA_BLOCK, HoodieAvroUtils.gteqAvro1_9() ? 1802 : 1809);
+            put(HoodieLogBlockType.PARQUET_DATA_BLOCK,
+                HoodieAvroUtils.gteqAvro1_9()
+                    ? getJavaVersion() == 17 || getJavaVersion() == 11 ? 1803 : 1802
+                    : 1809);
           }};
 
       List<IndexedRecord> recordsRead = getRecords(dataBlockRead);
@@ -2571,13 +2798,29 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testGetRecordPositions(boolean addRecordPositionsHeader) throws IOException {
+    Map<HeaderMetadataType, String> header = new HashMap<>();
+    List<Long> positions = new ArrayList<>();
+    if (addRecordPositionsHeader) {
+      positions = TestLogReaderUtils.generatePositions();
+      String content = LogReaderUtils.encodePositions(positions);
+      header.put(HeaderMetadataType.RECORD_POSITIONS, content);
+    }
+    HoodieLogBlock logBlock = new HoodieDeleteBlock(new DeleteRecord[0], header);
+    if (addRecordPositionsHeader) {
+      TestLogReaderUtils.assertPositionEquals(positions, logBlock.getRecordPositions());
+    }
+  }
+
   private static HoodieDataBlock getDataBlock(HoodieLogBlockType dataBlockType, List<IndexedRecord> records,
-                                       Map<HeaderMetadataType, String> header) {
+                                              Map<HeaderMetadataType, String> header) {
     return getDataBlock(dataBlockType, records.stream().map(HoodieAvroIndexedRecord::new).collect(Collectors.toList()), header, new Path("dummy_path"));
   }
 
   private static HoodieDataBlock getDataBlock(HoodieLogBlockType dataBlockType, List<HoodieRecord> records,
-                                       Map<HeaderMetadataType, String> header, Path pathForReader) {
+                                              Map<HeaderMetadataType, String> header, Path pathForReader) {
     switch (dataBlockType) {
       case CDC_DATA_BLOCK:
         return new HoodieCDCDataBlock(records, header, HoodieRecord.RECORD_KEY_METADATA_FIELD);
@@ -2615,7 +2858,7 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
   }
 
   private static Stream<Arguments> testArgumentsWithoutOptimizedScanArg() {
-    // Arg1: ExternalSpillableMap Type, Arg2: isDiskMapCompressionEnabled, Arg3: readBlocksLazily, Arg4: enableOptimizedLogBlocksScan
+    // Arg1: ExternalSpillableMap Type, Arg2: isDiskMapCompressionEnabled, Arg3: readBlocksLazily
     return Stream.of(
         arguments(ExternalSpillableMap.DiskMapType.BITCASK, false, false),
         arguments(ExternalSpillableMap.DiskMapType.ROCKS_DB, false, false),
@@ -2632,6 +2875,15 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
                                                   Schema schema,
                                                   List<IndexedRecord> records,
                                                   int numFiles) throws IOException, InterruptedException {
+    return writeLogFiles(partitionPath, schema, records, numFiles, false);
+  }
+
+  private static Set<HoodieLogFile> writeLogFiles(Path partitionPath,
+                                                  Schema schema,
+                                                  List<IndexedRecord> records,
+                                                  int numFiles,
+                                                  boolean enableBlockSequenceNumbers) throws IOException, InterruptedException {
+    int blockSeqNo = 0;
     Writer writer =
         HoodieLogFormat.newWriterBuilder().onParentPath(partitionPath).withFileExtension(HoodieLogFile.DELTA_EXTENSION)
             .withSizeThreshold(1024).withFileId("test-fileid1").overBaseCommit("100").withFs(fs).build();
@@ -2653,14 +2905,23 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
       List<IndexedRecord> targetRecords = records.subList(offset, offset + targetRecordsCount);
 
       logFiles.add(writer.getLogFile());
+      if (enableBlockSequenceNumbers) {
+        header = getUpdatedHeader(header, blockSeqNo++);
+      }
       writer.appendBlock(getDataBlock(DEFAULT_DATA_BLOCK_TYPE, targetRecords, header));
-
       filesWritten++;
     }
 
     writer.close();
 
     return logFiles;
+  }
+
+  private static Map<HeaderMetadataType, String> getUpdatedHeader(Map<HeaderMetadataType, String> header, int blockSequenceNumber) {
+    Map<HeaderMetadataType, String> updatedHeader = new HashMap<>();
+    updatedHeader.putAll(header);
+    updatedHeader.put(HeaderMetadataType.BLOCK_SEQUENCE_NUMBER, String.valueOf(blockSequenceNumber));
+    return updatedHeader;
   }
 
   /**
@@ -2693,7 +2954,7 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     writer.appendBlock(dataBlock);
     writer.close();
 
-    // Append some arbit byte[] to thee end of the log (mimics a partially written commit)
+    // Append some arbitrary byte[] to the end of the log (mimics a partially written commit)
     fs = FSUtils.getFs(fs.getUri().toString(), fs.getConf());
     FSDataOutputStream outputStream = fs.append(writer.getLogFile().getPath());
     // create a block with
@@ -2717,5 +2978,38 @@ public class TestHoodieLogFormat extends HoodieCommonTestHarness {
     reader.next();
 
     return reader;
+  }
+
+  private void checkLogBlocksAndKeys(String latestInstantTime, Schema schema, boolean readBlocksLazily,
+                                     ExternalSpillableMap.DiskMapType diskMapType, boolean isCompressionEnabled, boolean enableOptimizedLogBlocksScan, int expectedTotalRecords,
+                                     int expectedTotalKeys, Option<Set<String>> expectedKeys) throws IOException {
+    List<String> allLogFiles =
+        FSUtils.getAllLogFiles(fs, partitionPath, "test-fileid1", HoodieLogFile.DELTA_EXTENSION, "100")
+            .map(s -> s.getPath().toString()).collect(Collectors.toList());
+
+    HoodieMergedLogRecordScanner.Builder builder = HoodieMergedLogRecordScanner.newBuilder()
+        .withFileSystem(fs)
+        .withBasePath(basePath)
+        .withLogFilePaths(allLogFiles)
+        .withReaderSchema(schema)
+        .withLatestInstantTime(latestInstantTime)
+        .withMaxMemorySizeInBytes(10240L)
+        .withReadBlocksLazily(readBlocksLazily)
+        .withReverseReader(false)
+        .withBufferSize(BUFFER_SIZE)
+        .withSpillableMapBasePath(spillableBasePath)
+        .withDiskMapType(diskMapType)
+        .withBitCaskDiskMapCompressionEnabled(isCompressionEnabled)
+        .withOptimizedLogBlocksScan(enableOptimizedLogBlocksScan);
+    try (HoodieMergedLogRecordScanner scanner = builder.build()) {
+      assertEquals(expectedTotalRecords, scanner.getTotalLogRecords(), "There should be " + expectedTotalRecords + " records");
+      final Set<String> readKeys = new HashSet<>();
+      scanner.forEach(s -> readKeys.add(s.getKey().getRecordKey()));
+      assertEquals(expectedTotalKeys, readKeys.size(), "Read should return return all " + expectedTotalKeys + " keys");
+
+      if (expectedKeys.isPresent()) {
+        assertEquals(expectedKeys.get(), readKeys, "Keys read from log file should match written keys");
+      }
+    }
   }
 }

@@ -49,8 +49,8 @@ import org.apache.hadoop.hbase.io.hfile.HFileContext;
 import org.apache.hadoop.hbase.io.hfile.HFileContextBuilder;
 import org.apache.hadoop.hbase.io.hfile.HFileScanner;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -80,7 +80,7 @@ public class HFileBootstrapIndex extends BootstrapIndex {
 
   protected static final long serialVersionUID = 1L;
 
-  private static final Logger LOG = LogManager.getLogger(HFileBootstrapIndex.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HFileBootstrapIndex.class);
 
   public static final String BOOTSTRAP_INDEX_FILE_ID = "00000000-0000-0000-0000-000000000000-0";
 
@@ -182,12 +182,8 @@ public class HFileBootstrapIndex extends BootstrapIndex {
    * @param fileSystem File System
    */
   private static HFile.Reader createReader(String hFilePath, Configuration conf, FileSystem fileSystem) {
-    try {
-      LOG.info("Opening HFile for reading :" + hFilePath);
-      return HoodieHFileUtils.createHFileReader(fileSystem, new HFilePathForReader(hFilePath), new CacheConfig(conf), conf);
-    } catch (IOException ioe) {
-      throw new HoodieIOException(ioe.getMessage(), ioe);
-    }
+    LOG.info("Opening HFile for reading :" + hFilePath);
+    return HoodieHFileUtils.createHFileReader(fileSystem, new HFilePathForReader(hFilePath), new CacheConfig(conf), conf);
   }
 
   @Override

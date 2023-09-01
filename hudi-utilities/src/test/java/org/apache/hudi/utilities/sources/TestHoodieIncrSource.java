@@ -44,10 +44,10 @@ import org.apache.hudi.utilities.sources.helpers.IncrSourceHelper;
 
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hudi.utilities.sources.helpers.TestSnapshotQuerySplitterImpl;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -66,6 +66,7 @@ import static org.apache.hudi.common.testutils.HoodieTestUtils.RAW_TRIPS_TEST_NA
 import static org.apache.hudi.testutils.Assertions.assertNoWriteErrors;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class TestHoodieIncrSource extends SparkClientFunctionalTestHarness {
@@ -96,7 +97,7 @@ public class TestHoodieIncrSource extends SparkClientFunctionalTestHarness {
     this.tableType = tableType;
     metaClient = getHoodieMetaClient(hadoopConf(), basePath());
     HoodieWriteConfig writeConfig = getConfigBuilder(basePath(), metaClient)
-        .withArchivalConfig(HoodieArchivalConfig.newBuilder().archiveCommitsWith(2, 3).build())
+        .withArchivalConfig(HoodieArchivalConfig.newBuilder().archiveCommitsWith(4, 5).build())
         .withCleanConfig(HoodieCleanConfig.newBuilder().retainCommits(1).build())
         .withCompactionConfig(HoodieCompactionConfig.newBuilder().withInlineCompaction(true).withMaxNumDeltaCommitsBeforeCompaction(3).build())
         .withMetadataConfig(HoodieMetadataConfig.newBuilder()
@@ -138,7 +139,7 @@ public class TestHoodieIncrSource extends SparkClientFunctionalTestHarness {
     this.tableType = tableType;
     metaClient = getHoodieMetaClient(hadoopConf(), basePath());
     HoodieWriteConfig writeConfig = getConfigBuilder(basePath(), metaClient)
-        .withArchivalConfig(HoodieArchivalConfig.newBuilder().archiveCommitsWith(3, 4).build())
+        .withArchivalConfig(HoodieArchivalConfig.newBuilder().archiveCommitsWith(4, 5).build())
         .withCleanConfig(HoodieCleanConfig.newBuilder().retainCommits(2).build())
         .withCompactionConfig(
             HoodieCompactionConfig.newBuilder()
@@ -287,6 +288,15 @@ public class TestHoodieIncrSource extends SparkClientFunctionalTestHarness {
       assertTrue(compactionInstant.get().getTimestamp().compareTo(latestCommitTimestamp) < 0);
     }
 
+    // test SnapshotLoadQuerySpliiter to split snapshot query .
+    // Reads only first commit
+    readAndAssert(IncrSourceHelper.MissingCheckpointStrategy.READ_UPTO_LATEST_COMMIT,
+        Option.empty(),
+        100,
+        dataBatches.get(0).getKey(),
+        Option.of(TestSnapshotQuerySplitterImpl.class.getName()));
+    writeClient.close();
+
     // The pending tables services should not block the incremental pulls
     // Reads everything up to latest
     readAndAssert(
@@ -315,27 +325,33 @@ public class TestHoodieIncrSource extends SparkClientFunctionalTestHarness {
         Option.of(dataBatches.get(6).getKey()),
         0,
         dataBatches.get(6).getKey());
-
-    writeClient.close();
   }
 
-  private void readAndAssert(IncrSourceHelper.MissingCheckpointStrategy missingCheckpointStrategy, Option<String> checkpointToPull, int expectedCount, String expectedCheckpoint) {
+  private void readAndAssert(IncrSourceHelper.MissingCheckpointStrategy missingCheckpointStrategy, Option<String> checkpointToPull, int expectedCount,
+                             String expectedCheckpoint, Option<String> snapshotCheckPointImplClassOpt) {
 
     Properties properties = new Properties();
     properties.setProperty("hoodie.deltastreamer.source.hoodieincr.path", basePath());
     properties.setProperty("hoodie.deltastreamer.source.hoodieincr.missing.checkpoint.strategy", missingCheckpointStrategy.name());
+    snapshotCheckPointImplClassOpt.map(className ->
+        properties.setProperty(SnapshotLoadQuerySplitter.Config.SNAPSHOT_LOAD_QUERY_SPLITTER_CLASS_NAME, className));
     TypedProperties typedProperties = new TypedProperties(properties);
     HoodieIncrSource incrSource = new HoodieIncrSource(typedProperties, jsc(), spark(), new DummySchemaProvider(HoodieTestDataGenerator.AVRO_SCHEMA));
 
     // read everything until latest
     Pair<Option<Dataset<Row>>, String> batchCheckPoint = incrSource.fetchNextBatch(checkpointToPull, 500);
-    Assertions.assertNotNull(batchCheckPoint.getValue());
+    assertNotNull(batchCheckPoint.getValue());
     if (expectedCount == 0) {
       assertFalse(batchCheckPoint.getKey().isPresent());
     } else {
       assertEquals(expectedCount, batchCheckPoint.getKey().get().count());
     }
-    Assertions.assertEquals(expectedCheckpoint, batchCheckPoint.getRight());
+    assertEquals(expectedCheckpoint, batchCheckPoint.getRight());
+  }
+
+  private void readAndAssert(IncrSourceHelper.MissingCheckpointStrategy missingCheckpointStrategy, Option<String> checkpointToPull,
+                             int expectedCount, String expectedCheckpoint) {
+    readAndAssert(missingCheckpointStrategy, checkpointToPull, expectedCount, expectedCheckpoint, Option.empty());
   }
 
   private Pair<String, List<HoodieRecord>> writeRecords(SparkRDDWriteClient writeClient,

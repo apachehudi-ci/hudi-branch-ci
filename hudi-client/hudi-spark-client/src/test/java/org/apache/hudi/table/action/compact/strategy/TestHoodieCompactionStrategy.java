@@ -87,7 +87,7 @@ public class TestHoodieCompactionStrategy {
     Long returnedSize = returned.stream().map(s -> s.getMetrics().get(BoundedIOCompactionStrategy.TOTAL_IO_MB))
         .map(Double::longValue).reduce(Long::sum).orElse(0L);
     assertEquals(610, (long) returnedSize,
-        "Should chose the first 2 compactions which should result in a total IO of 690 MB");
+        "Should chose the first 2 compactions which should result in a total IO of 610 MB");
   }
 
   @Test
@@ -262,7 +262,7 @@ public class TestHoodieCompactionStrategy {
         "LogFileLengthBasedCompactionStrategy should have resulted in fewer compactions");
     assertEquals(2, returned.size(), "LogFileLengthBasedCompactionStrategy should have resulted in 2 compaction");
 
-    // Delte log File length
+    // Delta log File length
     Integer allFileLength = returned.stream().map(s -> s.getDeltaFilePaths().size())
         .reduce(Integer::sum).orElse(0);
 
