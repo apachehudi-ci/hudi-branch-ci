@@ -115,6 +115,10 @@ abstract class HoodieCDCTestBase extends HoodieSparkClientTestBase {
     commitMetadata.getWriteStats.asScala.flatMap(_.getCdcStats.keys).toList
   }
 
+  protected def isFilesExistInFileSystem(files: List[String]): Boolean = {
+    files.stream().allMatch(k => fs.exists(new Path(basePath + "/" + k)))
+  }
+
   protected def getCDCBlocks(relativeLogFile: String, cdcSchema: Schema): List[HoodieDataBlock] = {
     val logFile = new HoodieLogFile(
       metaClient.getFs.getFileStatus(new Path(metaClient.getBasePathV2, relativeLogFile)))
