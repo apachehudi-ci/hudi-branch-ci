@@ -116,7 +116,7 @@ abstract class HoodieCDCTestBase extends HoodieSparkClientTestBase {
   }
 
   protected def isFilesExistInFileSystem(files: List[String]): Boolean = {
-    files.stream().allMatch(fs.exists(new Path(basePath + "/" + _)))
+    files.stream().allMatch((file: String) => fs.exists(new Path(basePath + "/" + file)))
   }
 
   protected def getCDCBlocks(relativeLogFile: String, cdcSchema: Schema): List[HoodieDataBlock] = {
