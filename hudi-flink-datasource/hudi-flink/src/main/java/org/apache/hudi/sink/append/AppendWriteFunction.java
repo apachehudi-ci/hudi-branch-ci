@@ -24,6 +24,8 @@ import org.apache.hudi.sink.StreamWriteOperatorCoordinator;
 import org.apache.hudi.sink.bulk.BulkInsertWriterHelper;
 import org.apache.hudi.sink.common.AbstractStreamWriteFunction;
 import org.apache.hudi.sink.event.WriteMetadataEvent;
+import org.apache.hudi.sink.event.WriteResultEvent;
+import org.apache.hudi.util.BaseWriteMetricHelper;
 
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.configuration.Configuration;
@@ -134,7 +136,7 @@ public class AppendWriteFunction<I> extends AbstractStreamWriteFunction<I> {
         .lastBatch(true)
         .endInput(endInput)
         .build();
-    this.eventGateway.sendEventToCoordinator(event);
+    this.eventGateway.sendEventToCoordinator(new WriteResultEvent(event, currentInstant));
     // nullify the write helper for next ckp
     this.writerHelper = null;
     this.writeStatuses.addAll(writeStatus);

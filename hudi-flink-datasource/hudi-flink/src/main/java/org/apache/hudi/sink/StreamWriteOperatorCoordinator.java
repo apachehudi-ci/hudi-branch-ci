@@ -36,6 +36,7 @@ import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.hive.HiveSyncTool;
 import org.apache.hudi.sink.event.CommitAckEvent;
 import org.apache.hudi.sink.event.WriteMetadataEvent;
+import org.apache.hudi.sink.event.WriteResultEvent;
 import org.apache.hudi.sink.meta.CkpMetadata;
 import org.apache.hudi.sink.utils.HiveSyncContext;
 import org.apache.hudi.sink.utils.NonThrownExecutor;
@@ -284,21 +285,22 @@ public class StreamWriteOperatorCoordinator
 
   @Override
   public void handleEventFromOperator(int i, OperatorEvent operatorEvent) {
-    ValidationUtils.checkState(operatorEvent instanceof WriteMetadataEvent,
-        "The coordinator can only handle WriteMetaEvent");
-    WriteMetadataEvent event = (WriteMetadataEvent) operatorEvent;
+    ValidationUtils.checkState(operatorEvent instanceof WriteResultEvent,
+        "The coordinator can only handle WriteResultEvent");
+    WriteResultEvent writeResultEvent = (WriteResultEvent) operatorEvent;
+    WriteMetadataEvent event = writeResultEvent.getWriteMetadataEvent();
 
     if (event.isEndInput()) {
       // handle end input event synchronously
       // wrap handleEndInputEvent in executeSync to preserve the order of events
-      executor.executeSync(() -> handleEndInputEvent(event), "handle end input event for instant %s", this.instant);
+      executor.executeSync(() -> handleEndInputEvent(writeResultEvent), "handle end input event for instant %s", this.instant);
     } else {
       executor.execute(
           () -> {
             if (event.isBootstrap()) {
-              handleBootstrapEvent(event);
+              handleBootstrapEvent(writeResultEvent);
             } else {
-              handleWriteMetaEvent(event);
+              handleWriteMetaEvent(writeResultEvent);
             }
           }, "handle write metadata event for instant %s", this.instant
       );
@@ -369,7 +371,7 @@ public class StreamWriteOperatorCoordinator
   }
 
   private void reset() {
-    this.eventBuffer = new WriteMetadataEvent[this.parallelism];
+    this.eventBuffer = new WriteResultEvent[this.parallelism];
   }
 
   /**
@@ -383,9 +385,9 @@ public class StreamWriteOperatorCoordinator
         .allMatch(event -> event != null && event.isLastBatch());
   }
 
-  private void addEventToBuffer(WriteMetadataEvent event) {
-    if (this.eventBuffer[event.getTaskID()] != null) {
-      this.eventBuffer[event.getTaskID()].mergeWith(event);
+  private void addEventToBuffer(WriteResultEvent event) {
+    if (this.eventBuffer[event.getWriteMetadataEvent().getTaskID()] != null) {
+      this.eventBuffer[event.getWriteMetadataEvent().getTaskID()].mergeWith(event);
     } else {
       this.eventBuffer[event.getTaskID()] = event;
     }
@@ -434,19 +436,25 @@ public class StreamWriteOperatorCoordinator
     }, "initialize instant %s", instant);
   }
 
-  private void handleBootstrapEvent(WriteMetadataEvent event) {
+  private void handleBootstrapEvent(WriteResultEvent writeEvent) {
+    WriteMetadataEvent event = writeEvent.getWriteMetadataEvent();
     this.eventBuffer[event.getTaskID()] = event;
     if (Arrays.stream(eventBuffer).allMatch(evt -> evt != null && evt.isBootstrap())) {
-      // start to initialize the instant.
-      final String instant = Arrays.stream(eventBuffer)
-          .filter(evt -> evt.getWriteStatuses().size() > 0)
-          .findFirst().map(WriteMetadataEvent::getInstantTime)
-          .orElse(WriteMetadataEvent.BOOTSTRAP_INSTANT);
-      initInstant(instant);
+      if (Arrays.stream(eventBuffer).allMatch(e -> !Objects.equals(instant, WriteMetadataEvent.BOOTSTRAP_INSTANT) &&
+          (e.getCurInstant() == null || HoodieTimeline.compareTimestamps(e.getCurInstant(), HoodieTimeline.LESSER_THAN, instant)))) {
+        LOG.info("Current instant " + instant + " is new, reuse current instant.");
+      } else {
+        // start to initialize the instant.
+        final String instant = Arrays.stream(eventBuffer)
+            .filter(evt -> evt.getWriteStatuses().size() > 0)
+            .findFirst().map(WriteMetadataEvent::getInstantTime)
+            .orElse(WriteMetadataEvent.BOOTSTRAP_INSTANT);
+        initInstant(instant);
+      }
     }
   }
 
-  private void handleEndInputEvent(WriteMetadataEvent event) {
+  private void handleEndInputEvent(WriteResultEvent event) {
     addEventToBuffer(event);
     if (allEventsReceived()) {
       // start to commit the instant.
@@ -466,14 +474,14 @@ public class StreamWriteOperatorCoordinator
     }
   }
 
-  private void handleWriteMetaEvent(WriteMetadataEvent event) {
+  private void handleWriteMetaEvent(WriteResultEvent event) {
     // the write task does not block after checkpointing(and before it receives a checkpoint success event),
     // if it checkpoints succeed then flushes the data buffer again before this coordinator receives a checkpoint
     // success event, the data buffer would flush with an older instant time.
     ValidationUtils.checkState(
-        HoodieTimeline.compareTimestamps(this.instant, HoodieTimeline.GREATER_THAN_OR_EQUALS, event.getInstantTime()),
+        HoodieTimeline.compareTimestamps(this.instant, HoodieTimeline.GREATER_THAN_OR_EQUALS, event.getWriteMetadataEvent().getInstantTime()),
         String.format("Receive an unexpected event for instant %s from task %d",
-            event.getInstantTime(), event.getTaskID()));
+            event.getWriteMetadataEvent().getInstantTime(), event.getWriteMetadataEvent().getTaskID()));
 
     addEventToBuffer(event);
   }
@@ -523,7 +531,7 @@ public class StreamWriteOperatorCoordinator
 
     List<WriteStatus> writeResults = Arrays.stream(eventBuffer)
         .filter(Objects::nonNull)
-        .map(WriteMetadataEvent::getWriteStatuses)
+        .map(e -> e.getWriteMetadataEvent().getWriteStatuses())
         .flatMap(Collection::stream)
         .collect(Collectors.toList());
 
@@ -587,7 +595,7 @@ public class StreamWriteOperatorCoordinator
 
   @VisibleForTesting
   public WriteMetadataEvent[] getEventBuffer() {
-    return eventBuffer;
+    return Arrays.stream(eventBuffer).map(WriteResultEvent::getWriteMetadataEvent).toArray(WriteMetadataEvent[]::new);
   }
 
   @VisibleForTesting
