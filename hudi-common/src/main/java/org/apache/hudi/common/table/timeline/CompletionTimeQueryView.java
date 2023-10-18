@@ -88,7 +88,8 @@ public class CompletionTimeQueryView implements AutoCloseable, Serializable {
    * Returns whether the instant is completed.
    */
   public boolean isCompleted(String instantTime) {
-    return getCompletionTime(instantTime).isPresent();
+    return this.startToCompletionInstantTimeMap.containsKey(instantTime)
+        || HoodieTimeline.compareTimestamps(instantTime, LESSER_THAN, this.firstInstantOnActiveTimeline);
   }
 
   /**
