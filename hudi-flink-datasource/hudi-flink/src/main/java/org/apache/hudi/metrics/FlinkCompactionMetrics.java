@@ -119,9 +119,11 @@ public class FlinkCompactionMetrics extends FlinkWriteMetrics {
   }
 
   public enum CompactionState {
-     SUCCESS(0),FAILED(1);
-     int state;
-     CompactionState(int state) { this.state = state; }
+    SUCCESS(0),FAILED(1);
+    int state;
+    CompactionState(int state) {
+      this.state = state;
+    }
   }
 
 }
