@@ -67,10 +67,10 @@ public class FlinkCompactionMetrics extends FlinkWriteMetrics {
   private long compactionCost;
 
   /**
-   * flag indicates whether rollback has occurred in final compaction state
+   * Flag saying whether the compaction is completed or been rolled back.
+   *
    */
-  private long compactionFailedState;
-
+  private long compactionStateSignal;
 
   public FlinkCompactionMetrics(MetricGroup metricGroup) {
     super(metricGroup, HoodieTimeline.COMPACTION_ACTION);
@@ -82,7 +82,7 @@ public class FlinkCompactionMetrics extends FlinkWriteMetrics {
     metricGroup.gauge(getMetricsName(actionType, "pendingCompactionCount"), () -> pendingCompactionCount);
     metricGroup.gauge(getMetricsName(actionType, "compactionDelay"), () -> compactionDelay);
     metricGroup.gauge(getMetricsName(actionType, "compactionCost"), () -> compactionCost);
-    metricGroup.gauge(getMetricsName(actionType, "compactionFailedState"), () -> compactionFailedState);
+    metricGroup.gauge(getMetricsName(actionType, "compactionStateSignal"), () -> compactionStateSignal);
   }
 
   public void setPendingCompactionCount(int pendingCompactionCount) {
@@ -110,16 +110,18 @@ public class FlinkCompactionMetrics extends FlinkWriteMetrics {
     this.compactionCost = stopTimer(COMPACTION_KEY);
   }
 
-  public void setCompactionFailedState(CompactionState compactionState){
-    this.compactionFailedState = compactionState.state;
+  public void markCompactionCompleted(CompactionState compactionState) {
+    this.compactionStateSignal = compactionState.state;
   }
 
-  public enum CompactionState{
+  public void markCompactionRolledBack(CompactionState compactionState) {
+    this.compactionStateSignal = compactionState.state;
+  }
+
+  public enum CompactionState {
      SUCCESS(0),FAILED(1);
      int state;
-     CompactionState(int state){
-        this.state = state;
-     }
+     CompactionState(int state) { this.state = state; }
   }
 
 }
