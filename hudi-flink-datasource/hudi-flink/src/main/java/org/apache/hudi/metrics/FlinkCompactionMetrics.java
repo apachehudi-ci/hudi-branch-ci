@@ -110,20 +110,12 @@ public class FlinkCompactionMetrics extends FlinkWriteMetrics {
     this.compactionCost = stopTimer(COMPACTION_KEY);
   }
 
-  public void markCompactionCompleted(CompactionState compactionState) {
-    this.compactionStateSignal = compactionState.state;
+  public void markCompactionCompleted() {
+    this.compactionStateSignal = 0L;
   }
 
-  public void markCompactionRolledBack(CompactionState compactionState) {
-    this.compactionStateSignal = compactionState.state;
-  }
-
-  public enum CompactionState {
-    SUCCESS(0),FAILED(1);
-    int state;
-    CompactionState(int state) {
-      this.state = state;
-    }
+  public void markCompactionRolledBack() {
+    this.compactionStateSignal = 1L;
   }
 
 }
