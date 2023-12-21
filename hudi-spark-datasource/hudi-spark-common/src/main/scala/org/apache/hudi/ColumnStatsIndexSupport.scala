@@ -348,12 +348,23 @@ class ColumnStatsIndexSupport(spark: SparkSession,
     colStatsDF.where(col(HoodieMetadataPayload.SCHEMA_FIELD_ID_COLUMN_STATS).isNotNull)
       .select(requiredIndexColumns: _*)
   }
+
+  def collectColumnStatsReferencedColumns(queryReferencedColumns: Seq[String], schema: StructType): Seq[String] = {
+    val fieldNamesWithTargetDataType: Set[String] = schema.fields
+      .filter(field => targetDataTypes.contains(field.dataType.simpleString.toLowerCase))
+      .map(_.name)
+      .toSet
+
+    queryReferencedColumns.filter(fieldNamesWithTargetDataType.contains)
+  }
 }
 
 object ColumnStatsIndexSupport {
 
   private val expectedAvroSchemaValues = Set("BooleanWrapper", "IntWrapper", "LongWrapper", "FloatWrapper", "DoubleWrapper",
     "BytesWrapper", "StringWrapper", "DateWrapper", "DecimalWrapper", "TimeMicrosWrapper", "TimestampMicrosWrapper")
+
+  private val targetDataTypes: Set[String] = Set("string", "boolean", "integer", "date", "double", "float", "long", "timestamp", "short", "byte")
 
   /**
    * Target Column Stats Index columns which internally are mapped onto fields of the corresponding
