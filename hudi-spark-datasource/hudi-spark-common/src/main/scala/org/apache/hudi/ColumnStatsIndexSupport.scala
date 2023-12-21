@@ -364,7 +364,7 @@ object ColumnStatsIndexSupport {
   private val expectedAvroSchemaValues = Set("BooleanWrapper", "IntWrapper", "LongWrapper", "FloatWrapper", "DoubleWrapper",
     "BytesWrapper", "StringWrapper", "DateWrapper", "DecimalWrapper", "TimeMicrosWrapper", "TimestampMicrosWrapper")
 
-  private val targetDataTypes: Set[String] = Set("string", "boolean", "integer", "date", "double", "float", "long", "timestamp", "short", "byte")
+  private val targetDataTypes: Set[String] = Set("string", "boolean", "int", "date", "double", "float", "long", "timestamp", "short", "byte")
 
   /**
    * Target Column Stats Index columns which internally are mapped onto fields of the corresponding
