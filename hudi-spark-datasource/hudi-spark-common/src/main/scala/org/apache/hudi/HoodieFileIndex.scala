@@ -355,15 +355,14 @@ case class HoodieFileIndex(spark: SparkSession,
       validateConfig()
       Option.empty
     } else {
-      val columnStatsReferencedColumns = columnStatsIndex.collectColumnStatsReferencedColumns(queryReferencedColumns, schema)
       // NOTE: Since executing on-cluster via Spark API has its own non-trivial amount of overhead,
       //       it's most often preferential to fetch Column Stats Index w/in the same process (usually driver),
       //       w/o resorting to on-cluster execution.
       //       For that we use a simple-heuristic to determine whether we should read and process CSI in-memory or
       //       on-cluster: total number of rows of the expected projected portion of the index has to be below the
       //       threshold (of 100k records)
-      val shouldReadInMemory = columnStatsIndex.shouldReadInMemory(this, columnStatsReferencedColumns)
-      columnStatsIndex.loadTransposed(columnStatsReferencedColumns, shouldReadInMemory) { transposedColStatsDF =>
+      val shouldReadInMemory = columnStatsIndex.shouldReadInMemory(this, queryReferencedColumns)
+      columnStatsIndex.loadTransposed(queryReferencedColumns, shouldReadInMemory) { transposedColStatsDF =>
         Some(getCandidateFiles(transposedColStatsDF, queryFilters))
       }
     }

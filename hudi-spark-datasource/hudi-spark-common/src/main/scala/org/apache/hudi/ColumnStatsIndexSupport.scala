@@ -272,11 +272,12 @@ class ColumnStatsIndexSupport(spark: SparkSession,
                   // NOTE: This could occur in either of the following cases:
                   //    1. Particular file does not have this particular column (which is indexed by Column Stats Index):
                   //       in this case we're assuming missing column to essentially contain exclusively
-                  //       null values, we set min/max values as null and null-count to be equal to value-count (this
+                  //       null values, we set min/max、and null-count values as null (this
                   //       behavior is consistent with reading non-existent columns from Parquet)
-                  //
+                  //    2. When evaluating non-null index conditions, a condition has been added to check if null-count equals null;
+                  //       this suggests that we are uncertain whether the column is empty or not, and if so, we return True.
                   // This is a way to determine current column's index without explicit iteration (we're adding 3 stats / column)
-                  acc ++= Seq(null, null, valueCount)
+                  acc ++= Seq(null, null, null)
               }
           }
 
@@ -348,23 +349,12 @@ class ColumnStatsIndexSupport(spark: SparkSession,
     colStatsDF.where(col(HoodieMetadataPayload.SCHEMA_FIELD_ID_COLUMN_STATS).isNotNull)
       .select(requiredIndexColumns: _*)
   }
-
-  def collectColumnStatsReferencedColumns(queryReferencedColumns: Seq[String], schema: StructType): Seq[String] = {
-    val fieldNamesWithTargetDataType: Set[String] = schema.fields
-      .filter(field => targetDataTypes.contains(field.dataType.simpleString.toLowerCase))
-      .map(_.name)
-      .toSet
-
-    queryReferencedColumns.filter(fieldNamesWithTargetDataType.contains)
-  }
 }
 
 object ColumnStatsIndexSupport {
 
   private val expectedAvroSchemaValues = Set("BooleanWrapper", "IntWrapper", "LongWrapper", "FloatWrapper", "DoubleWrapper",
     "BytesWrapper", "StringWrapper", "DateWrapper", "DecimalWrapper", "TimeMicrosWrapper", "TimestampMicrosWrapper")
-
-  private val targetDataTypes: Set[String] = Set("string", "boolean", "int", "date", "double", "float", "long", "timestamp", "short", "byte")
 
   /**
    * Target Column Stats Index columns which internally are mapped onto fields of the corresponding
