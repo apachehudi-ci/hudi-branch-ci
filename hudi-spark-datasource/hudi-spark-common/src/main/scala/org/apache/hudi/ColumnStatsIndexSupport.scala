@@ -276,6 +276,7 @@ class ColumnStatsIndexSupport(spark: SparkSession,
                   //       behavior is consistent with reading non-existent columns from Parquet)
                   //    2. When evaluating non-null index conditions, a condition has been added to check if null-count equals null;
                   //       this suggests that we are uncertain whether the column is empty or not, and if so, we return True.
+                  //
                   // This is a way to determine current column's index without explicit iteration (we're adding 3 stats / column)
                   acc ++= Seq(null, null, null)
               }
