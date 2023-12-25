@@ -272,7 +272,7 @@ class ColumnStatsIndexSupport(spark: SparkSession,
                   // NOTE: This could occur in either of the following cases:
                   //    1. Particular file does not have this particular column (which is indexed by Column Stats Index):
                   //       in this case we're assuming missing column to essentially contain exclusively
-                  //       null values, we set min/max、and null-count values as null (this
+                  //       null values, we set min/max and null-count values as null (this
                   //       behavior is consistent with reading non-existent columns from Parquet)
                   //    2. When evaluating non-null index conditions, a condition has been added to check if null-count equals null;
                   //       this suggests that we are uncertain whether the column is empty or not, and if so, we return True.
