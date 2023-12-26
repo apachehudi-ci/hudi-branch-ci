@@ -25,6 +25,9 @@ import org.apache.hudi.common.bloom.BloomFilterFactory;
 import org.apache.hudi.common.bloom.BloomFilterTypeCode;
 import org.apache.hudi.common.model.HoodieFileFormat;
 import org.apache.hudi.common.model.HoodieKey;
+import org.apache.hudi.common.model.HoodieRecord;
+import org.apache.hudi.common.util.collection.ClosableIterator;
+import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.keygen.BaseKeyGenerator;
@@ -34,10 +37,13 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Utils for Hudi base file.
@@ -121,6 +127,39 @@ public abstract class BaseFileUtils {
     }
     return new String[] {minMaxKeys.get(HoodieBloomFilterWriteSupport.HOODIE_MIN_RECORD_KEY_FOOTER),
         minMaxKeys.get(HoodieBloomFilterWriteSupport.HOODIE_MAX_RECORD_KEY_FOOTER)};
+  }
+
+  /**
+   * Fetch {@link HoodieKey}s with positions from the given data file.
+   *
+   * @param configuration configuration to build fs object
+   * @param filePath      The data file path
+   * @return {@link List} of pairs of {@link HoodieKey} and position fetched from the data file
+   */
+  public List<Pair<HoodieKey, Long>> fetchRecordKeysWithPositions(Configuration configuration, Path filePath) {
+    return fetchRecordKeysWithPositions(configuration, filePath, Option.empty());
+  }
+
+  /**
+   * Fetch {@link HoodieKey}s with positions from the given data file.
+   *
+   * @param configuration   configuration to build fs object
+   * @param filePath        The data file path
+   * @param keyGeneratorOpt instance of KeyGenerator.
+   * @return {@link List} of pairs of {@link HoodieKey} and position fetched from the data file
+   */
+  public List<Pair<HoodieKey, Long>> fetchRecordKeysWithPositions(Configuration configuration,
+                                                                           Path filePath,
+                                                                           Option<BaseKeyGenerator> keyGeneratorOpt) {
+    List<Pair<HoodieKey, Long>> hoodieKeysAndPositions = new ArrayList<>();
+    long position = 0;
+    try (ClosableIterator<HoodieKey> iterator = getHoodieKeyIterator(configuration, filePath, keyGeneratorOpt)) {
+      while (iterator.hasNext()) {
+        hoodieKeysAndPositions.add(Pair.of(iterator.next(), position));
+        position++;
+      }
+      return hoodieKeysAndPositions;
+    }
   }
 
   /**
@@ -215,4 +254,55 @@ public abstract class BaseFileUtils {
    * @return The subclass's {@link HoodieFileFormat}.
    */
   public abstract HoodieFileFormat getFormat();
+
+  // -------------------------------------------------------------------------
+  //  Inner Class
+  // -------------------------------------------------------------------------
+
+  /**
+   * An iterator that can apply the given function {@code func} to transform records
+   * from the underneath record iterator to hoodie keys.
+   */
+  protected static class HoodieKeyIterator implements ClosableIterator<HoodieKey> {
+    private final ClosableIterator<GenericRecord> nestedItr;
+    private final Function<GenericRecord, HoodieKey> func;
+
+    public static HoodieKeyIterator getInstance(ClosableIterator<GenericRecord> nestedItr, Option<BaseKeyGenerator> keyGenerator) {
+      return new HoodieKeyIterator(nestedItr, keyGenerator);
+    }
+
+    private HoodieKeyIterator(ClosableIterator<GenericRecord> nestedItr, Option<BaseKeyGenerator> keyGenerator) {
+      this.nestedItr = nestedItr;
+      if (keyGenerator.isPresent()) {
+        this.func = retVal -> {
+          String recordKey = keyGenerator.get().getRecordKey(retVal);
+          String partitionPath = keyGenerator.get().getPartitionPath(retVal);
+          return new HoodieKey(recordKey, partitionPath);
+        };
+      } else {
+        this.func = retVal -> {
+          String recordKey = retVal.get(HoodieRecord.RECORD_KEY_METADATA_FIELD).toString();
+          String partitionPath = retVal.get(HoodieRecord.PARTITION_PATH_METADATA_FIELD).toString();
+          return new HoodieKey(recordKey, partitionPath);
+        };
+      }
+    }
+
+    @Override
+    public void close() {
+      if (this.nestedItr != null) {
+        this.nestedItr.close();
+      }
+    }
+
+    @Override
+    public boolean hasNext() {
+      return this.nestedItr.hasNext();
+    }
+
+    @Override
+    public HoodieKey next() {
+      return this.func.apply(this.nestedItr.next());
+    }
+  }
 }

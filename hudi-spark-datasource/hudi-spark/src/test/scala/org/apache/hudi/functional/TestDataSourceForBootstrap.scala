@@ -17,7 +17,7 @@
 
 package org.apache.hudi.functional
 
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hudi.{DataSourceReadOptions, DataSourceWriteOptions, HoodieDataSourceHelpers, HoodieSparkRecordMerger}
 import org.apache.hudi.bootstrap.SparkParquetBootstrapDataProvider
 import org.apache.hudi.client.bootstrap.selector.FullRecordBootstrapModeSelector
 import org.apache.hudi.common.config.HoodieStorageConfig
@@ -29,18 +29,20 @@ import org.apache.hudi.config.{HoodieBootstrapConfig, HoodieClusteringConfig, Ho
 import org.apache.hudi.functional.TestDataSourceForBootstrap.{dropMetaCols, sort}
 import org.apache.hudi.keygen.{NonpartitionedKeyGenerator, SimpleKeyGenerator}
 import org.apache.hudi.testutils.HoodieClientTestUtils
-import org.apache.hudi.{DataSourceReadOptions, DataSourceWriteOptions, HoodieDataSourceHelpers, HoodieSparkRecordMerger}
+
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.api.java.JavaSparkContext
+import org.apache.spark.sql.{DataFrame, Dataset, Row, SaveMode, SparkSession}
 import org.apache.spark.sql.functions.{col, lit}
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import org.junit.jupiter.api.{AfterEach, BeforeEach, Test}
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.io.TempDir
-import org.junit.jupiter.api.{AfterEach, BeforeEach, Test}
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.{CsvSource, EnumSource, ValueSource}
 
 import java.time.Instant
 import java.util.Collections
+
 import scala.collection.JavaConverters._
 
 class TestDataSourceForBootstrap {
@@ -107,7 +109,7 @@ class TestDataSourceForBootstrap {
     val timestamp = Instant.now.toEpochMilli
     val jsc = JavaSparkContext.fromSparkContext(spark.sparkContext)
 
-    val sourceDF = TestBootstrap.generateTestRawTripDataset(timestamp, 0, numRecords, Collections.emptyList(), jsc,
+    val sourceDF = TestBootstrapBase.generateTestRawTripDataset(timestamp, 0, numRecords, Collections.emptyList(), jsc,
       spark.sqlContext)
 
     // Write source data non-partitioned
@@ -137,7 +139,7 @@ class TestDataSourceForBootstrap {
 
     // Perform upsert
     val updateTimestamp = Instant.now.toEpochMilli
-    val updateDF = TestBootstrap.generateTestRawTripDataset(updateTimestamp, 0, numRecordsUpdate,
+    val updateDF = TestBootstrapBase.generateTestRawTripDataset(updateTimestamp, 0, numRecordsUpdate,
       Collections.emptyList(), jsc, spark.sqlContext)
 
     updateDF.write
@@ -176,7 +178,7 @@ class TestDataSourceForBootstrap {
     val timestamp = Instant.now.toEpochMilli
     val jsc = JavaSparkContext.fromSparkContext(spark.sparkContext)
 
-    val sourceDF = TestBootstrap.generateTestRawTripDataset(timestamp, 0, numRecords, partitionPaths.asJava, jsc,
+    val sourceDF = TestBootstrapBase.generateTestRawTripDataset(timestamp, 0, numRecords, partitionPaths.asJava, jsc,
       spark.sqlContext)
 
     // Write source data hive style partitioned
@@ -218,7 +220,7 @@ class TestDataSourceForBootstrap {
 
     // Perform upsert
     val updateTimestamp = Instant.now.toEpochMilli
-    val updateDF = TestBootstrap.generateTestRawTripDataset(updateTimestamp, 0, numRecordsUpdate, partitionPaths.asJava,
+    val updateDF = TestBootstrapBase.generateTestRawTripDataset(updateTimestamp, 0, numRecordsUpdate, partitionPaths.asJava,
       jsc, spark.sqlContext)
 
     val writeOpts = commonOpts ++ getRecordTypeOpts(recordType)
@@ -257,7 +259,7 @@ class TestDataSourceForBootstrap {
     val timestamp = Instant.now.toEpochMilli
     val jsc = JavaSparkContext.fromSparkContext(spark.sparkContext)
 
-    val sourceDF = TestBootstrap.generateTestRawTripDataset(timestamp, 0, numRecords, partitionPaths.asJava, jsc,
+    val sourceDF = TestBootstrapBase.generateTestRawTripDataset(timestamp, 0, numRecords, partitionPaths.asJava, jsc,
       spark.sqlContext)
 
     sourceDF.write.format("parquet")
@@ -302,7 +304,7 @@ class TestDataSourceForBootstrap {
 
     // Perform upsert based on the source data
     val updateTimestamp = Instant.now.toEpochMilli
-    val updateDF2 = TestBootstrap.generateTestRawTripDataset(updateTimestamp, 0, numRecordsUpdate, partitionPaths.asJava,
+    val updateDF2 = TestBootstrapBase.generateTestRawTripDataset(updateTimestamp, 0, numRecordsUpdate, partitionPaths.asJava,
       jsc, spark.sqlContext)
 
     updateDF2.write
@@ -334,7 +336,7 @@ class TestDataSourceForBootstrap {
     val timestamp = Instant.now.toEpochMilli
     val jsc = JavaSparkContext.fromSparkContext(spark.sparkContext)
     // Prepare source data
-    val sourceDF = TestBootstrap.generateTestRawTripDataset(timestamp, 0, numRecords, partitionPaths.asJava, jsc, spark.sqlContext)
+    val sourceDF = TestBootstrapBase.generateTestRawTripDataset(timestamp, 0, numRecords, partitionPaths.asJava, jsc, spark.sqlContext)
     sourceDF.write.format("parquet")
       .partitionBy("datestr")
       .mode(SaveMode.Overwrite)
@@ -360,7 +362,7 @@ class TestDataSourceForBootstrap {
 
     // Perform upsert with clustering
     val updateTimestamp = Instant.now.toEpochMilli
-    val updateDF = TestBootstrap.generateTestRawTripDataset(updateTimestamp, 0, numRecordsUpdate, partitionPaths.asJava, jsc, spark.sqlContext)
+    val updateDF = TestBootstrapBase.generateTestRawTripDataset(updateTimestamp, 0, numRecordsUpdate, partitionPaths.asJava, jsc, spark.sqlContext)
 
     updateDF.write
       .format("hudi")
@@ -400,7 +402,7 @@ class TestDataSourceForBootstrap {
     val timestamp = Instant.now.toEpochMilli
     val jsc = JavaSparkContext.fromSparkContext(spark.sparkContext)
 
-    val sourceDF = TestBootstrap.generateTestRawTripDataset(timestamp, 0, numRecords, partitionPaths.asJava, jsc,
+    val sourceDF = TestBootstrapBase.generateTestRawTripDataset(timestamp, 0, numRecords, partitionPaths.asJava, jsc,
       spark.sqlContext)
 
     sourceDF.write.format("parquet")
@@ -428,7 +430,7 @@ class TestDataSourceForBootstrap {
 
     // Perform upsert
     val updateTimestamp = Instant.now.toEpochMilli
-    val updateDF = TestBootstrap.generateTestRawTripDataset(updateTimestamp, 0, numRecordsUpdate, partitionPaths.asJava,
+    val updateDF = TestBootstrapBase.generateTestRawTripDataset(updateTimestamp, 0, numRecordsUpdate, partitionPaths.asJava,
       jsc, spark.sqlContext)
 
     updateDF.write
@@ -467,7 +469,7 @@ class TestDataSourceForBootstrap {
     val timestamp = Instant.now.toEpochMilli
     val jsc = JavaSparkContext.fromSparkContext(spark.sparkContext)
 
-    val sourceDF = TestBootstrap.generateTestRawTripDataset(timestamp, 0, numRecords, partitionPaths.asJava, jsc,
+    val sourceDF = TestBootstrapBase.generateTestRawTripDataset(timestamp, 0, numRecords, partitionPaths.asJava, jsc,
       spark.sqlContext)
 
     sourceDF.write.format("parquet")
@@ -523,7 +525,7 @@ class TestDataSourceForBootstrap {
 
     // Perform upsert based on the source data
     val updateTimestamp = Instant.now.toEpochMilli
-    val updateDF2 = TestBootstrap.generateTestRawTripDataset(updateTimestamp, 0, numRecordsUpdate,
+    val updateDF2 = TestBootstrapBase.generateTestRawTripDataset(updateTimestamp, 0, numRecordsUpdate,
       partitionPaths.asJava, jsc, spark.sqlContext)
 
     updateDF2.write
@@ -553,7 +555,7 @@ class TestDataSourceForBootstrap {
     val timestamp = Instant.now.toEpochMilli
     val jsc = JavaSparkContext.fromSparkContext(spark.sparkContext)
 
-    val sourceDF = TestBootstrap.generateTestRawTripDataset(timestamp, 0, numRecords, partitionPaths.asJava, jsc,
+    val sourceDF = TestBootstrapBase.generateTestRawTripDataset(timestamp, 0, numRecords, partitionPaths.asJava, jsc,
       spark.sqlContext)
 
     sourceDF.write.format("parquet")
@@ -591,7 +593,7 @@ class TestDataSourceForBootstrap {
 
     // Perform upsert
     val updateTimestamp = Instant.now.toEpochMilli
-    val updateDF = TestBootstrap.generateTestRawTripDataset(updateTimestamp, 0, numRecordsUpdate, partitionPaths.asJava,
+    val updateDF = TestBootstrapBase.generateTestRawTripDataset(updateTimestamp, 0, numRecordsUpdate, partitionPaths.asJava,
       jsc, spark.sqlContext)
 
     updateDF.write

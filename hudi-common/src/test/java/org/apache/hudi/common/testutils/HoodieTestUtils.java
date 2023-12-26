@@ -140,9 +140,13 @@ public class HoodieTestUtils {
             .setPayloadClass(HoodieAvroPayload.class);
 
     String keyGen = properties.getProperty("hoodie.datasource.write.keygenerator.class");
+    builder.setKeyGeneratorClassProp(keyGen);
     if (!Objects.equals(keyGen, "org.apache.hudi.keygen.NonpartitionedKeyGenerator")) {
-      builder.setPartitionFields("some_nonexistent_field");
+      builder.setPartitionFields(properties.getProperty(
+          "hoodie.datasource.write.partitionpath.field", "some_nonexistent_field"));
     }
+    builder.setRecordKeyFields(properties.getProperty(
+        "hoodie.datasource.write.recordkey.field", "_row_key"));
 
     Properties processedProperties = builder.fromProperties(properties).build();
 
