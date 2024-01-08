@@ -18,11 +18,14 @@
 
 package org.apache.hudi.common.testutils;
 
-import org.apache.hudi.common.fs.inline.InLineFSUtils;
-import org.apache.hudi.common.fs.inline.InLineFileSystem;
-import org.apache.hudi.common.fs.inline.InMemoryFileSystem;
 import org.apache.hudi.common.table.log.TestLogReaderUtils;
 import org.apache.hudi.common.util.FileIOUtils;
+import org.apache.hudi.hadoop.fs.inline.InLineFSUtils;
+import org.apache.hudi.hadoop.fs.inline.InLineFileSystem;
+import org.apache.hudi.hadoop.fs.inline.InMemoryFileSystem;
+import org.apache.hudi.io.storage.HoodieFileStatus;
+import org.apache.hudi.io.storage.HoodieLocation;
+import org.apache.hudi.io.storage.HoodieStorage;
 
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -94,6 +97,16 @@ public class FileSystemTestUtils {
       statuses.add(itr.next());
     }
     return statuses;
+  }
+
+  public static List<HoodieFileStatus> listRecursive(HoodieStorage storage, HoodieLocation loc)
+      throws IOException {
+    return listFiles(storage, loc);
+  }
+
+  public static List<HoodieFileStatus> listFiles(HoodieStorage storage, HoodieLocation loc)
+      throws IOException {
+    return storage.listFiles(loc);
   }
 
   public static String readLastLineFromResourceFile(String resourceName) throws IOException {

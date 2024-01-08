@@ -39,7 +39,8 @@ import java.util.List;
 /**
  * Performs rollback using marker files generated during the write..
  */
-public class MarkerBasedRollbackStrategy<T, I, K, O> implements BaseRollbackPlanActionExecutor.RollbackStrategy {
+public class MarkerBasedRollbackStrategy<T, I, K, O>
+    implements BaseRollbackPlanActionExecutor.RollbackStrategy {
 
   private static final Logger LOG = LoggerFactory.getLogger(MarkerBasedRollbackStrategy.class);
 

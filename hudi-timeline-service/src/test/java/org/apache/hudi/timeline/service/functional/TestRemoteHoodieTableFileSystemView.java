@@ -49,9 +49,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -167,8 +167,10 @@ public class TestRemoteHoodieTableFileSystemView extends TestHoodieTableFileSyst
   }
 
   private Stream<HoodieFileGroup> readFileGroupStream(String result, ObjectMapper mapper) throws IOException {
-    return DTOUtils.fileGroupDTOsToFileGroups((List<FileGroupDTO>) mapper.readValue(result, new TypeReference<List<FileGroupDTO>>() {}),
-        metaClient);
+    return DTOUtils.fileGroupDTOsToFileGroups(
+        (List<FileGroupDTO>) mapper.readValue(
+            result, new TypeReference<List<FileGroupDTO>>() {
+            }), metaClient);
   }
 
   private HoodieFileGroup createHoodieFileGroup() {

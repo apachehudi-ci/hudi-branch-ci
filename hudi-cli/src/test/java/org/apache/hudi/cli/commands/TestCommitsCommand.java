@@ -33,11 +33,11 @@ import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
-import org.apache.hudi.common.testutils.InProcessTimeGenerator;
 import org.apache.hudi.common.table.timeline.versioning.TimelineLayoutVersion;
 import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
 import org.apache.hudi.common.testutils.HoodieTestDataGenerator;
 import org.apache.hudi.common.testutils.HoodieTestUtils;
+import org.apache.hudi.common.testutils.InProcessTimeGenerator;
 import org.apache.hudi.common.util.NumericUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.collection.Pair;
@@ -302,7 +302,7 @@ public class TestCommitsCommand extends CLIFunctionalTestHarness {
     if (enableMetadataTable) {
       // Simulate a compaction commit in metadata table timeline
       // so the archival in data table can happen
-      createCompactionCommitInMetadataTable(hadoopConf(), metaClient.getFs(), tablePath1, "106");
+      createCompactionCommitInMetadataTable(hadoopConf(), tablePath1, "106");
     }
 
     // archive
@@ -336,7 +336,7 @@ public class TestCommitsCommand extends CLIFunctionalTestHarness {
     if (enableMetadataTable) {
       // Simulate a compaction commit in metadata table timeline
       // so the archival in data table can happen
-      createCompactionCommitInMetadataTable(hadoopConf(), metaClient.getFs(), tablePath1, "194");
+      createCompactionCommitInMetadataTable(hadoopConf(), tablePath1, "194");
     }
 
     for (Map.Entry<String, Integer[]> entry : data.entrySet()) {

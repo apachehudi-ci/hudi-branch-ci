@@ -39,9 +39,9 @@ import org.apache.hudi.common.table.timeline.versioning.TimelineLayoutVersion;
 import org.apache.hudi.common.testutils.HoodieTestDataGenerator;
 import org.apache.hudi.common.testutils.HoodieTestTable;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.io.storage.HoodieStorage;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -93,8 +93,9 @@ public class TestCleansCommand extends CLIFunctionalTestHarness {
     metaClient = HoodieCLI.getTableMetaClient();
     String fileId1 = UUID.randomUUID().toString();
     String fileId2 = UUID.randomUUID().toString();
-    FileSystem fs = FSUtils.getFs(basePath(), hadoopConf());
-    HoodieTestDataGenerator.writePartitionMetadataDeprecated(fs, HoodieTestDataGenerator.DEFAULT_PARTITION_PATHS, tablePath);
+    HoodieStorage storage = FSUtils.getHoodieStorage(basePath(), hadoopConf());
+    HoodieTestDataGenerator.writePartitionMetadataDeprecated(storage,
+        HoodieTestDataGenerator.DEFAULT_PARTITION_PATHS, tablePath);
 
     // Create four commits
     for (int i = 100; i < 104; i++) {

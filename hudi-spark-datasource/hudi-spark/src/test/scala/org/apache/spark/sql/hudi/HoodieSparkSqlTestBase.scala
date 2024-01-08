@@ -27,8 +27,10 @@ import org.apache.hudi.common.table.HoodieTableMetaClient
 import org.apache.hudi.common.table.timeline.TimelineMetadataUtils
 import org.apache.hudi.config.HoodieWriteConfig
 import org.apache.hudi.exception.ExceptionUtil.getRootCause
+import org.apache.hudi.hadoop.fs.HadoopFSUtils
 import org.apache.hudi.index.inmemory.HoodieInMemoryHashIndex
 import org.apache.hudi.testutils.HoodieClientTestUtils.getSparkConfForTest
+
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.hudi.HoodieSparkSqlTestBase.checkMessageContains
@@ -173,7 +175,7 @@ class HoodieSparkSqlTestBase extends FunSuite with BeforeAndAfterAll {
 
   protected def existsPath(filePath: String): Boolean = {
     val path = new Path(filePath)
-    val fs = FSUtils.getFs(filePath, spark.sparkContext.hadoopConfiguration)
+    val fs = HadoopFSUtils.getFs(filePath, spark.sparkContext.hadoopConfiguration)
     fs.exists(path)
   }
 

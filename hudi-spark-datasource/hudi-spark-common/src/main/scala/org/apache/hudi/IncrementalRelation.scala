@@ -27,7 +27,7 @@ import org.apache.hudi.client.utils.SparkInternalSchemaConverter
 import org.apache.hudi.common.fs.FSUtils
 import org.apache.hudi.common.model.{HoodieCommitMetadata, HoodieFileFormat, HoodieRecord, HoodieReplaceCommitMetadata}
 import org.apache.hudi.common.table.timeline.TimelineUtils.HollowCommitHandling.USE_TRANSITION_TIME
-import org.apache.hudi.common.table.timeline.TimelineUtils.{HollowCommitHandling, handleHollowCommitIfNeeded}
+import org.apache.hudi.common.table.timeline.TimelineUtils.{handleHollowCommitIfNeeded, HollowCommitHandling}
 import org.apache.hudi.common.table.timeline.{HoodieInstant, HoodieTimeline}
 import org.apache.hudi.common.table.{HoodieTableMetaClient, TableSchemaResolver}
 import org.apache.hudi.common.util.{HoodieTimer, InternalSchemaCache}
@@ -35,7 +35,9 @@ import org.apache.hudi.config.HoodieWriteConfig
 import org.apache.hudi.exception.{HoodieException, HoodieIncrementalPathNotFoundException}
 import org.apache.hudi.internal.schema.InternalSchema
 import org.apache.hudi.internal.schema.utils.SerDeHelper
+import org.apache.hudi.io.storage.HoodieLocation
 import org.apache.hudi.table.HoodieSparkTable
+
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.execution.datasources.parquet.LegacyHoodieParquetFileFormat
@@ -239,11 +241,11 @@ class IncrementalRelation(val sqlContext: SQLContext,
           var doFullTableScan = false
 
           if (fallbackToFullTableScan) {
-            val fs = basePath.getFileSystem(sqlContext.sparkContext.hadoopConfiguration);
+            val storage = FSUtils.getHoodieStorage(basePath, sqlContext.sparkContext.hadoopConfiguration)
             val timer = HoodieTimer.start
 
             val allFilesToCheck = filteredMetaBootstrapFullPaths ++ filteredRegularFullPaths
-            val firstNotFoundPath = allFilesToCheck.find(path => !fs.exists(new Path(path)))
+            val firstNotFoundPath = allFilesToCheck.find(path => !storage.exists(new HoodieLocation(path)))
             val timeTaken = timer.endTimer()
             log.info("Checking if paths exists took " + timeTaken + "ms")
 

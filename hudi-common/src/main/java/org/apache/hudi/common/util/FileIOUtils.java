@@ -19,6 +19,8 @@
 package org.apache.hudi.common.util;
 
 import org.apache.hudi.exception.HoodieIOException;
+import org.apache.hudi.io.storage.HoodieLocation;
+import org.apache.hudi.io.storage.HoodieStorage;
 
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -163,11 +165,13 @@ public class FileIOUtils {
     }
   }
 
-  public static void createFileInPath(FileSystem fileSystem, org.apache.hadoop.fs.Path fullPath, Option<byte[]> content, boolean ignoreIOE) {
+  public static void createFileInPath(HoodieStorage storage,
+                                      HoodieLocation fullPath,
+                                      Option<byte[]> content, boolean ignoreIOE) {
     try {
       // If the path does not exist, create it first
-      if (!fileSystem.exists(fullPath)) {
-        if (fileSystem.createNewFile(fullPath)) {
+      if (!storage.exists(fullPath)) {
+        if (storage.createNewFile(fullPath)) {
           LOG.info("Created a new file in meta path: " + fullPath);
         } else {
           throw new HoodieIOException("Failed to create file " + fullPath);
@@ -175,7 +179,7 @@ public class FileIOUtils {
       }
 
       if (content.isPresent()) {
-        FSDataOutputStream fsout = fileSystem.create(fullPath, true);
+        OutputStream fsout = storage.create(fullPath, true);
         fsout.write(content.get());
         fsout.close();
       }
@@ -187,8 +191,39 @@ public class FileIOUtils {
     }
   }
 
-  public static void createFileInPath(FileSystem fileSystem, org.apache.hadoop.fs.Path fullPath, Option<byte[]> content) {
-    createFileInPath(fileSystem, fullPath, content, false);
+  public static void createFileInPath(HoodieStorage storage,
+                                      HoodieLocation fullPath,
+                                      Option<byte[]> content) {
+    createFileInPath(storage, fullPath, content, false);
+  }
+
+  public static void createFileInLocation(HoodieStorage storage, HoodieLocation fullPath,
+                                          Option<byte[]> content, boolean ignoreIOE) {
+    try {
+      // If the path does not exist, create it first
+      if (!storage.exists(fullPath)) {
+        if (storage.createNewFile(fullPath)) {
+          LOG.info("Created a new file in meta path: " + fullPath);
+        } else {
+          throw new HoodieIOException("Failed to create file " + fullPath);
+        }
+      }
+
+      if (content.isPresent()) {
+        OutputStream fsout = storage.create(fullPath, true);
+        fsout.write(content.get());
+        fsout.close();
+      }
+    } catch (IOException e) {
+      LOG.warn("Failed to create file " + fullPath, e);
+      if (!ignoreIOE) {
+        throw new HoodieIOException("Failed to create file " + fullPath, e);
+      }
+    }
+  }
+
+  public static void createFileInLocation(HoodieStorage storage, HoodieLocation fullPath, Option<byte[]> content) {
+    createFileInLocation(storage, fullPath, content, false);
   }
 
   public static Option<byte[]> readDataFromPath(FileSystem fileSystem, org.apache.hadoop.fs.Path detailPath, boolean ignoreIOE) {
@@ -203,8 +238,24 @@ public class FileIOUtils {
     }
   }
 
+  public static Option<byte[]> readDataFromPath(HoodieStorage storage, HoodieLocation detailPath, boolean ignoreIOE) {
+    try (InputStream is = storage.open(detailPath)) {
+      return Option.of(FileIOUtils.readAsByteArray(is));
+    } catch (IOException e) {
+      LOG.warn("Could not read commit details from " + detailPath, e);
+      if (!ignoreIOE) {
+        throw new HoodieIOException("Could not read commit details from " + detailPath, e);
+      }
+      return Option.empty();
+    }
+  }
+
   public static Option<byte[]> readDataFromPath(FileSystem fileSystem, org.apache.hadoop.fs.Path detailPath) {
     return readDataFromPath(fileSystem, detailPath, false);
+  }
+
+  public static Option<byte[]> readDataFromPath(HoodieStorage storage, HoodieLocation detailPath) {
+    return readDataFromPath(storage, detailPath, false);
   }
 
   /**

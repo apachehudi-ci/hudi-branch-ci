@@ -29,17 +29,18 @@ import org.apache.hudi.common.model.HoodieRecordLocation;
 import org.apache.hudi.common.model.HoodieWriteStat;
 import org.apache.hudi.common.model.IOType;
 import org.apache.hudi.common.util.HoodieTimer;
-import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.exception.HoodieIOException;
 import org.apache.hudi.exception.HoodieInsertException;
+import org.apache.hudi.io.storage.HoodieLocation;
+import org.apache.hudi.io.storage.HoodieStorage;
+import org.apache.hudi.common.util.Option;
 import org.apache.hudi.table.HoodieTable;
 import org.apache.hudi.table.marker.WriteMarkers;
 import org.apache.hudi.table.marker.WriteMarkersFactory;
 
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,7 +69,7 @@ public class HoodieRowDataCreateHandle implements Serializable {
   private final Path path;
   private final String fileId;
   private final boolean preserveHoodieMetadata;
-  private final FileSystem fs;
+  private final HoodieStorage storage;
   protected final WriteStatus writeStatus;
   private final HoodieRecordLocation newRecordLocation;
 
@@ -88,7 +89,7 @@ public class HoodieRowDataCreateHandle implements Serializable {
     this.newRecordLocation = new HoodieRecordLocation(instantTime, fileId);
     this.preserveHoodieMetadata = preserveHoodieMetadata;
     this.currTimer = HoodieTimer.start();
-    this.fs = table.getMetaClient().getFs();
+    this.storage = table.getMetaClient().getHoodieStorage();
     this.path = makeNewPath(partitionPath);
 
     this.writeStatus = new WriteStatus(table.shouldTrackSuccessRecords(),
@@ -99,10 +100,10 @@ public class HoodieRowDataCreateHandle implements Serializable {
     try {
       HoodiePartitionMetadata partitionMetadata =
           new HoodiePartitionMetadata(
-              fs,
+              storage,
               instantTime,
-              new Path(writeConfig.getBasePath()),
-              FSUtils.getPartitionPath(writeConfig.getBasePath(), partitionPath),
+              new HoodieLocation(writeConfig.getBasePath()),
+              FSUtils.getPartitionPathInLocation(writeConfig.getBasePath(), partitionPath),
               table.getPartitionMetafileFormat());
       partitionMetadata.trySave(taskPartitionId);
       createMarkerFile(partitionPath, FSUtils.makeBaseFileName(this.instantTime, getWriteToken(), this.fileId, table.getBaseFileExtension()));
@@ -171,7 +172,8 @@ public class HoodieRowDataCreateHandle implements Serializable {
     stat.setPrevCommit(HoodieWriteStat.NULL_COMMIT);
     stat.setFileId(fileId);
     stat.setPath(new Path(writeConfig.getBasePath()), path);
-    long fileSizeInBytes = FSUtils.getFileSize(table.getMetaClient().getFs(), path);
+    long fileSizeInBytes = FSUtils.getFileSize(
+        table.getMetaClient().getHoodieStorage(), new HoodieLocation(path.toUri()));
     stat.setTotalWriteBytes(fileSizeInBytes);
     stat.setFileSizeInBytes(fileSizeInBytes);
     stat.setTotalWriteErrors(writeStatus.getTotalErrorRecords());
@@ -186,10 +188,11 @@ public class HoodieRowDataCreateHandle implements Serializable {
   }
 
   private Path makeNewPath(String partitionPath) {
-    Path path = FSUtils.getPartitionPath(writeConfig.getBasePath(), partitionPath);
+    HoodieLocation path =
+        FSUtils.getPartitionPathInLocation(writeConfig.getBasePath(), partitionPath);
     try {
-      if (!fs.exists(path)) {
-        fs.mkdirs(path); // create a new partition as needed.
+      if (!storage.exists(path)) {
+        storage.createDirectory(path); // create a new partition as needed.
       }
     } catch (IOException e) {
       throw new HoodieIOException("Failed to make dir " + path, e);

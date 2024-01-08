@@ -65,7 +65,7 @@ public class TestHoodieTableMetadataUtil extends HoodieCommonTestHarness {
 
   @AfterEach
   public void tearDown() throws IOException {
-    metaClient.getFs().delete(metaClient.getBasePathV2(), true);
+    metaClient.getHoodieStorage().deleteDirectory(metaClient.getBasePathV2());
     cleanupTestDataGenerator();
     cleanMetaClient();
   }

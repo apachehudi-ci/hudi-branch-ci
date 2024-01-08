@@ -29,6 +29,7 @@ import org.apache.hudi.functional.TestDataSourceForBootstrap.{dropMetaCols, sort
 import org.apache.hudi.keygen.{NonpartitionedKeyGenerator, SimpleKeyGenerator}
 import org.apache.hudi.testutils.HoodieClientTestUtils
 import org.apache.hudi.{DataSourceReadOptions, DataSourceWriteOptions, HoodieDataSourceHelpers, HoodieSparkRecordMerger}
+import org.apache.hudi.hadoop.fs.HadoopFSUtils
 
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.api.java.JavaSparkContext
@@ -42,6 +43,7 @@ import org.junit.jupiter.params.provider.{CsvSource, EnumSource, ValueSource}
 
 import java.time.Instant
 import java.util.Collections
+
 import scala.collection.JavaConverters._
 
 class TestDataSourceForBootstrap {
@@ -89,7 +91,7 @@ class TestDataSourceForBootstrap {
     spark = SparkSession.builder.config(sparkConf).getOrCreate
     basePath = tempDir.toAbsolutePath.toString + "/base"
     srcPath = tempDir.toAbsolutePath.toString + "/src"
-    fs = FSUtils.getFs(basePath, spark.sparkContext.hadoopConfiguration)
+    fs = HadoopFSUtils.getFs(basePath, spark.sparkContext.hadoopConfiguration)
   }
 
   @AfterEach def tearDown(): Unit ={

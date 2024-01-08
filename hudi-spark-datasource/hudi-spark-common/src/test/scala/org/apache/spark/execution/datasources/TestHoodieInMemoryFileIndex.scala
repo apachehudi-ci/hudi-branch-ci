@@ -17,6 +17,9 @@
 
 package org.apache.spark.execution.datasources
 
+import org.apache.hudi.common.fs.FSUtils
+import org.apache.hudi.io.storage.HoodieLocation
+
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -36,9 +39,9 @@ class TestHoodieInMemoryFileIndex {
       .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
       .getOrCreate
 
-    val folders: Seq[Path] = Seq(
-      new Path(Paths.get(tempDir.getAbsolutePath, "folder1").toUri),
-      new Path(Paths.get(tempDir.getAbsolutePath, "folder2").toUri)
+    val folders: Seq[HoodieLocation] = Seq(
+      new HoodieLocation(Paths.get(tempDir.getAbsolutePath, "folder1").toUri),
+      new HoodieLocation(Paths.get(tempDir.getAbsolutePath, "folder2").toUri)
     )
 
     val files: Seq[Path] = Seq(
@@ -48,7 +51,8 @@ class TestHoodieInMemoryFileIndex {
       new Path(Paths.get(tempDir.getAbsolutePath, "folder2", "file4").toUri)
     )
 
-    folders.foreach(folder => new File(folder.toUri).mkdir())
+    val storage = FSUtils.getHoodieStorage(folders(0), spark.sparkContext.hadoopConfiguration)
+    folders.foreach(folder => storage.createDirectory(new HoodieLocation(folder.toUri)))
     files.foreach(file => new File(file.toUri).createNewFile())
 
     val index = HoodieInMemoryFileIndex.create(spark, Seq(folders(0), folders(1)))

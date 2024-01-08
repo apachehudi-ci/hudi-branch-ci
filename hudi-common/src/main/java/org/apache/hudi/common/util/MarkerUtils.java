@@ -29,6 +29,7 @@ import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.exception.HoodieIOException;
+import org.apache.hudi.io.storage.HoodieStorage;
 
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -293,7 +294,8 @@ public class MarkerUtils {
    * @return
    */
   public static List<String> getCandidateInstants(HoodieActiveTimeline activeTimeline, List<Path> instants, String currentInstantTime,
-                                                  long maxAllowableHeartbeatIntervalInMs, FileSystem fs, String basePath) {
+                                                  long maxAllowableHeartbeatIntervalInMs,
+                                                  HoodieStorage storage, String basePath) {
 
     return instants.stream().map(Path::toString).filter(instantPath -> {
       String instantTime = markerDirToInstantTime(instantPath);
@@ -302,7 +304,8 @@ public class MarkerUtils {
           && !activeTimeline.filterPendingReplaceTimeline().containsInstant(instantTime);
     }).filter(instantPath -> {
       try {
-        return !isHeartbeatExpired(markerDirToInstantTime(instantPath), maxAllowableHeartbeatIntervalInMs, fs, basePath);
+        return !isHeartbeatExpired(markerDirToInstantTime(instantPath),
+            maxAllowableHeartbeatIntervalInMs, storage, basePath);
       } catch (IOException e) {
         return false;
       }

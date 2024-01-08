@@ -21,12 +21,13 @@ package org.apache.hudi.common.conflict.detection;
 import org.apache.hudi.ApiMaturityLevel;
 import org.apache.hudi.PublicAPIClass;
 import org.apache.hudi.common.config.HoodieConfig;
-import org.apache.hudi.common.fs.HoodieWrapperFileSystem;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.util.MarkerUtils;
 import org.apache.hudi.common.util.StringUtils;
 import org.apache.hudi.exception.HoodieIOException;
+import org.apache.hudi.hadoop.fs.HoodieWrapperFileSystem;
+import org.apache.hudi.io.storage.HoodieStorageUtils;
 
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -39,6 +40,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static org.apache.hudi.common.fs.FSUtils.PATH_SEPARATOR;
 
 /**
  * This abstract strategy is used for direct marker writers, trying to do early conflict detection.
@@ -77,10 +80,13 @@ public abstract class DirectMarkerBasedDetectionStrategy implements EarlyConflic
    * @throws IOException upon errors.
    */
   public boolean checkMarkerConflict(String basePath, long maxAllowableHeartbeatIntervalInMs) throws IOException {
-    String tempFolderPath = basePath + Path.SEPARATOR + HoodieTableMetaClient.TEMPFOLDER_NAME;
+    String tempFolderPath = basePath + PATH_SEPARATOR + HoodieTableMetaClient.TEMPFOLDER_NAME;
 
-    List<String> candidateInstants = MarkerUtils.getCandidateInstants(activeTimeline, Arrays.stream(fs.listStatus(new Path(tempFolderPath))).map(FileStatus::getPath).collect(Collectors.toList()),
-        instantTime, maxAllowableHeartbeatIntervalInMs, fs, basePath);
+    List<String> candidateInstants = MarkerUtils.getCandidateInstants(activeTimeline,
+        Arrays.stream(fs.listStatus(new Path(tempFolderPath))).map(FileStatus::getPath)
+            .collect(Collectors.toList()),
+        instantTime, maxAllowableHeartbeatIntervalInMs, HoodieStorageUtils.getHoodieStorage(fs),
+        basePath);
 
     long res = candidateInstants.stream().flatMap(currentMarkerDirPath -> {
       try {

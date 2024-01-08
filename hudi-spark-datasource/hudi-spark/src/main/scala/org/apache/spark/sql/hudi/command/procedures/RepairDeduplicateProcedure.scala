@@ -61,7 +61,7 @@ class RepairDeduplicateProcedure extends BaseProcedure with ProcedureBuilder wit
 
     Try {
       val job = new DedupeSparkJob(basePath, duplicatedPartitionPath, repairedOutputPath, spark.sqlContext,
-        FSUtils.getFs(basePath, jsc.hadoopConfiguration), DeDupeType.withName(dedupeType))
+        FSUtils.getHoodieStorage(basePath, jsc.hadoopConfiguration), DeDupeType.withName(dedupeType))
       job.fixDuplicates(dryRun)
     } match {
       case Success(_) =>

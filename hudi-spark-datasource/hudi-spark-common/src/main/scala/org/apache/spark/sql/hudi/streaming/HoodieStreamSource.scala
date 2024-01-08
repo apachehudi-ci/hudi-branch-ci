@@ -23,10 +23,13 @@ import org.apache.hudi.cdc.CDCRelation
 import org.apache.hudi.common.model.HoodieTableType
 import org.apache.hudi.common.table.cdc.HoodieCDCUtils
 import org.apache.hudi.common.table.timeline.TimelineUtils.HollowCommitHandling._
-import org.apache.hudi.common.table.timeline.TimelineUtils.{HollowCommitHandling, handleHollowCommitIfNeeded}
+import org.apache.hudi.common.table.timeline.TimelineUtils.{handleHollowCommitIfNeeded, HollowCommitHandling}
 import org.apache.hudi.common.table.{HoodieTableMetaClient, TableSchemaResolver}
 import org.apache.hudi.common.util.TablePathUtils
 import org.apache.hudi.{AvroConversionUtils, DataSourceReadOptions, IncrementalRelation, MergeOnReadIncrementalRelation, SparkAdapterSupport}
+import org.apache.hudi.common.fs.FSUtils
+import org.apache.hudi.io.storage.HoodieLocation
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
@@ -53,9 +56,9 @@ class HoodieStreamSource(
 
   @transient private val hadoopConf = sqlContext.sparkSession.sessionState.newHadoopConf()
 
-  private lazy val tablePath: Path = {
-    val path = new Path(parameters.getOrElse("path", "Missing 'path' option"))
-    val fs = path.getFileSystem(hadoopConf)
+  private lazy val tablePath: HoodieLocation = {
+    val path = new HoodieLocation(parameters.getOrElse("path", "Missing 'path' option"))
+    val fs = FSUtils.getHoodieStorage(path, hadoopConf)
     TablePathUtils.getTablePath(fs, path).get()
   }
 

@@ -85,7 +85,7 @@ public class TestRemoteFileSystemViewWithMetadataTable extends HoodieSparkClient
   public void setUp() throws Exception {
     initPath();
     initSparkContexts();
-    initFileSystem();
+    initHoodieStorage();
     dataGen = new HoodieTestDataGenerator(0x1f86);
   }
 

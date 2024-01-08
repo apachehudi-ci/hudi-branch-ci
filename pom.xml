@@ -35,6 +35,8 @@
   <name>Hudi</name>
 
   <modules>
+    <module>hudi-io</module>
+    <module>hudi-hadoop-common</module>
     <module>hudi-common</module>
     <module>hudi-cli</module>
     <module>hudi-client</module>

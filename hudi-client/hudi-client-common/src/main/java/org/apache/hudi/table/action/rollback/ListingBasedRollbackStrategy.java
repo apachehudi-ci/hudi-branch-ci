@@ -21,7 +21,6 @@ package org.apache.hudi.table.action.rollback;
 import org.apache.hudi.avro.model.HoodieRollbackRequest;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.fs.FSUtils;
-import org.apache.hudi.common.fs.HoodieWrapperFileSystem;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.WriteOperationType;
@@ -109,7 +108,8 @@ public class ListingBasedRollbackStrategy implements BaseRollbackPlanActionExecu
         Supplier<FileStatus[]> filesToDelete = () -> {
           try {
             return fetchFilesFromInstant(instantToRollback, partitionPath, metaClient.getBasePath(), baseFileExtension,
-                metaClient.getFs(), commitMetadataOptional, isCommitMetadataCompleted, tableType);
+                (FileSystem) metaClient.getHoodieStorage().getFileSystem(),
+                commitMetadataOptional, isCommitMetadataCompleted, tableType);
           } catch (IOException e) {
             throw new HoodieIOException("Fetching files to delete error", e);
           }
@@ -140,7 +140,7 @@ public class ListingBasedRollbackStrategy implements BaseRollbackPlanActionExecu
                 // have been written to the log files.
                 hoodieRollbackRequests.addAll(getHoodieRollbackRequests(partitionPath,
                     listBaseFilesToBeDeleted(instantToRollback.getTimestamp(), baseFileExtension, partitionPath,
-                        metaClient.getFs())));
+                        (FileSystem) metaClient.getHoodieStorage().getFileSystem())));
               } else {
                 // if this is part of a restore operation, we should rollback/delete entire file slice.
                 hoodieRollbackRequests.addAll(getHoodieRollbackRequests(partitionPath,
@@ -181,14 +181,17 @@ public class ListingBasedRollbackStrategy implements BaseRollbackPlanActionExecu
     PathFilter filter = (path) -> {
       if (path.toString().contains(baseFileExtension)) {
         String fileCommitTime = FSUtils.getCommitTime(path.getName());
-        return HoodieTimeline.compareTimestamps(commit, HoodieTimeline.LESSER_THAN_OR_EQUALS, fileCommitTime);
+        return HoodieTimeline.compareTimestamps(commit, HoodieTimeline.LESSER_THAN_OR_EQUALS,
+            fileCommitTime);
       } else if (FSUtils.isLogFile(path)) {
         String fileCommitTime = FSUtils.getDeltaCommitTimeFromLogPath(path);
         return completionTimeQueryView.isSlicedAfterOrOn(commit, fileCommitTime);
       }
       return false;
     };
-    return metaClient.getFs().listStatus(FSUtils.getPartitionPath(config.getBasePath(), partitionPath), filter);
+    return ((FileSystem) metaClient.getHoodieStorage().getFileSystem())
+        .listStatus(FSUtils.getPartitionPath(config.getBasePath(), partitionPath),
+            filter);
   }
 
   @NotNull
@@ -221,7 +224,7 @@ public class ListingBasedRollbackStrategy implements BaseRollbackPlanActionExecu
   }
 
   private FileStatus[] fetchFilesFromInstant(HoodieInstant instantToRollback, String partitionPath, String basePath,
-                                             String baseFileExtension, HoodieWrapperFileSystem fs,
+                                             String baseFileExtension, FileSystem fs,
                                              Option<HoodieCommitMetadata> commitMetadataOptional,
                                              Boolean isCommitMetadataCompleted,
                                              HoodieTableType tableType) throws IOException {
@@ -236,7 +239,7 @@ public class ListingBasedRollbackStrategy implements BaseRollbackPlanActionExecu
 
   private FileStatus[] fetchFilesFromCommitMetadata(HoodieInstant instantToRollback, String partitionPath,
                                                     String basePath, HoodieCommitMetadata commitMetadata,
-                                                    String baseFileExtension, HoodieWrapperFileSystem fs)
+                                                    String baseFileExtension, FileSystem fs)
       throws IOException {
     SerializablePathFilter pathFilter = getSerializablePathFilter(baseFileExtension, instantToRollback.getTimestamp());
     Path[] filePaths = getFilesFromCommitMetadata(basePath, commitMetadata, partitionPath);
@@ -263,7 +266,7 @@ public class ListingBasedRollbackStrategy implements BaseRollbackPlanActionExecu
    * @throws IOException
    */
   private FileStatus[] fetchFilesFromListFiles(HoodieInstant instantToRollback, String partitionPath, String basePath,
-                                               String baseFileExtension, HoodieWrapperFileSystem fs)
+                                               String baseFileExtension, FileSystem fs)
       throws IOException {
     SerializablePathFilter pathFilter = getSerializablePathFilter(baseFileExtension, instantToRollback.getTimestamp());
     Path[] filePaths = listFilesToBeDeleted(basePath, partitionPath);

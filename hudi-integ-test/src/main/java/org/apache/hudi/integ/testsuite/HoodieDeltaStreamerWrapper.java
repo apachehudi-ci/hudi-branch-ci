@@ -30,6 +30,7 @@ import org.apache.hudi.utilities.sources.InputBatch;
 import org.apache.hudi.utilities.streamer.StreamSync;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 
@@ -83,7 +84,7 @@ public class HoodieDeltaStreamerWrapper extends HoodieDeltaStreamer {
     StreamSync service = getDeltaSync();
     service.refreshTimeline();
     HoodieTableMetaClient metaClient = HoodieTableMetaClient.builder()
-        .setConf(new Configuration(service.getFs().getConf()))
+        .setConf(new Configuration(((FileSystem) service.getStorage().getFileSystem()).getConf()))
         .setBasePath(service.getCfg().targetBasePath)
         .build();
     String instantTime = InProcessTimeGenerator.createNewInstantTime();

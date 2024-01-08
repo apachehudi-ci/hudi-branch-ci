@@ -48,6 +48,7 @@ import org.apache.hudi.hadoop.utils.HoodieHiveUtils;
 import org.apache.hudi.index.HoodieIndex;
 import org.apache.hudi.io.HoodieCreateHandle;
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
+import org.apache.hudi.io.storage.HoodieLocation;
 import org.apache.hudi.table.HoodieSparkCopyOnWriteTable;
 import org.apache.hudi.table.HoodieSparkTable;
 import org.apache.hudi.table.HoodieTable;
@@ -58,6 +59,7 @@ import org.apache.hudi.testutils.MetadataMergeWriteStatus;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.FileInputFormat;
 import org.apache.hadoop.mapred.JobConf;
@@ -451,36 +453,46 @@ public class TestCopyOnWriteActionExecutor extends HoodieClientTestBase implemen
 
   @Test
   public void testInsertUpsertWithHoodieAvroPayload() throws Exception {
-    HoodieWriteConfig config = HoodieWriteConfig.newBuilder().withPath(basePath).withSchema(TRIP_EXAMPLE_SCHEMA)
-        .withFileSystemViewConfig(FileSystemViewStorageConfig.newBuilder()
-            .withRemoteServerPort(timelineServicePort).build())
-        .withStorageConfig(HoodieStorageConfig.newBuilder()
-            .parquetMaxFileSize(1000 * 1024).hfileMaxFileSize(1000 * 1024).build()).build();
+    HoodieWriteConfig config =
+        HoodieWriteConfig.newBuilder().withPath(basePath).withSchema(TRIP_EXAMPLE_SCHEMA)
+            .withFileSystemViewConfig(FileSystemViewStorageConfig.newBuilder()
+                .withRemoteServerPort(timelineServicePort).build())
+            .withStorageConfig(HoodieStorageConfig.newBuilder()
+                .parquetMaxFileSize(1000 * 1024).hfileMaxFileSize(1000 * 1024).build()).build();
     metaClient = HoodieTableMetaClient.reload(metaClient);
-    HoodieSparkCopyOnWriteTable table = (HoodieSparkCopyOnWriteTable) HoodieSparkTable.create(config, context, metaClient);
+    HoodieSparkCopyOnWriteTable table =
+        (HoodieSparkCopyOnWriteTable) HoodieSparkTable.create(config, context, metaClient);
     String instantTime = "000";
     // Perform inserts of 100 records to test CreateHandle and BufferedExecutor
-    final List<HoodieRecord> inserts = dataGen.generateInsertsWithHoodieAvroPayload(instantTime, 100);
-    BaseSparkCommitActionExecutor actionExecutor = new SparkInsertCommitActionExecutor(context, config, table,
-        instantTime, context.parallelize(inserts));
+    final List<HoodieRecord> inserts =
+        dataGen.generateInsertsWithHoodieAvroPayload(instantTime, 100);
+    BaseSparkCommitActionExecutor actionExecutor =
+        new SparkInsertCommitActionExecutor(context, config, table,
+            instantTime, context.parallelize(inserts));
     final List<List<WriteStatus>> ws = jsc.parallelize(Arrays.asList(1)).map(x -> {
       return actionExecutor.handleInsert(UUID.randomUUID().toString(), inserts.iterator());
     }).map(Transformations::flatten).collect();
 
     WriteStatus writeStatus = ws.get(0).get(0);
     String fileId = writeStatus.getFileId();
-    metaClient.getFs().create(new Path(Paths.get(basePath, ".hoodie", "000.commit").toString())).close();
-    final List<HoodieRecord> updates = dataGen.generateUpdatesWithHoodieAvroPayload(instantTime, inserts);
+    metaClient.getHoodieStorage().create(
+        new HoodieLocation(Paths.get(basePath, ".hoodie", "000.commit").toString())).close();
+    final List<HoodieRecord> updates =
+        dataGen.generateUpdatesWithHoodieAvroPayload(instantTime, inserts);
 
     String partitionPath = writeStatus.getPartitionPath();
-    long numRecordsInPartition = updates.stream().filter(u -> u.getPartitionPath().equals(partitionPath)).count();
-    table = (HoodieSparkCopyOnWriteTable) HoodieSparkTable.create(config, context, HoodieTableMetaClient.reload(metaClient));
-    BaseSparkCommitActionExecutor newActionExecutor = new SparkUpsertCommitActionExecutor(context, config, table,
-        instantTime, context.parallelize(updates));
+    long numRecordsInPartition =
+        updates.stream().filter(u -> u.getPartitionPath().equals(partitionPath)).count();
+    table = (HoodieSparkCopyOnWriteTable) HoodieSparkTable.create(config, context,
+        HoodieTableMetaClient.reload(metaClient));
+    BaseSparkCommitActionExecutor newActionExecutor =
+        new SparkUpsertCommitActionExecutor(context, config, table,
+            instantTime, context.parallelize(updates));
     final List<List<WriteStatus>> updateStatus = jsc.parallelize(Arrays.asList(1)).map(x -> {
       return newActionExecutor.handleUpdate(partitionPath, fileId, updates.iterator());
     }).map(Transformations::flatten).collect();
-    assertEquals(updates.size() - numRecordsInPartition, updateStatus.get(0).get(0).getTotalErrorRecords());
+    assertEquals(updates.size() - numRecordsInPartition,
+        updateStatus.get(0).get(0).getTotalErrorRecords());
   }
 
   private void testBulkInsertRecords(String bulkInsertMode) {
@@ -536,19 +548,23 @@ public class TestCopyOnWriteActionExecutor extends HoodieClientTestBase implemen
     writeClient.bulkInsert(inputRecords, instantTime);
 
     // Partition metafile should be created
-    Path partitionPath = new Path(basePath, HoodieTestDataGenerator.DEFAULT_FIRST_PARTITION_PATH);
-    assertTrue(HoodiePartitionMetadata.hasPartitionMetadata(fs, partitionPath));
-    Option<Path> metafilePath = HoodiePartitionMetadata.getPartitionMetafilePath(fs, partitionPath);
+    HoodieLocation partitionPath = new HoodieLocation(
+        basePath, HoodieTestDataGenerator.DEFAULT_FIRST_PARTITION_PATH);
+    assertTrue(HoodiePartitionMetadata.hasPartitionMetadata(storage, partitionPath));
+    Option<Path> metafilePath =
+        HoodiePartitionMetadata.getPartitionMetafilePath(
+            (FileSystem) storage.getFileSystem(), new Path(partitionPath.toUri()));
     if (partitionMetafileUseBaseFormat) {
       // Extension should be the same as the data file format of the table
       assertTrue(metafilePath.get().toString().endsWith(table.getBaseFileExtension()));
     } else {
       // No extension as it is in properties file format
-      assertTrue(metafilePath.get().toString().endsWith(HoodiePartitionMetadata.HOODIE_PARTITION_METAFILE_PREFIX));
+      assertTrue(metafilePath.get().toString()
+          .endsWith(HoodiePartitionMetadata.HOODIE_PARTITION_METAFILE_PREFIX));
     }
 
     // Validate contents of the partition metafile
-    HoodiePartitionMetadata partitionMetadata = new HoodiePartitionMetadata(fs, partitionPath);
+    HoodiePartitionMetadata partitionMetadata = new HoodiePartitionMetadata(storage, partitionPath);
     partitionMetadata.readFromFS();
     assertTrue(partitionMetadata.getPartitionDepth() == 3);
     assertTrue(partitionMetadata.readPartitionCreatedCommitTime().get().equals(instantTime));

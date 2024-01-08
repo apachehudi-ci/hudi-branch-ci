@@ -38,6 +38,7 @@ import org.apache.hudi.configuration.OptionsInference;
 import org.apache.hudi.configuration.OptionsResolver;
 import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.exception.HoodieValidationException;
+import org.apache.hudi.io.storage.HoodieFileStatus;
 import org.apache.hudi.sink.utils.Pipelines;
 import org.apache.hudi.source.ExpressionEvaluators;
 import org.apache.hudi.source.ExpressionPredicates;
@@ -88,7 +89,6 @@ import org.apache.flink.table.expressions.ResolvedExpression;
 import org.apache.flink.table.runtime.types.TypeInfoDataTypeConverter;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -108,8 +108,8 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.apache.hudi.configuration.HadoopConfigurations.getParquetConf;
-import static org.apache.hudi.util.ExpressionUtils.splitExprByPartitionCall;
 import static org.apache.hudi.util.ExpressionUtils.filterSimpleCallExpression;
+import static org.apache.hudi.util.ExpressionUtils.splitExprByPartitionCall;
 
 /**
  * Hoodie batch table source that always read the latest snapshot of the underneath table.
@@ -330,14 +330,15 @@ public class HoodieTableSource implements
     if (relPartitionPaths.size() == 0) {
       return Collections.emptyList();
     }
-    FileStatus[] fileStatuses = fileIndex.getFilesInPartitions();
-    if (fileStatuses.length == 0) {
+    List<HoodieFileStatus> fileStatuses = fileIndex.getFilesInPartitions();
+    if (fileStatuses.size() == 0) {
       throw new HoodieException("No files found for reading in user provided path.");
     }
 
     HoodieTableFileSystemView fsView = new HoodieTableFileSystemView(metaClient,
         // file-slice after pending compaction-requested instant-time is also considered valid
-        metaClient.getCommitsAndCompactionTimeline().filterCompletedAndCompactionInstants(), fileStatuses);
+        metaClient.getCommitsAndCompactionTimeline().filterCompletedAndCompactionInstants(),
+        fileStatuses);
     if (!fsView.getLastInstant().isPresent()) {
       return Collections.emptyList();
     }
@@ -351,7 +352,7 @@ public class HoodieTableSource implements
               String basePath = fileSlice.getBaseFile().map(BaseFile::getPath).orElse(null);
               Option<List<String>> logPaths = Option.ofNullable(fileSlice.getLogFiles()
                   .sorted(HoodieLogFile.getLogFileComparator())
-                  .map(logFile -> logFile.getPath().toString())
+                  .map(logFile -> logFile.getLocation().toString())
                   .collect(Collectors.toList()));
               return new MergeOnReadInputSplit(cnt.getAndAdd(1), basePath, logPaths, latestCommit,
                   metaClient.getBasePath(), maxCompactionMemoryInBytes, mergeType, null, fileSlice.getFileId());
@@ -513,8 +514,8 @@ public class HoodieTableSource implements
   }
 
   private InputFormat<RowData, ?> baseFileOnlyInputFormat() {
-    final FileStatus[] fileStatuses = getReadFiles();
-    if (fileStatuses.length == 0) {
+    final List<HoodieFileStatus> fileStatuses = getReadFiles();
+    if (fileStatuses.size() == 0) {
       return InputFormats.EMPTY_INPUT_FORMAT;
     }
 
@@ -522,7 +523,7 @@ public class HoodieTableSource implements
         metaClient.getCommitsAndCompactionTimeline().filterCompletedInstants(), fileStatuses);
     Path[] paths = fsView.getLatestBaseFiles()
         .map(HoodieBaseFile::getFileStatus)
-        .map(FileStatus::getPath).toArray(Path[]::new);
+        .map(e -> new Path(e.getLocation().toUri())).toArray(Path[]::new);
 
     if (paths.length == 0) {
       return InputFormats.EMPTY_INPUT_FORMAT;
@@ -598,11 +599,11 @@ public class HoodieTableSource implements
    * Get the reader paths with partition path expanded.
    */
   @VisibleForTesting
-  public FileStatus[] getReadFiles() {
+  public List<HoodieFileStatus> getReadFiles() {
     FileIndex fileIndex = getOrBuildFileIndex();
     List<String> relPartitionPaths = fileIndex.getOrBuildPartitionPaths();
     if (relPartitionPaths.size() == 0) {
-      return new FileStatus[0];
+      return Collections.emptyList();
     }
     return fileIndex.getFilesInPartitions();
   }

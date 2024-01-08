@@ -34,7 +34,6 @@ import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
 import org.apache.hudi.common.table.view.FileSystemViewStorageType;
 import org.apache.hudi.common.testutils.HoodieTestDataGenerator;
 import org.apache.hudi.common.testutils.HoodieTestUtils;
-import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieCleanConfig;
 import org.apache.hudi.config.HoodieClusteringConfig;
@@ -45,6 +44,8 @@ import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.execution.bulkinsert.BulkInsertSortMode;
 import org.apache.hudi.index.HoodieIndex;
 import org.apache.hudi.index.bucket.ConsistentBucketIndexUtils;
+import org.apache.hudi.io.storage.HoodieLocation;
+import org.apache.hudi.common.util.Option;
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 import org.apache.hudi.table.HoodieSparkTable;
 import org.apache.hudi.table.HoodieTable;
@@ -54,7 +55,6 @@ import org.apache.hudi.testutils.HoodieSparkClientTestHarness;
 import org.apache.hudi.testutils.MetadataMergeWriteStatus;
 
 import org.apache.avro.Schema;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 import org.apache.hadoop.io.ArrayWritable;
 import org.apache.hadoop.mapred.JobConf;
@@ -101,7 +101,7 @@ public class TestSparkConsistentBucketClustering extends HoodieSparkClientTestHa
     initPath();
     initSparkContexts();
     initTestDataGenerator();
-    initFileSystem();
+    initHoodieStorage();
     Properties props = getPropertiesForKeyGen(true);
     props.putAll(options);
     props.setProperty(KeyGeneratorOptions.RECORDKEY_FIELD_NAME.key(), "_row_key");
@@ -189,13 +189,15 @@ public class TestSparkConsistentBucketClustering extends HoodieSparkClientTestHa
     hoodieTimelineArchiver.archiveIfRequired(context);
     Arrays.stream(dataGen.getPartitionPaths()).forEach(p -> {
       if (!isCommitFilePresent) {
-        Path metadataPath = FSUtils.getPartitionPath(table.getMetaClient().getHashingMetadataPath(), p);
+        HoodieLocation metadataPath =
+            FSUtils.getPartitionPathInLocation(table.getMetaClient().getHashingMetadataPath(), p);
         try {
-          Arrays.stream(table.getMetaClient().getFs().listStatus(metadataPath)).forEach(fl -> {
-            if (fl.getPath().getName().contains(HoodieConsistentHashingMetadata.HASHING_METADATA_COMMIT_FILE_SUFFIX)) {
+          table.getMetaClient().getHoodieStorage().listDirectEntries(metadataPath).forEach(fl -> {
+            if (fl.getLocation().getName()
+                .contains(HoodieConsistentHashingMetadata.HASHING_METADATA_COMMIT_FILE_SUFFIX)) {
               try {
                 // delete commit marker to test recovery job
-                table.getMetaClient().getFs().delete(fl.getPath());
+                table.getMetaClient().getHoodieStorage().deleteDirectory(fl.getLocation());
               } catch (IOException e) {
                 throw new RuntimeException(e);
               }

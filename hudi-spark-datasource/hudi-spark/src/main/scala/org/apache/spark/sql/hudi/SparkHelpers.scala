@@ -26,26 +26,28 @@ import org.apache.hudi.common.bloom.{BloomFilter, BloomFilterFactory}
 import org.apache.hudi.common.config.HoodieStorageConfig
 import org.apache.hudi.common.config.HoodieStorageConfig.{BLOOM_FILTER_DYNAMIC_MAX_ENTRIES, BLOOM_FILTER_FPP_VALUE, BLOOM_FILTER_NUM_ENTRIES_VALUE, BLOOM_FILTER_TYPE}
 import org.apache.hudi.common.model.{HoodieFileFormat, HoodieRecord}
-import org.apache.hudi.common.util.BaseFileUtils
-import org.apache.hudi.io.storage.{HoodieAvroParquetWriter, HoodieParquetConfig}
+import org.apache.hudi.common.util.{BaseFileUtils, Option}
+import org.apache.hudi.io.storage.{HoodieAvroParquetWriter, HoodieParquetConfig, HoodieStorage}
+
 import org.apache.parquet.avro.AvroSchemaConverter
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 import org.apache.spark.sql.{DataFrame, SQLContext}
 
 import java.util.Properties
+
 import scala.collection.JavaConversions._
 import scala.collection.mutable._
 
 object SparkHelpers {
   @throws[Exception]
-  def skipKeysAndWriteNewFile(instantTime: String, fs: FileSystem, sourceFile: Path, destinationFile: Path, keysToSkip: Set[String]) {
-    val sourceRecords = BaseFileUtils.getInstance(HoodieFileFormat.PARQUET).readAvroRecords(fs.getConf, sourceFile)
+  def skipKeysAndWriteNewFile(instantTime: String, conf: Configuration, storage: HoodieStorage, sourceFile: Path, destinationFile: Path, keysToSkip: Set[String]) {
+    val sourceRecords = BaseFileUtils.getInstance(HoodieFileFormat.PARQUET).readAvroRecords(conf, sourceFile)
     val schema: Schema = sourceRecords.get(0).getSchema
     val filter: BloomFilter = BloomFilterFactory.createBloomFilter(
       BLOOM_FILTER_NUM_ENTRIES_VALUE.defaultValue.toInt, BLOOM_FILTER_FPP_VALUE.defaultValue.toDouble,
       BLOOM_FILTER_DYNAMIC_MAX_ENTRIES.defaultValue.toInt, BLOOM_FILTER_TYPE.defaultValue);
-    val writeSupport: HoodieAvroWriteSupport[_] = new HoodieAvroWriteSupport(new AvroSchemaConverter(fs.getConf).convert(schema),
-      schema, org.apache.hudi.common.util.Option.of(filter), new Properties())
+    val writeSupport: HoodieAvroWriteSupport[_] = new HoodieAvroWriteSupport(new AvroSchemaConverter(conf).convert(schema),
+      schema, Option.of(filter), new Properties())
     val parquetConfig: HoodieParquetConfig[HoodieAvroWriteSupport[_]] =
       new HoodieParquetConfig(
         writeSupport,
@@ -53,7 +55,7 @@ object SparkHelpers {
         HoodieStorageConfig.PARQUET_BLOCK_SIZE.defaultValue.toInt,
         HoodieStorageConfig.PARQUET_PAGE_SIZE.defaultValue.toInt,
         HoodieStorageConfig.PARQUET_MAX_FILE_SIZE.defaultValue.toInt,
-        fs.getConf,
+        conf,
         HoodieStorageConfig.PARQUET_COMPRESSION_RATIO_FRACTION.defaultValue.toDouble,
         HoodieStorageConfig.PARQUET_DICTIONARY_ENABLED.defaultValue)
 

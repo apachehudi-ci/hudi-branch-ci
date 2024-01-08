@@ -39,6 +39,7 @@ import org.apache.hudi.data.HoodieJavaPairRDD;
 import org.apache.hudi.index.HoodieIndex;
 import org.apache.hudi.index.HoodieIndexUtils;
 import org.apache.hudi.metadata.SparkHoodieBackedTableMetadataWriter;
+import org.apache.hudi.io.storage.HoodieLocation;
 import org.apache.hudi.table.HoodieSparkTable;
 import org.apache.hudi.table.HoodieTable;
 import org.apache.hudi.testutils.HoodieSparkWriteableTestTable;
@@ -104,7 +105,7 @@ public class TestHoodieBloomIndex extends TestHoodieMetadataBase {
   public void setUp() throws Exception {
     initSparkContexts();
     initPath();
-    initFileSystem();
+    initHoodieStorage();
     // We have some records to be tagged (two different partitions)
     initMetaClient();
     HoodieIndexConfig.Builder indexBuilder = HoodieIndexConfig.newBuilder().withIndexType(HoodieIndex.IndexType.BLOOM);
@@ -189,8 +190,9 @@ public class TestHoodieBloomIndex extends TestHoodieMetadataBase {
     final Map<String, List<Pair<String, Integer>>> partitionToFilesNameLengthMap = new HashMap<>();
 
     String commitTime = "20160401010101";
-    Path baseFilePath = testTable.forCommit(commitTime).withInserts(partitions.get(1), fileId2, Collections.emptyList());
-    long baseFileLength = fs.getFileStatus(baseFilePath).getLen();
+    HoodieLocation baseFilePath = testTable.forCommit(commitTime)
+        .withInserts(partitions.get(1), fileId2, Collections.emptyList());
+    long baseFileLength = storage.getFileInfo(new HoodieLocation(baseFilePath.toUri())).getLength();
     partitionToFilesNameLengthMap.computeIfAbsent(partitions.get(1),
         k -> new ArrayList<>()).add(Pair.of(fileId2, Integer.valueOf((int) baseFileLength)));
     testTable.doWriteOperation(commitTime, WriteOperationType.UPSERT, Arrays.asList(partitions.get(1)),
@@ -200,17 +202,19 @@ public class TestHoodieBloomIndex extends TestHoodieMetadataBase {
     partitionToFilesNameLengthMap.clear();
     testTable.forCommit(commitTime);
     baseFilePath = testTable.withInserts(partitions.get(2), fileId1, Collections.emptyList());
-    baseFileLength = fs.getFileStatus(baseFilePath).getLen();
+    baseFileLength = storage.getFileInfo(baseFilePath).getLength();
     partitionToFilesNameLengthMap.computeIfAbsent(partitions.get(2),
         k -> new ArrayList<>()).add(Pair.of(fileId1, Integer.valueOf((int) baseFileLength)));
 
-    baseFilePath = testTable.withInserts(partitions.get(2), fileId3, Collections.singletonList(record1));
-    baseFileLength = fs.getFileStatus(baseFilePath).getLen();
+    baseFilePath =
+        testTable.withInserts(partitions.get(2), fileId3, Collections.singletonList(record1));
+    baseFileLength = storage.getFileInfo(baseFilePath).getLength();
     partitionToFilesNameLengthMap.computeIfAbsent(partitions.get(2),
         k -> new ArrayList<>()).add(Pair.of(fileId3, Integer.valueOf((int) baseFileLength)));
 
-    baseFilePath = testTable.withInserts(partitions.get(2), fileId4, Arrays.asList(record2, record3, record4));
-    baseFileLength = fs.getFileStatus(baseFilePath).getLen();
+    baseFilePath =
+        testTable.withInserts(partitions.get(2), fileId4, Arrays.asList(record2, record3, record4));
+    baseFileLength = storage.getFileInfo(baseFilePath).getLength();
     partitionToFilesNameLengthMap.computeIfAbsent(partitions.get(2),
         k -> new ArrayList<>()).add(Pair.of(fileId4, Integer.valueOf((int) baseFileLength)));
 
@@ -310,9 +314,9 @@ public class TestHoodieBloomIndex extends TestHoodieMetadataBase {
     final String commitTime = "0000001";
     final String fileId = genRandomUUID();
 
-    Path baseFilePath = testTable.forCommit(commitTime)
+    HoodieLocation baseFilePath = testTable.forCommit(commitTime)
         .withInserts(partition, fileId, Arrays.asList(record1, record2));
-    long baseFileLength = fs.getFileStatus(baseFilePath).getLen();
+    long baseFileLength = storage.getFileInfo(baseFilePath).getLength();
     partitionToFilesNameLengthMap.computeIfAbsent(partition,
         k -> new ArrayList<>()).add(Pair.of(fileId, Integer.valueOf((int) baseFileLength)));
     testTable.doWriteOperation(commitTime, WriteOperationType.UPSERT, Collections.singletonList(partition),
@@ -414,8 +418,9 @@ public class TestHoodieBloomIndex extends TestHoodieMetadataBase {
     // We create three parquet file, each having one record. (two different partitions)
     final String fileId1 = genRandomUUID();
     final String commit1 = "0000001";
-    Path baseFilePath = testTable.forCommit(commit1).withInserts(partition1, fileId1, Collections.singletonList(record1));
-    long baseFileLength = fs.getFileStatus(baseFilePath).getLen();
+    HoodieLocation baseFilePath = testTable.forCommit(commit1)
+        .withInserts(partition1, fileId1, Collections.singletonList(record1));
+    long baseFileLength = storage.getFileInfo(baseFilePath).getLength();
     partitionToFilesNameLengthMap.computeIfAbsent(partition1,
         k -> new ArrayList<>()).add(Pair.of(fileId1, Integer.valueOf((int) baseFileLength)));
     testTable.doWriteOperation(commit1, WriteOperationType.UPSERT, Collections.singletonList(partition1),
@@ -423,8 +428,9 @@ public class TestHoodieBloomIndex extends TestHoodieMetadataBase {
 
     final String fileId2 = genRandomUUID();
     final String commit2 = "0000002";
-    baseFilePath = testTable.forCommit(commit2).withInserts(partition1, fileId2, Collections.singletonList(record2));
-    baseFileLength = fs.getFileStatus(baseFilePath).getLen();
+    baseFilePath = testTable.forCommit(commit2)
+        .withInserts(partition1, fileId2, Collections.singletonList(record2));
+    baseFileLength = storage.getFileInfo(baseFilePath).getLength();
     partitionToFilesNameLengthMap.clear();
     partitionToFilesNameLengthMap.computeIfAbsent(partition1,
         k -> new ArrayList<>()).add(Pair.of(fileId2, Integer.valueOf((int) baseFileLength)));
@@ -433,8 +439,9 @@ public class TestHoodieBloomIndex extends TestHoodieMetadataBase {
 
     final String fileId3 = genRandomUUID();
     final String commit3 = "0000003";
-    baseFilePath = testTable.forCommit(commit3).withInserts(partition2, fileId3, Collections.singletonList(record4));
-    baseFileLength = fs.getFileStatus(baseFilePath).getLen();
+    baseFilePath = testTable.forCommit(commit3)
+        .withInserts(partition2, fileId3, Collections.singletonList(record4));
+    baseFileLength = storage.getFileInfo(baseFilePath).getLength();
     partitionToFilesNameLengthMap.clear();
     partitionToFilesNameLengthMap.computeIfAbsent(partition2,
         k -> new ArrayList<>()).add(Pair.of(fileId3, Integer.valueOf((int) baseFileLength)));
@@ -508,8 +515,9 @@ public class TestHoodieBloomIndex extends TestHoodieMetadataBase {
     // We create three parquet file, each having one record
     final String fileId1 = genRandomUUID();
     final String commit1 = "0000001";
-    Path baseFilePath = testTable.forCommit(commit1).withInserts(emptyPartitionPath, fileId1, Collections.singletonList(record1));
-    long baseFileLength = fs.getFileStatus(baseFilePath).getLen();
+    HoodieLocation baseFilePath = testTable.forCommit(commit1)
+        .withInserts(emptyPartitionPath, fileId1, Collections.singletonList(record1));
+    long baseFileLength = storage.getFileInfo(baseFilePath).getLength();
     partitionToFilesNameLengthMap.computeIfAbsent(emptyPartitionPath,
         k -> new ArrayList<>()).add(Pair.of(fileId1, Integer.valueOf((int) baseFileLength)));
     testTable.doWriteOperation(commit1, WriteOperationType.UPSERT, Collections.singletonList(emptyPartitionPath),
@@ -517,8 +525,9 @@ public class TestHoodieBloomIndex extends TestHoodieMetadataBase {
 
     final String fileId2 = genRandomUUID();
     final String commit2 = "0000002";
-    baseFilePath = testTable.forCommit(commit2).withInserts(emptyPartitionPath, fileId2, Collections.singletonList(record2));
-    baseFileLength = fs.getFileStatus(baseFilePath).getLen();
+    baseFilePath = testTable.forCommit(commit2)
+        .withInserts(emptyPartitionPath, fileId2, Collections.singletonList(record2));
+    baseFileLength = storage.getFileInfo(baseFilePath).getLength();
     partitionToFilesNameLengthMap.clear();
     partitionToFilesNameLengthMap.computeIfAbsent(emptyPartitionPath,
         k -> new ArrayList<>()).add(Pair.of(fileId2, Integer.valueOf((int) baseFileLength)));
@@ -527,8 +536,9 @@ public class TestHoodieBloomIndex extends TestHoodieMetadataBase {
 
     final String fileId3 = UUID.randomUUID().toString();
     final String commit3 = "0000003";
-    baseFilePath = testTable.forCommit(commit3).withInserts(emptyPartitionPath, fileId3, Collections.singletonList(record3));
-    baseFileLength = fs.getFileStatus(baseFilePath).getLen();
+    baseFilePath = testTable.forCommit(commit3)
+        .withInserts(emptyPartitionPath, fileId3, Collections.singletonList(record3));
+    baseFileLength = storage.getFileInfo(baseFilePath).getLength();
     partitionToFilesNameLengthMap.clear();
     partitionToFilesNameLengthMap.computeIfAbsent(emptyPartitionPath,
         k -> new ArrayList<>()).add(Pair.of(fileId3, Integer.valueOf((int) baseFileLength)));
@@ -610,8 +620,9 @@ public class TestHoodieBloomIndex extends TestHoodieMetadataBase {
     final Map<String, List<Pair<String, Integer>>> partitionToFilesNameLengthMap = new HashMap<>();
     // We create three parquet file, each having one record. (two different partitions)
     final String commit1 = "0000001";
-    Path baseFilePath = testTable.forCommit(commit1).withInserts(partition1, fileId1, Collections.singletonList(record1));
-    long baseFileLength = fs.getFileStatus(baseFilePath).getLen();
+    HoodieLocation baseFilePath = testTable.forCommit(commit1)
+        .withInserts(partition1, fileId1, Collections.singletonList(record1));
+    long baseFileLength = storage.getFileInfo(baseFilePath).getLength();
     partitionToFilesNameLengthMap.computeIfAbsent(partition1,
         k -> new ArrayList<>()).add(Pair.of(fileId1, Integer.valueOf((int) baseFileLength)));
     testTable.doWriteOperation(commit1, WriteOperationType.UPSERT, Collections.singletonList(partition1),
@@ -619,8 +630,9 @@ public class TestHoodieBloomIndex extends TestHoodieMetadataBase {
 
     final String commit2 = "0000002";
     partitionToFilesNameLengthMap.clear();
-    baseFilePath = testTable.forCommit(commit2).withInserts(partition1, fileId2, Collections.singletonList(record2));
-    baseFileLength = fs.getFileStatus(baseFilePath).getLen();
+    baseFilePath = testTable.forCommit(commit2)
+        .withInserts(partition1, fileId2, Collections.singletonList(record2));
+    baseFileLength = storage.getFileInfo(baseFilePath).getLength();
     partitionToFilesNameLengthMap.computeIfAbsent(partition1,
         k -> new ArrayList<>()).add(Pair.of(fileId2, Integer.valueOf((int) baseFileLength)));
     testTable.doWriteOperation(commit2, WriteOperationType.UPSERT, Collections.singletonList(partition1),
@@ -628,8 +640,9 @@ public class TestHoodieBloomIndex extends TestHoodieMetadataBase {
 
     final String commit3 = "0000003";
     partitionToFilesNameLengthMap.clear();
-    baseFilePath = testTable.forCommit(commit3).withInserts(partition2, fileId3, Collections.singletonList(record4));
-    baseFileLength = fs.getFileStatus(baseFilePath).getLen();
+    baseFilePath = testTable.forCommit(commit3)
+        .withInserts(partition2, fileId3, Collections.singletonList(record4));
+    baseFileLength = storage.getFileInfo(baseFilePath).getLength();
     partitionToFilesNameLengthMap.computeIfAbsent(partition2,
         k -> new ArrayList<>()).add(Pair.of(fileId3, Integer.valueOf((int) baseFileLength)));
     testTable.doWriteOperation(commit3, WriteOperationType.UPSERT, Collections.singletonList(partition2),

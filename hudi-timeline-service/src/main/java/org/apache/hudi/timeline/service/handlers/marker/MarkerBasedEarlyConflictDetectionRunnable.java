@@ -25,6 +25,7 @@ import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.util.HoodieTimer;
 import org.apache.hudi.common.util.MarkerUtils;
 import org.apache.hudi.exception.HoodieIOException;
+import org.apache.hudi.io.storage.HoodieStorageUtils;
 import org.apache.hudi.timeline.service.handlers.MarkerHandler;
 
 import org.apache.hadoop.conf.Configuration;
@@ -40,6 +41,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+
+import static org.apache.hudi.common.fs.FSUtils.PATH_SEPARATOR;
 
 public class MarkerBasedEarlyConflictDetectionRunnable implements Runnable {
   private static final Logger LOG = LoggerFactory.getLogger(MarkerBasedEarlyConflictDetectionRunnable.class);
@@ -87,7 +90,7 @@ public class MarkerBasedEarlyConflictDetectionRunnable implements Runnable {
       // and the markers from the requests pending processing.
       currentInstantAllMarkers.addAll(markerHandler.getAllMarkers(markerDir));
       currentInstantAllMarkers.addAll(pendingMarkers);
-      Path tempPath = new Path(basePath + Path.SEPARATOR + HoodieTableMetaClient.TEMPFOLDER_NAME);
+      Path tempPath = new Path(basePath + PATH_SEPARATOR + HoodieTableMetaClient.TEMPFOLDER_NAME);
 
       List<Path> instants = MarkerUtils.getAllMarkerDir(tempPath, fs);
 
@@ -97,9 +100,11 @@ public class MarkerBasedEarlyConflictDetectionRunnable implements Runnable {
       HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
 
       List<String> candidate = MarkerUtils.getCandidateInstants(activeTimeline, instants,
-          MarkerUtils.markerDirToInstantTime(markerDir), maxAllowableHeartbeatIntervalInMs, fs, basePath);
+          MarkerUtils.markerDirToInstantTime(markerDir), maxAllowableHeartbeatIntervalInMs,
+          HoodieStorageUtils.getHoodieStorage(fs), basePath);
       Set<String> tableMarkers = candidate.stream().flatMap(instant -> {
-        return MarkerUtils.readTimelineServerBasedMarkersFromFileSystem(instant, fs, new HoodieLocalEngineContext(new Configuration()), 100)
+        return MarkerUtils.readTimelineServerBasedMarkersFromFileSystem(instant, fs,
+                new HoodieLocalEngineContext(new Configuration()), 100)
             .values().stream().flatMap(Collection::stream);
       }).collect(Collectors.toSet());
 

@@ -18,6 +18,9 @@
 
 package org.apache.hudi.common.fs;
 
+import org.apache.hudi.io.consistency.ConsistencyGuard;
+import org.apache.hudi.io.storage.HoodieLocation;
+
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
@@ -57,18 +60,19 @@ public class OptimisticConsistencyGuard extends FailSafeConsistencyGuard {
   }
 
   @Override
-  public void waitTillFileAppears(Path filePath) throws TimeoutException {
+  public void waitTillFileAppears(HoodieLocation filePath) throws TimeoutException {
     try {
-      if (!checkFileVisibility(filePath, FileVisibility.APPEAR)) {
+      if (!checkFileVisibility(new Path(filePath.toUri()), FileVisibility.APPEAR)) {
         Thread.sleep(consistencyGuardConfig.getOptimisticConsistencyGuardSleepTimeMs());
       }
     } catch (IOException | InterruptedException ioe) {
-      LOG.warn("Got IOException or InterruptedException waiting for file visibility. Ignoring", ioe);
+      LOG.warn("Got IOException or InterruptedException waiting for file visibility. Ignoring",
+          ioe);
     }
   }
 
   @Override
-  public void waitTillFileDisappears(Path filePath) throws TimeoutException {
+  public void waitTillFileDisappears(HoodieLocation filePath) throws TimeoutException {
     // no op
   }
 

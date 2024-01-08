@@ -18,15 +18,16 @@
 
 package org.apache.hudi.table;
 
-import org.apache.hudi.common.fs.ConsistencyGuard;
 import org.apache.hudi.common.fs.ConsistencyGuardConfig;
 import org.apache.hudi.common.fs.FailSafeConsistencyGuard;
 import org.apache.hudi.common.fs.OptimisticConsistencyGuard;
 import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.testutils.FileCreateUtils;
+import org.apache.hudi.io.consistency.ConsistencyGuard;
+import org.apache.hudi.io.storage.HoodieLocation;
 import org.apache.hudi.testutils.HoodieSparkClientTestHarness;
 
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.FileSystem;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,8 @@ public class TestConsistencyGuard extends HoodieSparkClientTestHarness {
 
   private static final String BASE_FILE_EXTENSION = HoodieTableConfig.BASE_FILE_FORMAT.defaultValue().getFileExtension();
 
+  private FileSystem fs;
+
   // multiple parameters, uses Collection<Object[]>
   public static List<Arguments> consistencyGuardType() {
     return Arrays.asList(
@@ -59,11 +62,15 @@ public class TestConsistencyGuard extends HoodieSparkClientTestHarness {
   public void setup() {
     initPath();
     initFileSystemWithDefaultConfiguration();
+    fs = (FileSystem) storage.getFileSystem();
   }
 
   @AfterEach
   public void tearDown() throws Exception {
     cleanupResources();
+    if (fs != null) {
+      fs.close();
+    }
   }
 
   @ParameterizedTest
@@ -75,17 +82,24 @@ public class TestConsistencyGuard extends HoodieSparkClientTestHarness {
 
     ConsistencyGuardConfig config = getConsistencyGuardConfig(1, 1000, 1000);
     ConsistencyGuard passing = consistencyGuardType.equals(FailSafeConsistencyGuard.class.getName())
-        ? new FailSafeConsistencyGuard(fs, config) : new OptimisticConsistencyGuard(fs, config);
-    passing.waitTillFileAppears(new Path(basePath + "/partition/path/f1_1-0-1_000" + BASE_FILE_EXTENSION));
-    passing.waitTillFileAppears(new Path(basePath + "/partition/path/f2_1-0-1_000" + BASE_FILE_EXTENSION));
+        ? new FailSafeConsistencyGuard(fs, config) :
+        new OptimisticConsistencyGuard(fs, config);
+    passing.waitTillFileAppears(
+        new HoodieLocation(basePath + "/partition/path/f1_1-0-1_000" + BASE_FILE_EXTENSION));
+    passing.waitTillFileAppears(
+        new HoodieLocation(basePath + "/partition/path/f2_1-0-1_000" + BASE_FILE_EXTENSION));
     passing.waitTillAllFilesAppear(basePath + "/partition/path", Arrays
         .asList(basePath + "/partition/path/f1_1-0-1_000" + BASE_FILE_EXTENSION,
             basePath + "/partition/path/f2_1-0-1_000" + BASE_FILE_EXTENSION));
 
-    fs.delete(new Path(basePath + "/partition/path/f1_1-0-1_000" + BASE_FILE_EXTENSION), false);
-    fs.delete(new Path(basePath + "/partition/path/f2_1-0-1_000" + BASE_FILE_EXTENSION), false);
-    passing.waitTillFileDisappears(new Path(basePath + "/partition/path/f1_1-0-1_000" + BASE_FILE_EXTENSION));
-    passing.waitTillFileDisappears(new Path(basePath + "/partition/path/f2_1-0-1_000" + BASE_FILE_EXTENSION));
+    storage.deleteFile(new HoodieLocation(
+        basePath + "/partition/path/f1_1-0-1_000" + BASE_FILE_EXTENSION));
+    storage.deleteFile(new HoodieLocation(
+        basePath + "/partition/path/f2_1-0-1_000" + BASE_FILE_EXTENSION));
+    passing.waitTillFileDisappears(
+        new HoodieLocation(basePath + "/partition/path/f1_1-0-1_000" + BASE_FILE_EXTENSION));
+    passing.waitTillFileDisappears(
+        new HoodieLocation(basePath + "/partition/path/f2_1-0-1_000" + BASE_FILE_EXTENSION));
     passing.waitTillAllFilesDisappear(basePath + "/partition/path", Arrays
         .asList(basePath + "/partition/path/f1_1-0-1_000" + BASE_FILE_EXTENSION,
             basePath + "/partition/path/f2_1-0-1_000" + BASE_FILE_EXTENSION));
@@ -116,7 +130,8 @@ public class TestConsistencyGuard extends HoodieSparkClientTestHarness {
     FileCreateUtils.createBaseFile(basePath, "partition/path", "000", "f1");
     ConsistencyGuard passing = new FailSafeConsistencyGuard(fs, getConsistencyGuardConfig());
     assertThrows(TimeoutException.class, () -> {
-      passing.waitTillFileAppears(new Path(basePath + "/partition/path/f1_1-0-2_000" + BASE_FILE_EXTENSION));
+      passing.waitTillFileAppears(
+          new HoodieLocation(basePath + "/partition/path/f1_1-0-2_000" + BASE_FILE_EXTENSION));
     });
   }
 
@@ -124,7 +139,8 @@ public class TestConsistencyGuard extends HoodieSparkClientTestHarness {
   public void testCheckFailingAppearsTimedWait() throws Exception {
     FileCreateUtils.createBaseFile(basePath, "partition/path", "000", "f1");
     ConsistencyGuard passing = new OptimisticConsistencyGuard(fs, getConsistencyGuardConfig());
-    passing.waitTillFileAppears(new Path(basePath + "/partition/path/f1_1-0-2_000" + BASE_FILE_EXTENSION));
+    passing.waitTillFileAppears(
+        new HoodieLocation(basePath + "/partition/path/f1_1-0-2_000" + BASE_FILE_EXTENSION));
   }
 
   @Test
@@ -153,7 +169,8 @@ public class TestConsistencyGuard extends HoodieSparkClientTestHarness {
     FileCreateUtils.createBaseFile(basePath, "partition/path", "000", "f1");
     ConsistencyGuard passing = new FailSafeConsistencyGuard(fs, getConsistencyGuardConfig());
     assertThrows(TimeoutException.class, () -> {
-      passing.waitTillFileDisappears(new Path(basePath + "/partition/path/f1_1-0-1_000" + BASE_FILE_EXTENSION));
+      passing.waitTillFileDisappears(
+          new HoodieLocation(basePath + "/partition/path/f1_1-0-1_000" + BASE_FILE_EXTENSION));
     });
   }
 
@@ -162,7 +179,8 @@ public class TestConsistencyGuard extends HoodieSparkClientTestHarness {
     FileCreateUtils.createBaseFile(basePath, "partition/path", "000", "f1");
     FileCreateUtils.createBaseFile(basePath, "partition/path", "000", "f1");
     ConsistencyGuard passing = new OptimisticConsistencyGuard(fs, getConsistencyGuardConfig());
-    passing.waitTillFileDisappears(new Path(basePath + "/partition/path/f1_1-0-1_000" + BASE_FILE_EXTENSION));
+    passing.waitTillFileDisappears(
+        new HoodieLocation(basePath + "/partition/path/f1_1-0-1_000" + BASE_FILE_EXTENSION));
   }
 
   private ConsistencyGuardConfig getConsistencyGuardConfig() {

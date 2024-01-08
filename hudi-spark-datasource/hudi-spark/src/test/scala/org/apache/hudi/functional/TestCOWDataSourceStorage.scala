@@ -34,6 +34,8 @@ import org.apache.hudi.keygen.{NonpartitionedKeyGenerator, TimestampBasedKeyGene
 import org.apache.hudi.testutils.SparkClientFunctionalTestHarness
 import org.apache.hudi.testutils.SparkClientFunctionalTestHarness.getSparkSqlConf
 import org.apache.hudi.{DataSourceReadOptions, DataSourceWriteOptions, HoodieDataSourceHelpers}
+import org.apache.hudi.hadoop.fs.HadoopFSUtils
+
 import org.apache.spark.SparkConf
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions.{col, lit}
@@ -92,7 +94,7 @@ class TestCOWDataSourceStorage extends SparkClientFunctionalTestHarness {
       options += TIMESTAMP_OUTPUT_DATE_FORMAT.key -> "yyyyMMdd"
     }
     val dataGen = new HoodieTestDataGenerator(0xDEED)
-    val fs = FSUtils.getFs(basePath, spark.sparkContext.hadoopConfiguration)
+    val fs = HadoopFSUtils.getFs(basePath, spark.sparkContext.hadoopConfiguration)
     // Insert Operation
     val records0 = recordsToStrings(dataGen.generateInserts("000", 100)).toList
     val inputDF0 = spark.read.json(spark.sparkContext.parallelize(records0, 2))
@@ -316,7 +318,7 @@ class TestCOWDataSourceStorage extends SparkClientFunctionalTestHarness {
     }
 
     val dataGen = new HoodieTestDataGenerator(0xDEED)
-    val fs = FSUtils.getFs(basePath, spark.sparkContext.hadoopConfiguration)
+    val fs = HadoopFSUtils.getFs(basePath, spark.sparkContext.hadoopConfiguration)
     val records = recordsToStrings(dataGen.generateInserts("001", 100)).toList
 
     // First commit, new partition, no existing table schema

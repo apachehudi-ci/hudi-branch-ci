@@ -7,24 +7,26 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
-package org.apache.hudi.common.fs;
+package org.apache.hudi.hadoop.fs;
 
 import org.apache.hudi.common.metrics.Registry;
-import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.util.HoodieTimer;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.exception.HoodieIOException;
-import org.apache.hudi.hadoop.CachingPath;
+import org.apache.hudi.io.consistency.ConsistencyGuard;
+import org.apache.hudi.io.consistency.NoOpConsistencyGuard;
+import org.apache.hudi.io.storage.HoodieLocation;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
@@ -61,13 +63,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeoutException;
 
-import static org.apache.hudi.common.fs.StorageSchemes.HDFS;
-
 /**
  * HoodieWrapperFileSystem wraps the default file system. It holds state about the open streams in the file system to
  * support getting the written size to each of the open streams.
  */
 public class HoodieWrapperFileSystem extends FileSystem {
+  public static final String METAFOLDER_NAME = ".hoodie";
 
   public static final String HOODIE_SCHEME_PREFIX = "hoodie-";
 
@@ -105,7 +106,7 @@ public class HoodieWrapperFileSystem extends FileSystem {
   }
 
   private static Registry getMetricRegistryForPath(Path p) {
-    return ((p != null) && (p.toString().contains(HoodieTableMetaClient.METAFOLDER_NAME)))
+    return ((p != null) && (p.toString().contains(METAFOLDER_NAME)))
         ? METRICS_REGISTRY_META : METRICS_REGISTRY_DATA;
   }
 
@@ -142,7 +143,7 @@ public class HoodieWrapperFileSystem extends FileSystem {
 
   public static Path convertToHoodiePath(Path file, Configuration conf) {
     try {
-      String scheme = FSUtils.getFs(file.toString(), conf).getScheme();
+      String scheme = HadoopFSUtils.getFs(file.toString(), conf).getScheme();
       return convertPathWithScheme(file, getHoodieScheme(scheme));
     } catch (HoodieIOException e) {
       throw e;
@@ -186,7 +187,7 @@ public class HoodieWrapperFileSystem extends FileSystem {
     } else {
       this.uri = uri;
     }
-    this.fileSystem = FSUtils.getFs(path.toString(), conf);
+    this.fileSystem = HadoopFSUtils.getFs(path.toString(), conf);
     // Do not need to explicitly initialize the default filesystem, its done already in the above
     // FileSystem.get
     // fileSystem.initialize(FileSystem.getDefaultUri(conf), conf);
@@ -327,7 +328,7 @@ public class HoodieWrapperFileSystem extends FileSystem {
   public boolean rename(Path src, Path dst) throws IOException {
     return executeFuncWithTimeMetrics(MetricName.rename.name(), src, () -> {
       try {
-        consistencyGuard.waitTillFileAppears(convertToDefaultPath(src));
+        consistencyGuard.waitTillFileAppears(convertToDefaultLocation(src));
       } catch (TimeoutException e) {
         throw new HoodieException("Timed out waiting for " + src + " to appear", e);
       }
@@ -336,13 +337,13 @@ public class HoodieWrapperFileSystem extends FileSystem {
 
       if (success) {
         try {
-          consistencyGuard.waitTillFileAppears(convertToDefaultPath(dst));
+          consistencyGuard.waitTillFileAppears(convertToDefaultLocation(dst));
         } catch (TimeoutException e) {
           throw new HoodieException("Timed out waiting for " + dst + " to appear", e);
         }
 
         try {
-          consistencyGuard.waitTillFileDisappears(convertToDefaultPath(src));
+          consistencyGuard.waitTillFileDisappears(convertToDefaultLocation(src));
         } catch (TimeoutException e) {
           throw new HoodieException("Timed out waiting for " + src + " to disappear", e);
         }
@@ -358,7 +359,7 @@ public class HoodieWrapperFileSystem extends FileSystem {
 
       if (success) {
         try {
-          consistencyGuard.waitTillFileDisappears(f);
+          consistencyGuard.waitTillFileDisappears(new HoodieLocation(f.toUri()));
         } catch (TimeoutException e) {
           throw new HoodieException("Timed out waiting for " + f + " to disappear", e);
         }
@@ -390,7 +391,7 @@ public class HoodieWrapperFileSystem extends FileSystem {
       boolean success = fileSystem.mkdirs(convertToDefaultPath(f), permission);
       if (success) {
         try {
-          consistencyGuard.waitTillFileAppears(convertToDefaultPath(f));
+          consistencyGuard.waitTillFileAppears(convertToDefaultLocation(f));
         } catch (TimeoutException e) {
           throw new HoodieException("Timed out waiting for directory " + f + " to appear", e);
         }
@@ -403,7 +404,7 @@ public class HoodieWrapperFileSystem extends FileSystem {
   public FileStatus getFileStatus(Path f) throws IOException {
     return executeFuncWithTimeMetrics(MetricName.getFileStatus.name(), f, () -> {
       try {
-        consistencyGuard.waitTillFileAppears(convertToDefaultPath(f));
+        consistencyGuard.waitTillFileAppears(convertToDefaultLocation(f));
       } catch (TimeoutException e) {
         // pass
       }
@@ -505,7 +506,7 @@ public class HoodieWrapperFileSystem extends FileSystem {
     boolean newFile = fileSystem.createNewFile(convertToDefaultPath(f));
     if (newFile) {
       try {
-        consistencyGuard.waitTillFileAppears(convertToDefaultPath(f));
+        consistencyGuard.waitTillFileAppears(convertToDefaultLocation(f));
       } catch (TimeoutException e) {
         throw new HoodieException("Timed out waiting for " + f + " to appear", e);
       }
@@ -528,7 +529,7 @@ public class HoodieWrapperFileSystem extends FileSystem {
     Path[] psrcsNew = convertDefaults(psrcs);
     fileSystem.concat(convertToDefaultPath(trg), psrcsNew);
     try {
-      consistencyGuard.waitTillFileAppears(convertToDefaultPath(trg));
+      consistencyGuard.waitTillFileAppears(convertToDefaultLocation(trg));
     } catch (TimeoutException e) {
       throw new HoodieException("Timed out waiting for " + trg + " to appear", e);
     }
@@ -649,7 +650,7 @@ public class HoodieWrapperFileSystem extends FileSystem {
       boolean success = fileSystem.mkdirs(convertToDefaultPath(f));
       if (success) {
         try {
-          consistencyGuard.waitTillFileAppears(convertToDefaultPath(f));
+          consistencyGuard.waitTillFileAppears(convertToDefaultLocation(f));
         } catch (TimeoutException e) {
           throw new HoodieException("Timed out waiting for directory " + f + " to appear", e);
         }
@@ -662,7 +663,7 @@ public class HoodieWrapperFileSystem extends FileSystem {
   public void copyFromLocalFile(Path src, Path dst) throws IOException {
     fileSystem.copyFromLocalFile(convertToLocalPath(src), convertToDefaultPath(dst));
     try {
-      consistencyGuard.waitTillFileAppears(convertToDefaultPath(dst));
+      consistencyGuard.waitTillFileAppears(convertToDefaultLocation(dst));
     } catch (TimeoutException e) {
       throw new HoodieException("Timed out waiting for destination " + dst + " to appear", e);
     }
@@ -672,7 +673,7 @@ public class HoodieWrapperFileSystem extends FileSystem {
   public void moveFromLocalFile(Path[] srcs, Path dst) throws IOException {
     fileSystem.moveFromLocalFile(convertLocalPaths(srcs), convertToDefaultPath(dst));
     try {
-      consistencyGuard.waitTillFileAppears(convertToDefaultPath(dst));
+      consistencyGuard.waitTillFileAppears(convertToDefaultLocation(dst));
     } catch (TimeoutException e) {
       throw new HoodieException("Timed out waiting for destination " + dst + " to appear", e);
     }
@@ -682,7 +683,7 @@ public class HoodieWrapperFileSystem extends FileSystem {
   public void moveFromLocalFile(Path src, Path dst) throws IOException {
     fileSystem.moveFromLocalFile(convertToLocalPath(src), convertToDefaultPath(dst));
     try {
-      consistencyGuard.waitTillFileAppears(convertToDefaultPath(dst));
+      consistencyGuard.waitTillFileAppears(convertToDefaultLocation(dst));
     } catch (TimeoutException e) {
       throw new HoodieException("Timed out waiting for destination " + dst + " to appear", e);
     }
@@ -692,7 +693,7 @@ public class HoodieWrapperFileSystem extends FileSystem {
   public void copyFromLocalFile(boolean delSrc, Path src, Path dst) throws IOException {
     fileSystem.copyFromLocalFile(delSrc, convertToLocalPath(src), convertToDefaultPath(dst));
     try {
-      consistencyGuard.waitTillFileAppears(convertToDefaultPath(dst));
+      consistencyGuard.waitTillFileAppears(convertToDefaultLocation(dst));
     } catch (TimeoutException e) {
       throw new HoodieException("Timed out waiting for destination " + dst + " to appear", e);
     }
@@ -702,7 +703,7 @@ public class HoodieWrapperFileSystem extends FileSystem {
   public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path[] srcs, Path dst) throws IOException {
     fileSystem.copyFromLocalFile(delSrc, overwrite, convertLocalPaths(srcs), convertToDefaultPath(dst));
     try {
-      consistencyGuard.waitTillFileAppears(convertToDefaultPath(dst));
+      consistencyGuard.waitTillFileAppears(convertToDefaultLocation(dst));
     } catch (TimeoutException e) {
       throw new HoodieException("Timed out waiting for destination " + dst + " to appear", e);
     }
@@ -712,7 +713,7 @@ public class HoodieWrapperFileSystem extends FileSystem {
   public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path src, Path dst) throws IOException {
     fileSystem.copyFromLocalFile(delSrc, overwrite, convertToLocalPath(src), convertToDefaultPath(dst));
     try {
-      consistencyGuard.waitTillFileAppears(convertToDefaultPath(dst));
+      consistencyGuard.waitTillFileAppears(convertToDefaultLocation(dst));
     } catch (TimeoutException e) {
       throw new HoodieException("Timed out waiting for destination " + dst + " to appear", e);
     }
@@ -969,6 +970,10 @@ public class HoodieWrapperFileSystem extends FileSystem {
     return convertPathWithScheme(oldPath, getScheme());
   }
 
+  private HoodieLocation convertToDefaultLocation(Path oldPath) {
+    return new HoodieLocation(convertPathWithScheme(oldPath, getScheme()).toUri());
+  }
+
   private Path convertToLocalPath(Path oldPath) {
     try {
       return convertPathWithScheme(oldPath, FileSystem.getLocal(getConf()).getScheme());
@@ -1003,7 +1008,7 @@ public class HoodieWrapperFileSystem extends FileSystem {
   }
 
   protected boolean needCreateTempFile() {
-    return HDFS.getScheme().equals(fileSystem.getScheme());
+    return StorageSchemes.HDFS.getScheme().equals(fileSystem.getScheme());
   }
 
   /**

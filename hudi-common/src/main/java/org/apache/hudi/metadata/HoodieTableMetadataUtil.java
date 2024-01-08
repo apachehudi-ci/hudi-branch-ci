@@ -69,7 +69,6 @@ import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.CollectionUtils;
 import org.apache.hudi.common.util.FileIOUtils;
 import org.apache.hudi.common.util.HoodieRecordUtils;
-import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.ParquetUtils;
 import org.apache.hudi.common.util.StringUtils;
 import org.apache.hudi.common.util.collection.ClosableIterator;
@@ -78,8 +77,12 @@ import org.apache.hudi.common.util.collection.Tuple3;
 import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.exception.HoodieIOException;
 import org.apache.hudi.exception.HoodieMetadataException;
+import org.apache.hudi.hadoop.fs.HadoopFSUtils;
 import org.apache.hudi.io.storage.HoodieFileReader;
 import org.apache.hudi.io.storage.HoodieFileReaderFactory;
+import org.apache.hudi.io.storage.HoodieLocation;
+import org.apache.hudi.io.storage.HoodieStorage;
+import org.apache.hudi.common.util.Option;
 import org.apache.hudi.util.Lazy;
 
 import org.apache.avro.AvroTypeException;
@@ -126,6 +129,7 @@ import static org.apache.hudi.common.config.HoodieCommonConfig.DEFAULT_MAX_MEMOR
 import static org.apache.hudi.common.config.HoodieCommonConfig.DISK_MAP_BITCASK_COMPRESSION_ENABLED;
 import static org.apache.hudi.common.config.HoodieCommonConfig.MAX_MEMORY_FOR_COMPACTION;
 import static org.apache.hudi.common.config.HoodieCommonConfig.SPILLABLE_DISK_MAP_TYPE;
+import static org.apache.hudi.common.fs.FSUtils.PATH_SEPARATOR;
 import static org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator.MILLIS_INSTANT_ID_LENGTH;
 import static org.apache.hudi.common.util.StringUtils.getUTF8Bytes;
 import static org.apache.hudi.common.util.StringUtils.isNullOrEmpty;
@@ -339,7 +343,7 @@ public class HoodieTableMetadataUtil {
    */
   public static boolean metadataPartitionExists(String basePath, HoodieEngineContext context, MetadataPartitionType partitionType) {
     final String metadataTablePath = HoodieTableMetadata.getMetadataTableBasePath(basePath);
-    FileSystem fs = FSUtils.getFs(metadataTablePath, context.getHadoopConf().get());
+    FileSystem fs = HadoopFSUtils.getFs(metadataTablePath, context.getHadoopConf().get());
     try {
       return fs.exists(new Path(metadataTablePath, partitionType.getPartitionPath()));
     } catch (Exception e) {
@@ -1445,11 +1449,11 @@ public class HoodieTableMetadataUtil {
    * @return The backup directory if backup was requested
    */
   public static String deleteMetadataTable(HoodieTableMetaClient dataMetaClient, HoodieEngineContext context, boolean backup) {
-    final Path metadataTablePath = HoodieTableMetadata.getMetadataTableBasePath(dataMetaClient.getBasePathV2());
-    FileSystem fs = FSUtils.getFs(metadataTablePath.toString(), context.getHadoopConf().get());
+    final HoodieLocation metadataTablePath = HoodieTableMetadata.getMetadataTableBasePath(dataMetaClient.getBasePathV2());
+    HoodieStorage storage = FSUtils.getHoodieStorage(metadataTablePath.toString(), context.getHadoopConf().get());
     dataMetaClient.getTableConfig().clearMetadataPartitions(dataMetaClient);
     try {
-      if (!fs.exists(metadataTablePath)) {
+      if (!storage.exists(metadataTablePath)) {
         return null;
       }
     } catch (FileNotFoundException e) {
@@ -1460,10 +1464,11 @@ public class HoodieTableMetadataUtil {
     }
 
     if (backup) {
-      final Path metadataBackupPath = new Path(metadataTablePath.getParent(), ".metadata_" + dataMetaClient.createNewInstantTime(false));
+      final HoodieLocation metadataBackupPath = new HoodieLocation(
+          metadataTablePath.getParent(), ".metadata_" + dataMetaClient.createNewInstantTime(false));
       LOG.info("Backing up metadata directory to " + metadataBackupPath + " before deletion");
       try {
-        if (fs.rename(metadataTablePath, metadataBackupPath)) {
+        if (storage.rename(metadataTablePath, metadataBackupPath)) {
           return metadataBackupPath.toString();
         }
       } catch (Exception e) {
@@ -1474,7 +1479,7 @@ public class HoodieTableMetadataUtil {
 
     LOG.info("Deleting metadata table from " + metadataTablePath);
     try {
-      fs.delete(metadataTablePath, true);
+      storage.deleteDirectory(metadataTablePath);
     } catch (Exception e) {
       throw new HoodieMetadataException("Failed to delete metadata table from path " + metadataTablePath, e);
     }
@@ -1501,7 +1506,7 @@ public class HoodieTableMetadataUtil {
     }
 
     final Path metadataTablePartitionPath = new Path(HoodieTableMetadata.getMetadataTableBasePath(dataMetaClient.getBasePath()), partitionType.getPartitionPath());
-    FileSystem fs = FSUtils.getFs(metadataTablePartitionPath.toString(), context.getHadoopConf().get());
+    FileSystem fs = HadoopFSUtils.getFs(metadataTablePartitionPath.toString(), context.getHadoopConf().get());
     dataMetaClient.getTableConfig().setMetadataPartitionState(dataMetaClient, partitionType, false);
     try {
       if (!fs.exists(metadataTablePartitionPath)) {
@@ -1817,9 +1822,9 @@ public class HoodieTableMetadataUtil {
       final FileSlice fileSlice = partitionAndBaseFile.getValue();
       if (!fileSlice.getBaseFile().isPresent()) {
         List<String> logFilePaths = fileSlice.getLogFiles().sorted(HoodieLogFile.getLogFileComparator())
-            .map(l -> l.getPath().toString()).collect(toList());
+            .map(l -> l.getLocation().toString()).collect(toList());
         HoodieMergedLogRecordScanner mergedLogRecordScanner = HoodieMergedLogRecordScanner.newBuilder()
-            .withFileSystem(metaClient.getFs())
+            .withHoodieStorage(metaClient.getHoodieStorage())
             .withBasePath(basePath)
             .withLogFilePaths(logFilePaths)
             .withReaderSchema(HoodieAvroUtils.getRecordKeySchema())
@@ -1898,7 +1903,7 @@ public class HoodieTableMetadataUtil {
     if (partition.isEmpty()) {
       return new Path(basePath, filename);
     } else {
-      return new Path(basePath, partition + Path.SEPARATOR + filename);
+      return new Path(basePath, partition + PATH_SEPARATOR + filename);
     }
   }
 }

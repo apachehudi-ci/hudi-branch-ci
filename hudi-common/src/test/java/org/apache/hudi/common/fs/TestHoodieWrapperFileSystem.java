@@ -21,6 +21,9 @@ package org.apache.hudi.common.fs;
 import org.apache.hudi.common.testutils.HoodieTestUtils;
 import org.apache.hudi.common.testutils.minicluster.HdfsTestService;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.hadoop.fs.HadoopFSUtils;
+import org.apache.hudi.hadoop.fs.HoodieWrapperFileSystem;
+import org.apache.hudi.io.consistency.NoOpConsistencyGuard;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -32,6 +35,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
+import static org.apache.hudi.common.fs.FSUtils.PATH_SEPARATOR;
 import static org.apache.hudi.common.testutils.HoodieTestUtils.shouldUseExternalHdfs;
 import static org.apache.hudi.common.testutils.HoodieTestUtils.useExternalHdfs;
 import static org.apache.hudi.common.util.StringUtils.getUTF8Bytes;
@@ -65,15 +69,18 @@ class TestHoodieWrapperFileSystem {
 
   @Test
   public void testCreateImmutableFileInPath() throws IOException {
-    HoodieWrapperFileSystem fs = new HoodieWrapperFileSystem(FSUtils.getFs(basePath, new Configuration()), new NoOpConsistencyGuard());
+    HoodieWrapperFileSystem
+        fs = new HoodieWrapperFileSystem(HadoopFSUtils.getFs(basePath, new Configuration()),
+        new NoOpConsistencyGuard());
     String testContent = "test content";
-    Path testFile = new Path(basePath + Path.SEPARATOR + "clean.00000001");
+    Path testFile = new Path(basePath + PATH_SEPARATOR + "clean.00000001");
 
     // create same commit twice
     fs.createImmutableFileInPath(testFile, Option.of(getUTF8Bytes(testContent)));
     fs.createImmutableFileInPath(testFile, Option.of(getUTF8Bytes(testContent)));
 
     assertEquals(1, fs.listStatus(new Path(basePath)).length,
-        "create same file twice should only have one file exists, files: " + fs.listStatus(new Path(basePath)));
+        "create same file twice should only have one file exists, files: "
+            + fs.listStatus(new Path(basePath)).toString());
   }
 }

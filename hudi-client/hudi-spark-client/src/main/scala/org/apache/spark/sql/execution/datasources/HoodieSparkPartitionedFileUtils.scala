@@ -19,6 +19,7 @@
 
 package org.apache.spark.sql.execution.datasources
 
+import org.apache.hudi.io.storage.HoodieLocation
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.catalyst.InternalRow
 
@@ -51,7 +52,7 @@ trait HoodieSparkPartitionedFileUtils extends Serializable {
    * @param partitionedFile Spark [[PartitionedFile]] instance.
    * @return Hadoop [[Path]] instance.
    */
-  def getPathFromPartitionedFile(partitionedFile: PartitionedFile): Path
+  def getPathFromPartitionedFile(partitionedFile: PartitionedFile): HoodieLocation
 
   /**
    * Gets the [[String]] path from Spark [[PartitionedFile]] instance.
@@ -71,7 +72,7 @@ trait HoodieSparkPartitionedFileUtils extends Serializable {
    * @return a new [[PartitionedFile]] instance.
    */
   def createPartitionedFile(partitionValues: InternalRow,
-                            filePath: Path,
+                            filePath: HoodieLocation,
                             start: Long,
                             length: Long): PartitionedFile
 

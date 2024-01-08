@@ -7,18 +7,17 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package org.apache.hudi.common.util;
-
-import javax.annotation.Nullable;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -65,7 +64,7 @@ public class StringUtils {
     if (array == null) {
       return null;
     }
-    return org.apache.hadoop.util.StringUtils.join(separator, array);
+    return String.join(separator, array);
   }
 
   /**
@@ -84,7 +83,7 @@ public class StringUtils {
     if (list == null || list.size() == 0) {
       return null;
     }
-    return org.apache.hadoop.util.StringUtils.join(separator, list.toArray(new String[0]));
+    return String.join(separator, list.toArray(new String[0]));
   }
 
   public static String toHexString(byte[] bytes) {
@@ -122,11 +121,11 @@ public class StringUtils {
    * @param string the string to test and possibly return
    * @return {@code string} itself if it is non-null; {@code ""} if it is null
    */
-  public static String nullToEmpty(@Nullable String string) {
+  public static String nullToEmpty(String string) {
     return string == null ? "" : string;
   }
 
-  public static String objToString(@Nullable Object obj) {
+  public static String objToString(Object obj) {
     if (obj == null) {
       return null;
     }
@@ -139,11 +138,11 @@ public class StringUtils {
    * @param string the string to test and possibly return
    * @return {@code string} itself if it is nonempty; {@code null} if it is empty or null
    */
-  public static @Nullable String emptyToNull(@Nullable String string) {
+  public static String emptyToNull(String string) {
     return stringIsNullOrEmpty(string) ? null : string;
   }
 
-  private static boolean stringIsNullOrEmpty(@Nullable String string) {
+  private static boolean stringIsNullOrEmpty(String string) {
     return string == null || string.isEmpty();
   }
 
@@ -151,11 +150,12 @@ public class StringUtils {
    * Splits input string, delimited {@code delimiter} into a list of non-empty strings
    * (skipping any empty string produced during splitting)
    */
-  public static List<String> split(@Nullable String input, String delimiter) {
+  public static List<String> split(String input, String delimiter) {
     if (isNullOrEmpty(input)) {
       return Collections.emptyList();
     }
-    return Stream.of(input.split(delimiter)).map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
+    return Stream.of(input.split(delimiter)).map(String::trim).filter(s -> !s.isEmpty())
+        .collect(Collectors.toList());
   }
 
   public static String getSuffixBy(String input, int ch) {

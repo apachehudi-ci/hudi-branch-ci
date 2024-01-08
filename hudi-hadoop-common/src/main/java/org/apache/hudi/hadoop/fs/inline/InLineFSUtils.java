@@ -7,22 +7,24 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
-package org.apache.hudi.common.fs.inline;
+package org.apache.hudi.hadoop.fs.inline;
+
+import org.apache.hudi.common.util.ValidationUtils;
+import org.apache.hudi.io.storage.HoodieLocation;
 
 import org.apache.hadoop.fs.Path;
 
 import java.io.File;
-
-import static org.apache.hudi.common.util.ValidationUtils.checkArgument;
 
 /**
  * Utils to parse InLineFileSystem paths.
@@ -79,7 +81,7 @@ public class InLineFSUtils {
 
     final String outerFileScheme = inlineFSPath.getParent().getName();
     final Path basePath = inlineFSPath.getParent().getParent();
-    checkArgument(basePath.toString().contains(SCHEME_SEPARATOR),
+    ValidationUtils.checkArgument(basePath.toString().contains(SCHEME_SEPARATOR),
         "Invalid InLineFS path: " + inlineFSPath);
 
     final String pathExceptScheme = basePath.toString().substring(basePath.toString().indexOf(SCHEME_SEPARATOR) + 1);
@@ -87,6 +89,21 @@ public class InLineFSUtils {
         + (outerFileScheme.equals(LOCAL_FILESYSTEM_SCHEME) ? PATH_SEPARATOR : "")
         + pathExceptScheme;
     return new Path(fullPath);
+  }
+
+  public static HoodieLocation getOuterFilePathFromInlinePath(HoodieLocation inlineFSPath) {
+    assertInlineFSPath(inlineFSPath);
+
+    final String outerFileScheme = inlineFSPath.getParent().getName();
+    final HoodieLocation basePath = inlineFSPath.getParent().getParent();
+    ValidationUtils.checkArgument(basePath.toString().contains(SCHEME_SEPARATOR),
+        "Invalid InLineFS path: " + inlineFSPath);
+
+    final String pathExceptScheme = basePath.toString().substring(basePath.toString().indexOf(SCHEME_SEPARATOR) + 1);
+    final String fullPath = outerFileScheme + SCHEME_SEPARATOR
+        + (outerFileScheme.equals(LOCAL_FILESYSTEM_SCHEME) ? PATH_SEPARATOR : "")
+        + pathExceptScheme;
+    return new HoodieLocation(fullPath);
   }
 
   /**
@@ -117,6 +134,11 @@ public class InLineFSUtils {
 
   private static void assertInlineFSPath(Path inlinePath) {
     String scheme = inlinePath.toUri().getScheme();
-    checkArgument(InLineFileSystem.SCHEME.equals(scheme));
+    ValidationUtils.checkArgument(InLineFileSystem.SCHEME.equals(scheme));
+  }
+
+  private static void assertInlineFSPath(HoodieLocation inlinePath) {
+    String scheme = inlinePath.toUri().getScheme();
+    ValidationUtils.checkArgument(InLineFileSystem.SCHEME.equals(scheme));
   }
 }

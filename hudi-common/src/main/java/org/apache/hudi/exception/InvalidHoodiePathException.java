@@ -18,6 +18,8 @@
 
 package org.apache.hudi.exception;
 
+import org.apache.hudi.io.storage.HoodieLocation;
+
 import org.apache.hadoop.fs.Path;
 
 /**
@@ -25,7 +27,15 @@ import org.apache.hadoop.fs.Path;
  */
 public class InvalidHoodiePathException extends HoodieException {
 
+  public InvalidHoodiePathException(String path, String type) {
+    super("Invalid path " + path + " of type " + type);
+  }
+
   public InvalidHoodiePathException(Path path, String type) {
+    super("Invalid path " + path + " of type " + type);
+  }
+
+  public InvalidHoodiePathException(HoodieLocation path, String type) {
     super("Invalid path " + path + " of type " + type);
   }
 }
