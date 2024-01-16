@@ -111,6 +111,8 @@ stages:
     jobs:
       - job: UT_FT_1
         displayName: UT FT common & flink & UT client/spark-client
+        pool:
+          name: agentPool1
         timeoutInMinutes: '150'
         steps:
           - task: Maven@4
@@ -147,6 +149,8 @@ stages:
             displayName: Top 100 long-running testcases
       - job: UT_FT_2
         displayName: FT client/spark-client & hudi-spark-datasource/hudi-spark
+        pool:
+          name: agentPool2
         timeoutInMinutes: '150'
         steps:
           - task: Maven@4
@@ -173,6 +177,8 @@ stages:
             displayName: Top 100 long-running testcases
       - job: UT_FT_3
         displayName: UT spark-datasource
+        pool:
+          name: agentPool3
         timeoutInMinutes: '240'
         steps:
           - task: Maven@4
@@ -199,6 +205,8 @@ stages:
             displayName: Top 100 long-running testcases
       - job: UT_FT_4
         displayName: UT FT other modules
+        pool:
+          name: agentPool4
         timeoutInMinutes: '240'
         steps:
           - task: Maven@4
