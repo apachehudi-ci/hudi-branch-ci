@@ -25,6 +25,9 @@ trigger:
 pool:
   vmImage: 'ubuntu-22.04'
 
+container:
+  image: ubuntu:22.04
+
 parameters:
   - name: job1Modules
     type: object
