@@ -149,11 +149,23 @@ stages:
             displayName: publish test result
             inputs:
               mergeTestResults: true
+          - task: reportgenerator@5
+            displayName: ReportGenerator
+            inputs:
+              reports: jacoco.xml
+              targetdir: $(System.DefaultWorkingDirectory)
+              reporttypes: Html;XML
+              verbosity: Verbose
           - task: PublishCodeCoverageResults@1
             displayName: code coverage result
             inputs:
               summaryFileLocation: $(System.DefaultWorkingDirectory)/**/target/site/*/jacoco.xml
-              pathToSources: $(System.DefaultWorkingDirectory)/**/src/main/java/;$(System.DefaultWorkingDirectory)/**/src/main/scala/
+              pathToSources: |
+                $(System.DefaultWorkingDirectory)/*/src/main/java/;
+                $(System.DefaultWorkingDirectory)/*/src/main/scala/;
+                $(System.DefaultWorkingDirectory)/*/*/src/main/java/;
+                $(System.DefaultWorkingDirectory)/*/*/src/main/scala/;
+
       - job: UT_FT_2
         displayName: FT client/spark-client & hudi-spark-datasource/hudi-spark
         timeoutInMinutes: '150'
@@ -184,11 +196,22 @@ stages:
             displayName: publish test result
             inputs:
               mergeTestResults: true
+          - task: reportgenerator@5
+            displayName: ReportGenerator
+            inputs:
+              reports: jacoco.xml
+              targetdir: $(System.DefaultWorkingDirectory)
+              reporttypes: Html;XML
+              verbosity: Verbose
           - task: PublishCodeCoverageResults@1
             displayName: code coverage result
             inputs:
               summaryFileLocation: $(System.DefaultWorkingDirectory)/**/target/site/*/jacoco.xml
-              pathToSources: $(System.DefaultWorkingDirectory)/**/src/main/java/;$(System.DefaultWorkingDirectory)/**/src/main/scala/
+              pathToSources: |
+                $(System.DefaultWorkingDirectory)/*/src/main/java/;
+                $(System.DefaultWorkingDirectory)/*/src/main/scala/;
+                $(System.DefaultWorkingDirectory)/*/*/src/main/java/;
+                $(System.DefaultWorkingDirectory)/*/*/src/main/scala/;
       - job: UT_FT_3
         displayName: UT spark-datasource
         timeoutInMinutes: '240'
@@ -219,11 +242,22 @@ stages:
             displayName: publish test result
             inputs:
               mergeTestResults: true
+          - task: reportgenerator@5
+            displayName: ReportGenerator
+            inputs:
+              reports: jacoco.xml
+              targetdir: $(System.DefaultWorkingDirectory)
+              reporttypes: Html;XML
+              verbosity: Verbose
           - task: PublishCodeCoverageResults@1
             displayName: code coverage result
             inputs:
               summaryFileLocation: $(System.DefaultWorkingDirectory)/**/target/site/*/jacoco.xml
-              pathToSources: $(System.DefaultWorkingDirectory)/**/src/main/java/;$(System.DefaultWorkingDirectory)/**/src/main/scala/
+              pathToSources: |
+                $(System.DefaultWorkingDirectory)/*/src/main/java/;
+                $(System.DefaultWorkingDirectory)/*/src/main/scala/;
+                $(System.DefaultWorkingDirectory)/*/*/src/main/java/;
+                $(System.DefaultWorkingDirectory)/*/*/src/main/scala/;
       - job: UT_FT_4
         displayName: UT FT other modules
         timeoutInMinutes: '240'
@@ -264,8 +298,19 @@ stages:
             displayName: publish test result
             inputs:
               mergeTestResults: true
+          - task: reportgenerator@5
+            displayName: ReportGenerator
+            inputs:
+              reports: jacoco.xml
+              targetdir: $(System.DefaultWorkingDirectory)
+              reporttypes: Html;XML
+              verbosity: Verbose
           - task: PublishCodeCoverageResults@1
             displayName: code coverage result
             inputs:
-              summaryFileLocation: $(System.DefaultWorkingDirectory)/**/target/site/*/jacoco.xml
-              pathToSources: $(System.DefaultWorkingDirectory)/**/src/main/java/;$(System.DefaultWorkingDirectory)/**/src/main/scala/
+              summaryFileLocation: $(System.DefaultWorkingDirectory)/jacoco.xml
+              pathToSources: |
+                $(System.DefaultWorkingDirectory)/*/src/main/java/;
+                $(System.DefaultWorkingDirectory)/*/src/main/scala/;
+                $(System.DefaultWorkingDirectory)/*/*/src/main/java/;
+                $(System.DefaultWorkingDirectory)/*/*/src/main/scala/;
