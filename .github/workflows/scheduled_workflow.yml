@@ -1,0 +1,160 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+name: Scheduled Workflow
+
+on:
+  schedule:
+    # Runs every 5 minutes
+    - cron: '*/5 * * * *'
+  pull_request:
+    types: [ opened, edited, reopened, synchronize ]
+
+permissions:
+  statuses: write
+  pull-requests: read
+  issues: read
+
+jobs:
+  process-new-and-updated-prs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Process new and updated PRs
+        # We have to run any actions that require write permissions here
+        # since the workflow triggered by events from a PR in a fork
+        # (not apache/hudi but other_owner/hudi) does not run on a
+        # GITHUB_TOKEN with write permissions (this is prohibited by
+        # Apache).
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const since = new Date(new Date().getTime() - (43200 * 60 * 1000)).toISOString();
+            const query = `repo:${context.repo.owner}/${context.repo.repo} type:pr updated:>=${since}`;
+            const response = await github.rest.search.issuesAndPullRequests({
+              q: query
+            });
+            
+            // Filter for open PRs
+            const openPrs = response.data.items.filter(pr => pr.state === 'open');
+            const { checkAzureCiStatus, createCommitStatusForAzureCi } = require(`${process.env.GITHUB_WORKSPACE}/.github/workflows/azure_ci.js`);
+            
+            for (const pr of openPrs) {
+              console.log(`* Processing PR: ${pr.title}, URL: ${pr.html_url}`);
+              const { data: pullRequest } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number
+              });
+            
+              // Add Azure CI check to PR
+              const latestCommitHash = pullRequest.head.sha;
+              const body = pr.body
+              const { status, message, azureRunLink } = await checkAzureCiStatus({
+                github,
+                context,
+                prNumber: pr.number,
+                latestCommitHash: latestCommitHash           
+              });
+            }
+            
+            const { status1, message1, azureRunLink1 } = await checkAzureCiStatus({
+              github,
+              context,
+              prNumber: 10743,
+              latestCommitHash: 'b3b6506ea9250721ea002fba584c56682d573ae3'            
+            });
+            
+            await createCommitStatusForAzureCi({
+              github,
+              context,
+              prNumber: 10743,
+              commitHash: 'b3b6506ea9250721ea002fba584c56682d573ae3',
+              status1,
+              azureRunLink1,
+              message1
+            });
+            
+            const { status2, message2, azureRunLink2 } = await checkAzureCiStatus({
+              github,
+              context,
+              prNumber: 10744,
+              latestCommitHash: '2c903b39d758f9ee365ad93d6dd3b2ff745eee74'            
+            });
+            
+            await createCommitStatusForAzureCi({
+              github,
+              context,
+              prNumber: 10744,
+              commitHash: '2c903b39d758f9ee365ad93d6dd3b2ff745eee74',
+              state: status2,
+              azureRunLink: azureRunLink2,
+              description: message2
+            });
+            
+            const { status3, message3, azureRunLink3 } = await checkAzureCiStatus({
+              github,
+              context,
+              prNumber: 10594,
+              latestCommitHash: '9c7fb2754efac58066e47e9af0312c4cfc8fa78f'            
+            });
+            
+            await createCommitStatusForAzureCi({
+              github,
+              context,
+              prNumber: 10594,
+              commitHash: '9c7fb2754efac58066e47e9af0312c4cfc8fa78f',
+              state: status3,
+              azureRunLink: azureRunLink3,
+              description: message3
+            });
+            
+            const issueNumber = 10743; // github.event.issue.number;
+            const { data: pullRequest } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: issueNumber
+            });
+            
+            const commitHash = pullRequest.head.sha;
+            console.log(`Latest commit hash: ${commitHash}`);
+            github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: commitHash,
+              state: 'pending',
+              target_url: 'https://hudi.apache.org/',
+              description: 'running in progress',
+              context: 'External CI'
+            });
+            
+            console.log('Sleeping for 30 seconds...');
+            await new Promise(resolve => setTimeout(resolve, 30000));
+            console.log('Done sleeping');
+            
+            github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: commitHash,
+              state: 'success',
+              target_url: 'https://hudi.apache.org/',
+              description: 'finished successfully',
+              context: 'External CI'
+            });
