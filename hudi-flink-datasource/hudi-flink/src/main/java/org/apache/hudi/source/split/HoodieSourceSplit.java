@@ -24,7 +24,6 @@ import org.apache.hudi.common.util.Option;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
-import lombok.ToString;
 import org.apache.flink.api.connector.source.SourceSplit;
 
 import javax.annotation.Nullable;
@@ -38,7 +37,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 @Getter
 @EqualsAndHashCode
-@ToString
 public class HoodieSourceSplit implements SourceSplit, Serializable {
   public static AtomicInteger SPLIT_ID_GEN = new AtomicInteger(-1);
   private static final long serialVersionUID = 1L;
@@ -111,4 +109,18 @@ public class HoodieSourceSplit implements SourceSplit, Serializable {
     consumed = newRecordOffset;
   }
 
+  @Override
+  public String toString() {
+    return "HoodieSourceSplit{"
+            + "splitNum='" + splitNum + '\''
+            + ", basePath='" + basePath + '\''
+            + ", logPaths='" + logPaths + '\''
+            + ", tablePath='" + tablePath + '\''
+            + ", partitionPath='" + partitionPath + '\''
+            + ", mergeType='" + mergeType + '\''
+            + ", latestCommit='" + latestCommit + '\''
+            + ", instantRange='" + instantRange + '\''
+            + ", fileId='" + fileId + '\''
+            + '}';
+  }
 }
