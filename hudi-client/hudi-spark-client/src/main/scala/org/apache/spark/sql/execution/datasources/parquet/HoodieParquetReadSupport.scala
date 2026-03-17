@@ -58,7 +58,8 @@ class HoodieParquetReadSupport(
     //  requested schema. parquet-mr reconciles requested vs file schema by field name, so bytes
     //  flow correctly. This is tracked in issue #18334
     val reorderedSchema = HoodieParquetReadSupport.reorderVariantFields(trimmedParquetSchema)
-    new ReadContext(reorderedSchema, readContext.getReadSupportMetadata)
+//    new ReadContext(reorderedSchema, readContext.getReadSupportMetadata)
+    new ReadContext(trimmedParquetSchema, readContext.getReadSupportMetadata)
   }
 }
 
