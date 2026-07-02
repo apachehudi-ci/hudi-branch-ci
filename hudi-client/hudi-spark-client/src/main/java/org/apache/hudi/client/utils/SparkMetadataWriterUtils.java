@@ -323,6 +323,10 @@ public class SparkMetadataWriterUtils {
     String partition = entry.getKey();
     Pair<String, Long> filePathSizePair = entry.getValue();
     String filePath = filePathSizePair.getKey();
+    if (FSUtils.isNativeDeleteLogFile(new StoragePath(filePath).getName())) {
+      log.info("Skipping expression index records for native delete log file: {}", filePath);
+      return Collections.emptyIterator();
+    }
     String relativeFilePath = FSUtils.getRelativePartitionPath(metaClient.getBasePath(), new StoragePath(filePath));
     long fileSize = filePathSizePair.getValue();
     boolean isBaseFile = FSUtils.isBaseFile(new StoragePath(filePath.substring(filePath.lastIndexOf("/") + 1)));

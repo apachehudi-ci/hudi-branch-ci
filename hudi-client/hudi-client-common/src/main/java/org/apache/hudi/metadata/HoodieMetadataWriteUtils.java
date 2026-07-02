@@ -33,6 +33,7 @@ import org.apache.hudi.common.engine.EngineType;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.engine.HoodieLocalEngineContext;
 import org.apache.hudi.common.fs.ConsistencyGuardConfig;
+import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieAvroRecordMerger;
 import org.apache.hudi.common.model.HoodieBaseFile;
 import org.apache.hudi.common.model.HoodieCleaningPolicy;
@@ -611,7 +612,10 @@ public class HoodieMetadataWriteUtils {
         .flatMap(fileSlice -> Stream.concat(
             Stream.of(fileSlice.getBaseFile().map(HoodieBaseFile::getFileName).orElse(null)),
             fileSlice.getLogFiles().map(HoodieLogFile::getFileName)))
-        .filter(e -> Objects.nonNull(e) && !filesWithColumnStats.contains(e) && !fileGroupIdsToReplace.contains(e))
+        .filter(e -> Objects.nonNull(e)
+            && !FSUtils.isNativeDeleteLogFile(e)
+            && !filesWithColumnStats.contains(e)
+            && !fileGroupIdsToReplace.contains(e))
         .collect(Collectors.toSet());
   }
 }
