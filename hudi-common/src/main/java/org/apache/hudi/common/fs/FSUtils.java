@@ -484,15 +484,19 @@ public class FSUtils {
     return String.format("%s_%s_%s_%d.%s.%s", fileId, writeToken, deltaCommitTime, version, extension, formatSuffix);
   }
 
-  public static boolean isBaseFile(StoragePath path) {
-    if (matchNativeLogFile(path.getName()).isPresent()) {
+  public static boolean isBaseFile(String path) {
+    if (matchNativeLogFile(path).isPresent()) {
       return false;
     }
-    String extension = getFileExtension(path.getName());
+    String extension = getFileExtension(path);
     if (HoodieFileFormat.BASE_FILE_EXTENSIONS.contains(extension)) {
-      return BASE_FILE_PATTERN.matcher(path.getName()).matches();
+      return BASE_FILE_PATTERN.matcher(path).matches();
     }
     return false;
+  }
+
+  public static boolean isBaseFile(StoragePath path) {
+    return isBaseFile(path.getName());
   }
 
   public static String getWriteTokenFromBaseFile(String fileName) {

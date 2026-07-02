@@ -55,6 +55,8 @@ public class WriteStatMerger {
       }
     }
     merged.setLogFiles(mergedLogFiles);
+    // delete file stats (native log delete files tracked separately from the data file path)
+    merged.setDeleteFileStats(getMergedStringLongMap(stat1.getDeleteFileStats(), stat2.getDeleteFileStats()));
     // column stats
     if (stat1.getColumnStats().isPresent()) {
       merged.putRecordsStats(stat1.getColumnStats().get());
@@ -69,7 +71,7 @@ public class WriteStatMerger {
     merged.setFileId(stat2.getFileId());
     merged.setPath(stat2.getPath());
     // merge cdc stats
-    merged.setCdcStats(getMergedCdcStats(stat1.getCdcStats(), stat2.getCdcStats()));
+    merged.setCdcStats(getMergedStringLongMap(stat1.getCdcStats(), stat2.getCdcStats()));
     // prev commit
     merged.setPrevCommit(stat2.getPrevCommit());
     // prev base file
@@ -125,18 +127,18 @@ public class WriteStatMerger {
     return runtimeStats;
   }
 
-  private static Map<String, Long> getMergedCdcStats(Map<String, Long> cdcStats1, Map<String, Long> cdcStats2) {
-    final Map<String, Long> cdcStats;
-    if (cdcStats1 != null && cdcStats2 != null) {
-      cdcStats = new HashMap<>();
-      cdcStats.putAll(cdcStats1);
-      cdcStats.putAll(cdcStats2);
-    } else if (cdcStats1 == null) {
-      cdcStats = cdcStats2;
+  private static Map<String, Long> getMergedStringLongMap(Map<String, Long> map1, Map<String, Long> map2) {
+    final Map<String, Long> merged;
+    if (map1 != null && map2 != null) {
+      merged = new HashMap<>();
+      merged.putAll(map1);
+      merged.putAll(map2);
+    } else if (map1 == null) {
+      merged = map2;
     } else {
-      cdcStats = cdcStats1;
+      merged = map1;
     }
-    return cdcStats;
+    return merged;
   }
 
   private static Long minLong(Long v1, Long v2) {
