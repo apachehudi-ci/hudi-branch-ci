@@ -225,9 +225,13 @@ public class HoodieNativeLogFormatWriter extends HoodieLogFormat.Writer {
     if (deleteFileWriter == null) {
       deleteLogFile = createNativeLogFile(currentAppendVersion, DELETE_LOG_EXTENSION);
       deleteLogSchema = HoodieSchemas.createDeleteLogSchema(tableSchema, orderingFieldNames);
+      // The delete records are built through recordContext#constructEngineRecord (see #appendDeleteRecord), so the
+      // writer must match the record context's engine type rather than the merger's record type: on Spark executors
+      // the reader context for write degrades to Avro (no engine context available), and using the merger record
+      // type here (e.g. SPARK) would create an engine-native writer that fails on the Avro delete records.
       deleteFileWriter = HoodieFileWriterFactory.getFileWriter(
           instantTime, deleteLogFile.getPath(), storage, writeConfig, deleteLogSchema, taskContextSupplier,
-          writeConfig.getRecordMerger().getRecordType());
+          recordContext.getRecordType());
     }
   }
 

@@ -137,6 +137,11 @@ public abstract class BaseSparkInternalRecordContext extends RecordContext<Inter
   }
 
   @Override
+  public HoodieRecord.HoodieRecordType getRecordType() {
+    return HoodieRecord.HoodieRecordType.SPARK;
+  }
+
+  @Override
   public InternalRow mergeWithEngineRecord(HoodieSchema schema,
                                            Map<Integer, Object> updateValues,
                                            BufferedRecord<InternalRow> baseRecord) {

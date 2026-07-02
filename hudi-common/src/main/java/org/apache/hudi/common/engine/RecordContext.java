@@ -171,6 +171,14 @@ public abstract class RecordContext<T> implements Serializable {
   public abstract T constructEngineRecord(HoodieSchema recordSchema, Object[] fieldValues);
 
   /**
+   * Returns the engine record type produced by this context (e.g. {@code AVRO}, {@code SPARK}, {@code FLINK},
+   * {@code HIVE}). This mirrors the concrete type of records built by {@link #constructEngineRecord}, so callers that
+   * feed those engine records into a {@link org.apache.hudi.io.storage.HoodieFileWriter} can pick a writer that
+   * matches. Used by the native log delete writer, where the record object type and the writer must agree.
+   */
+  public abstract HoodieRecord.HoodieRecordType getRecordType();
+
+  /**
    * Gets the record key in String.
    *
    * @param record The record in engine-specific type.

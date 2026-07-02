@@ -150,6 +150,11 @@ public class AvroRecordContext extends RecordContext<IndexedRecord> {
   }
 
   @Override
+  public HoodieRecord.HoodieRecordType getRecordType() {
+    return HoodieRecord.HoodieRecordType.AVRO;
+  }
+
+  @Override
   public IndexedRecord mergeWithEngineRecord(HoodieSchema schema,
                                              Map<Integer, Object> updateValues,
                                              BufferedRecord<IndexedRecord> baseRecord) {

@@ -154,6 +154,11 @@ class TestHoodieReaderContext {
     }
 
     @Override
+    public HoodieRecord.HoodieRecordType getRecordType() {
+      return HoodieRecord.HoodieRecordType.AVRO;
+    }
+
+    @Override
     public Object getValue(String record, HoodieSchema schema, String fieldName) {
       return null;
     }
