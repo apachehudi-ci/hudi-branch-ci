@@ -268,10 +268,12 @@ public class HoodieNativeLogFormatWriter extends HoodieLogFormat.Writer {
       return new AppendResult(logFile, 0, 0);
     }
 
-    long totalSize = lastAppendResults.stream().mapToLong(AppendResult::size).sum();
+    // The returned result represents the primary (data) file recorded as the write stat's path. Its size must be the
+    // data file's own size only: a delete file flushed in the same shot is a separate physical file whose size is
+    // tracked independently (HoodieDeltaWriteStat#getDeleteFileStats).
     AppendResult firstResult = lastAppendResults.get(0);
     this.logFile = firstResult.logFile();
-    return new AppendResult(firstResult.logFile(), 0, totalSize);
+    return firstResult;
   }
 
   private int nextAvailableVersion() throws IOException {

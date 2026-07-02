@@ -42,6 +42,7 @@ import org.apache.hudi.common.fs.ConsistencyGuard.FileVisibility;
 import org.apache.hudi.common.fs.ConsistencyGuardConfig;
 import org.apache.hudi.common.fs.FailSafeConsistencyGuard;
 import org.apache.hudi.common.fs.OptimisticConsistencyGuard;
+import org.apache.hudi.common.model.HoodieDeltaWriteStat;
 import org.apache.hudi.common.model.HoodieFailedWritesCleaningPolicy;
 import org.apache.hudi.common.model.HoodieFileFormat;
 import org.apache.hudi.common.model.HoodieIndexDefinition;
@@ -818,10 +819,20 @@ public abstract class HoodieTable<T, I, K, O> implements Serializable {
           .filter(Objects::nonNull)
           .flatMap(cdcStat -> cdcStat.keySet().stream())
           .collect(Collectors.toSet());
+      // A native log append can flush both a data file and a delete file in one shot, but the write stat only records
+      // the data file as its path (delete files are tracked separately in HoodieDeltaWriteStat#getDeleteFileStats).
+      // Collect the delete files here so their CREATE markers are not mistaken for partially written files and deleted.
+      Set<String> validDeletePaths = stats.stream()
+          .filter(stat -> stat instanceof HoodieDeltaWriteStat)
+          .map(stat -> ((HoodieDeltaWriteStat) stat).getDeleteFileStats())
+          .filter(Objects::nonNull)
+          .flatMap(deleteFileStats -> deleteFileStats.keySet().stream())
+          .collect(Collectors.toSet());
 
       // Contains list of partially created files. These needs to be cleaned up.
       invalidDataPaths.removeAll(validDataPaths);
       invalidDataPaths.removeAll(validCdcDataPaths);
+      invalidDataPaths.removeAll(validDeletePaths);
 
       if (!invalidDataPaths.isEmpty()) {
         if (shouldFailOnDuplicateDataFileDetection) {

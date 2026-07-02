@@ -183,8 +183,17 @@ public class HoodieNativeLogAppendHandle<T, I, K, O> extends HoodieAppendHandle<
   @Override
   protected void updateLogFiles(HoodieDeltaWriteStat stat) {
     for (AppendResult appendResult : writer.getLastAppendResults()) {
-      if (!stat.getLogFiles().contains(appendResult.logFile().getFileName())) {
-        stat.addLogFiles(appendResult.logFile().getFileName());
+      String fileName = appendResult.logFile().getFileName();
+      if (!stat.getLogFiles().contains(fileName)) {
+        stat.addLogFiles(fileName);
+      }
+      // A native flush can produce a separate delete file that is not captured by stat.getPath(). Record it (with
+      // its size) so metadata table file listing and marker reconciliation account for it.
+      if (FSUtils.isNativeDeleteLogFile(fileName)) {
+        String deleteFilePath = partitionPath.isEmpty()
+            ? new StoragePath(fileName).toString()
+            : new StoragePath(partitionPath, fileName).toString();
+        stat.addDeleteFileStat(deleteFilePath, appendResult.size());
       }
     }
   }

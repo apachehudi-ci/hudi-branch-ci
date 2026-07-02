@@ -22,8 +22,12 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Getter;
 import lombok.Setter;
 
+import javax.annotation.Nullable;
+
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Statistics about a single Hoodie delta log operation.
@@ -39,8 +43,29 @@ public class HoodieDeltaWriteStat extends HoodieWriteStat {
   private String baseFile;
   private List<String> logFiles = new ArrayList<>();
 
+  /**
+   * Relative delete-log file path (with partition) to its size. A native log append flushes a separate
+   * {@code .deletes} file alongside the data file, but only the data file is captured by {@link #getPath()}.
+   * Recording the delete file here lets downstream consumers (metadata table file listing, marker reconciliation)
+   * account for it, mirroring how {@link HoodieWriteStat#getCdcStats()} tracks CDC files.
+   */
+  @Getter(lombok.AccessLevel.NONE)
+  private Map<String, Long> deleteFileStats;
+
   public void addLogFiles(String logFile) {
     logFiles.add(logFile);
+  }
+
+  public void addDeleteFileStat(String deleteFilePath, long fileSize) {
+    if (deleteFileStats == null) {
+      deleteFileStats = new HashMap<>();
+    }
+    deleteFileStats.put(deleteFilePath, fileSize);
+  }
+
+  @Nullable
+  public Map<String, Long> getDeleteFileStats() {
+    return deleteFileStats;
   }
 
   /**
@@ -54,6 +79,9 @@ public class HoodieDeltaWriteStat extends HoodieWriteStat {
     copy.setPrevCommit(getPrevCommit());
     copy.setBaseFile(getBaseFile());
     copy.setLogFiles(new ArrayList<>(getLogFiles()));
+    if (deleteFileStats != null) {
+      copy.setDeleteFileStats(new HashMap<>(deleteFileStats));
+    }
     return copy;
   }
 }
