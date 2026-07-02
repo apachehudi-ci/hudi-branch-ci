@@ -887,8 +887,10 @@ public class HoodieTableMetadataUtil {
                                                                                  EngineType engineType) {
     List<HoodieWriteStat> allWriteStats = commitMetadata.getPartitionToWriteStats().values().stream()
         .flatMap(Collection::stream).collect(Collectors.toList());
-    // Return early if there are no write stats, or if the operation is a compaction.
-    if (allWriteStats.isEmpty() || commitMetadata.getOperationType() == WriteOperationType.COMPACT) {
+    // Return early if there are no write stats, or if the operation is compaction or log compaction.
+    if (allWriteStats.isEmpty()
+        || commitMetadata.getOperationType() == WriteOperationType.COMPACT
+        || commitMetadata.getOperationType() == WriteOperationType.LOG_COMPACT) {
       return engineContext.emptyHoodieData();
     }
     // RLI cannot support logs having inserts with current offering. So, lets validate that.
