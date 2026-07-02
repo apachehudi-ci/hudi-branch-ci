@@ -131,7 +131,7 @@ public class HoodieLogFormatReader implements HoodieLogFormat.Reader {
       }
       List<String> orderingFieldNames =
           HoodieRecordUtils.getOrderingFieldNames(metaClient.getTableConfig().getRecordMergeMode(), metaClient);
-      return new HoodieNativeLogFileReader(storage, logFile, readerSchema,
+      return new HoodieNativeLogFileReader(storage, logFile, readerSchema, internalSchema,
           orderingFieldNames,
           getRelativePartitionPath(logFile), metaClient.getTableConfig().getProps());
     }

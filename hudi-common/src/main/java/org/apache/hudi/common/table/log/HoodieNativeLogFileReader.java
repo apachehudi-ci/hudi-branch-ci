@@ -30,6 +30,7 @@ import org.apache.hudi.common.table.log.block.HoodieNativeDeleteBlock;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.exception.HoodieIOException;
 import org.apache.hudi.exception.HoodieNotSupportedException;
+import org.apache.hudi.internal.schema.InternalSchema;
 import org.apache.hudi.io.storage.HoodieIOFactory;
 import org.apache.hudi.storage.HoodieStorage;
 
@@ -47,6 +48,7 @@ public class HoodieNativeLogFileReader implements HoodieLogFormat.Reader {
   private final HoodieStorage storage;
   private final HoodieLogFile logFile;
   private final HoodieSchema readerSchema;
+  private final InternalSchema internalSchema;
   private final List<String> orderingFieldNames;
   private final String partitionPath;
   private final Properties props;
@@ -55,9 +57,16 @@ public class HoodieNativeLogFileReader implements HoodieLogFormat.Reader {
   HoodieNativeLogFileReader(HoodieStorage storage, HoodieLogFile logFile,
                             HoodieSchema readerSchema,
                             List<String> orderingFieldNames, String partitionPath, Properties props) {
+    this(storage, logFile, readerSchema, null, orderingFieldNames, partitionPath, props);
+  }
+
+  HoodieNativeLogFileReader(HoodieStorage storage, HoodieLogFile logFile,
+                            HoodieSchema readerSchema, InternalSchema internalSchema,
+                            List<String> orderingFieldNames, String partitionPath, Properties props) {
     this.storage = storage;
     this.logFile = logFile;
     this.readerSchema = readerSchema;
+    this.internalSchema = internalSchema == null ? InternalSchema.getEmptyInternalSchema() : internalSchema;
     this.orderingFieldNames = orderingFieldNames;
     this.partitionPath = partitionPath;
     this.props = props;
@@ -101,7 +110,8 @@ public class HoodieNativeLogFileReader implements HoodieLogFormat.Reader {
       return new HoodieNativeDeleteBlock(storage, logFile,
           orderingFieldNames, partitionPath, props, header, new HashMap<>());
     }
-    return new HoodieNativeDataBlock(storage, logFile, fileFormat, Option.ofNullable(readerSchema), header, new HashMap<>());
+    Option<HoodieSchema> readerSchemaOpt = internalSchema.isEmptySchema() ? Option.ofNullable(readerSchema) : Option.empty();
+    return new HoodieNativeDataBlock(storage, logFile, fileFormat, readerSchemaOpt, header, new HashMap<>());
   }
 
   @Override
