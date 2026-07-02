@@ -206,7 +206,7 @@ public abstract class HoodieAppendHandle<T, I, K, O> extends HoodieWriteHandle<T
 
       if (isSecondaryIndexStatsStreamingWritesEnabled && !statuses.isEmpty()) {
         SecondaryIndexStreamingTracker.trackSecondaryIndexStats(partitionPath, fileId, getReadFileSlice(),
-            statuses.stream().map(status -> status.getStat().getPath()).collect(Collectors.toList()),
+            SecondaryIndexStreamingTracker.collectNewLogFilesForSecondaryIndexStats(statuses),
             statuses.get(statuses.size() - 1), hoodieTable, secondaryIndexDefns, config, instantTime, writeSchemaWithMetaFields);
       }
 

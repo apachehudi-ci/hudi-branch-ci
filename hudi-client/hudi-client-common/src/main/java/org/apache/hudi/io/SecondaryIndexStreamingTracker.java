@@ -22,6 +22,7 @@ import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.common.engine.HoodieReaderContext;
 import org.apache.hudi.common.engine.RecordContext;
 import org.apache.hudi.common.model.FileSlice;
+import org.apache.hudi.common.model.HoodieDeltaWriteStat;
 import org.apache.hudi.common.model.HoodieFileGroupId;
 import org.apache.hudi.common.model.HoodieIndexDefinition;
 import org.apache.hudi.common.model.HoodieKey;
@@ -30,6 +31,7 @@ import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.schema.HoodieSchema;
 import org.apache.hudi.common.table.read.BufferedRecord;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.common.util.VisibleForTesting;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.exception.HoodieIOException;
 import org.apache.hudi.keygen.BaseKeyGenerator;
@@ -40,10 +42,13 @@ import org.apache.hudi.table.HoodieTable;
 import javax.annotation.Nullable;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
@@ -125,6 +130,29 @@ public class SecondaryIndexStreamingTracker {
         }
       });
     });
+  }
+
+  /**
+   * Collects the paths of the new log files (including native delete files) written by an append handle,
+   * so that they can be added to the file slice when generating secondary index stats.
+   *
+   * @param statuses Write statuses produced by the append handle
+   * @return De-duplicated list of new log file paths in insertion order
+   */
+  @VisibleForTesting
+  static List<String> collectNewLogFilesForSecondaryIndexStats(List<WriteStatus> statuses) {
+    Set<String> newLogFiles = new LinkedHashSet<>();
+    for (WriteStatus status : statuses) {
+      HoodieDeltaWriteStat stat = (HoodieDeltaWriteStat) status.getStat();
+      if (stat.getPath() != null) {
+        newLogFiles.add(stat.getPath());
+      }
+      Map<String, Long> deleteFileStats = stat.getDeleteFileStats();
+      if (deleteFileStats != null) {
+        newLogFiles.addAll(deleteFileStats.keySet());
+      }
+    }
+    return new ArrayList<>(newLogFiles);
   }
 
   /**

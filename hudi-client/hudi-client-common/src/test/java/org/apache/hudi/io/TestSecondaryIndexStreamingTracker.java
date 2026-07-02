@@ -22,6 +22,7 @@ import org.apache.hudi.client.SecondaryIndexStats;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieAvroRecord;
+import org.apache.hudi.common.model.HoodieDeltaWriteStat;
 import org.apache.hudi.common.model.HoodieEmptyRecord;
 import org.apache.hudi.common.model.HoodieIndexDefinition;
 import org.apache.hudi.common.model.HoodieKey;
@@ -364,6 +365,36 @@ class TestSecondaryIndexStreamingTracker {
       assertEquals("85.0", stats.get(0).getSecondaryKeyValue());
       assertFalse(stats.get(0).isDeleted());
     });
+  }
+
+  @Test
+  public void testCollectNewLogFilesForSecondaryIndexStats() {
+    // regular log file: collected as is
+    WriteStatus regularLogFile = writeStatus("2024/01/01/.file_1.log.1");
+    assertEquals(Collections.singletonList("2024/01/01/.file_1.log.1"),
+        SecondaryIndexStreamingTracker.collectNewLogFilesForSecondaryIndexStats(Collections.singletonList(regularLogFile)));
+
+    // native data file with a separate delete file: both collected
+    WriteStatus nativeDataAndDelete = writeStatus("2024/01/01/.file_1.log.parquet");
+    ((HoodieDeltaWriteStat) nativeDataAndDelete.getStat()).addDeleteFileStat("2024/01/01/.file_1.deletes.parquet", 100L);
+    assertEquals(Arrays.asList(
+            "2024/01/01/.file_1.log.parquet",
+            "2024/01/01/.file_1.deletes.parquet"),
+        SecondaryIndexStreamingTracker.collectNewLogFilesForSecondaryIndexStats(Collections.singletonList(nativeDataAndDelete)));
+
+    // delete-only native file: the delete file matches the stat path and is deduped
+    WriteStatus deleteOnlyNativeFile = writeStatus("2024/01/01/.file_1.deletes.parquet");
+    ((HoodieDeltaWriteStat) deleteOnlyNativeFile.getStat()).addDeleteFileStat("2024/01/01/.file_1.deletes.parquet", 100L);
+    assertEquals(Collections.singletonList("2024/01/01/.file_1.deletes.parquet"),
+        SecondaryIndexStreamingTracker.collectNewLogFilesForSecondaryIndexStats(Collections.singletonList(deleteOnlyNativeFile)));
+  }
+
+  private static WriteStatus writeStatus(String path) {
+    WriteStatus status = new WriteStatus(false, 0.0d);
+    HoodieDeltaWriteStat stat = new HoodieDeltaWriteStat();
+    stat.setPath(path);
+    status.setStat(stat);
+    return status;
   }
 
   // Helper Methods
