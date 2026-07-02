@@ -34,7 +34,7 @@ import org.apache.hudi.common.model.HoodieWriteStat;
 import org.apache.hudi.common.model.TableServiceType;
 import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
-import org.apache.hudi.common.table.log.HoodieLogFileReader;
+import org.apache.hudi.common.table.log.HoodieLogFormat;
 import org.apache.hudi.common.table.log.block.HoodieLogBlock;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
@@ -602,13 +602,16 @@ public class TestHoodieMergeOnReadTable extends SparkClientFunctionalTestHarness
   }
 
   private void validateLogCompactionMetadataHeaders(HoodieCommitMetadata compactionMetadata, StoragePath basePath, String expectedCompactedBlockTimes) {
+    HoodieTableMetaClient tableMetaClient = HoodieTableMetaClient.builder()
+        .setConf(storageConf())
+        .setBasePath(basePath)
+        .build();
     compactionMetadata.getFileIdAndFullPaths(basePath).values().stream()
         .map(StoragePath::new)
         .filter(path -> FSUtils.isLogFile(path.getName()))
         .forEach(logFilePath -> {
-          try {
-            HoodieLogFileReader reader = new HoodieLogFileReader(hoodieStorage(), new HoodieLogFile(logFilePath), HOODIE_SCHEMA, 10000, false,
-                false, "_row_key", null);
+          try (HoodieLogFormat.Reader reader = HoodieLogFormat.newReader(
+              hoodieStorage(), tableMetaClient, new HoodieLogFile(logFilePath), HOODIE_SCHEMA)) {
             Map<HoodieLogBlock.HeaderMetadataType, String> headers = Collections.emptyMap();
             while (reader.hasNext()) {
               // Get headers from the final block
