@@ -262,7 +262,7 @@ public interface HoodieLogFormat {
   static HoodieLogFormat.Reader newReader(HoodieStorage storage, HoodieTableMetaClient metaClient,
                                           HoodieLogFile logFile, HoodieSchema readerSchema, boolean reverseReader) throws IOException {
     if (FSUtils.matchNativeLogFile(logFile.getFileName()).isPresent()) {
-      ValidationUtils.checkArgument(metaClient != null, "Native log files require HoodieTableMetaClient.");
+      ValidationUtils.checkArgument(metaClient != null, "Native log file readers require HoodieTableMetaClient.");
       StoragePath logFileParent = logFile.getPath().getParent();
       return new HoodieNativeLogFileReader(
           storage,

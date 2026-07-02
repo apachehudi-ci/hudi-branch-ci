@@ -98,13 +98,13 @@ public class FlinkRowDataReaderContext extends HoodieReaderContext<RowData> {
       HoodieSchema dataSchema,
       HoodieSchema requiredSchema,
       HoodieStorage storage) throws IOException {
-    boolean isLogFile = FSUtils.isLogFile(filePath);
+    boolean isInlineLogFile = FSUtils.isLogFile(filePath) && FSUtils.matchNativeLogFile(filePath.getName()).isEmpty();
     // disable schema evolution in fileReader if it's log file, since schema evolution for log file is handled in `FileGroupRecordBuffer`
-    InternalSchemaManager schemaManager = isLogFile ? InternalSchemaManager.DISABLED : internalSchemaManager.get();
+    InternalSchemaManager schemaManager = isInlineLogFile ? InternalSchemaManager.DISABLED : internalSchemaManager.get();
 
     // Log files only reach this method for parquet data blocks; base files are resolved by their extension.
     // Format-specific handling lives in the readers themselves, so this method stays format-agnostic.
-    HoodieFileFormat format = isLogFile ? HoodieFileFormat.PARQUET : HoodieFileFormat.fromFileExtension(filePath.getFileExtension());
+    HoodieFileFormat format = isInlineLogFile ? HoodieFileFormat.PARQUET : HoodieFileFormat.fromFileExtension(filePath.getFileExtension());
     HoodieRowDataFileReader reader = (HoodieRowDataFileReader) HoodieIOFactory.getIOFactory(storage)
         .getReaderFactory(HoodieRecord.HoodieRecordType.FLINK)
         .getFileReader(tableConfig, filePath, format, Option.empty());
