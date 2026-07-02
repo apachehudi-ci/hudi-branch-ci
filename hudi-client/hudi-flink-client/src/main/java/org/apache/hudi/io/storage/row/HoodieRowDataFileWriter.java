@@ -39,13 +39,6 @@ public interface HoodieRowDataFileWriter extends HoodieFileWriter {
   boolean canWrite();
 
   /**
-   * Writes an {@link RowData} to the {@link HoodieRowDataFileWriter}. Also takes in associated record key to be added to bloom filter if required.
-   *
-   * @throws IOException on any exception while writing.
-   */
-  void writeRow(String key, RowData row) throws IOException;
-
-  /**
    * Writes an {@link RowData} into the {@link HoodieRowDataFileWriter} with metadata fields.
    * Also takes in associated record key to be added to bloom filter if required.
    *

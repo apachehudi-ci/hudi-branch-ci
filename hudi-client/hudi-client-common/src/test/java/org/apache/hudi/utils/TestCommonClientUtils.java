@@ -112,6 +112,7 @@ class TestCommonClientUtils {
   }
 
   private static Stream<Arguments> provideWriteVersionNativeLogExpectations() {
+    // Native log format is the default for write version >= TEN, regardless of base file format.
     return Stream.of(
         Arguments.of(HoodieTableVersion.SIX, false),
         Arguments.of(HoodieTableVersion.EIGHT, false),

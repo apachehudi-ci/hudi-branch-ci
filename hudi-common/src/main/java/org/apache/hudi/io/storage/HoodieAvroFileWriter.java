@@ -51,6 +51,11 @@ public interface HoodieAvroFileWriter extends HoodieFileWriter {
     writeAvro(recordKey, avroPayload);
   }
 
+  @Override
+  default void writeRow(String recordKey, Object record) throws IOException {
+    writeAvro(recordKey, (IndexedRecord) record);
+  }
+
   default void prepRecordWithMetadata(HoodieKey key, IndexedRecord avroRecord, String instantTime, Integer partitionId, long recordIndex, String fileName) {
     String seqId = HoodieRecord.generateSequenceId(instantTime, partitionId, recordIndex);
     HoodieAvroUtils.addHoodieKeyToRecord((GenericRecord) avroRecord, key.getRecordKey(), key.getPartitionPath(), fileName);

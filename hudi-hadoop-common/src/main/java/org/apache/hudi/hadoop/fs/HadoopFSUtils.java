@@ -426,8 +426,7 @@ public class HadoopFSUtils {
   }
 
   public static boolean isBaseFile(Path path) {
-    String extension = FSUtils.getFileExtension(path.getName());
-    return HoodieFileFormat.BASE_FILE_EXTENSIONS.contains(extension);
+    return FSUtils.isBaseFile(new StoragePath(path.toUri()));
   }
 
   public static boolean isLogFile(Path logPath) {

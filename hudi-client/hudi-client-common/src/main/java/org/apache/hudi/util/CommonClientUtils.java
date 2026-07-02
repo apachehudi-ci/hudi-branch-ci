@@ -135,8 +135,8 @@ public class CommonClientUtils {
    * files written via {@code HoodieNativeLogFormatWriter}) instead of the legacy inline
    * log format. The native format is the default for write version &gt;= {@link HoodieTableVersion#TEN}.
    *
-   * <p>This decision is orthogonal to the storage layout (e.g. LSM-tree); it is keyed on the
-   * effective write version (i.e. {@code HoodieWriteConfig#getWriteVersion()}) and base file format
+   * <p>This decision is orthogonal to the storage layout (e.g. LSM-tree) and base file format;
+   * it is keyed on the effective write version (i.e. {@code HoodieWriteConfig#getWriteVersion()})
    * rather than the persisted table version, consistent with how the inline log block layout is
    * selected, so that the on-disk format follows what the writer is targeting during
    * upgrade/downgrade windows.

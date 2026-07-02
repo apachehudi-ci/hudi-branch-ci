@@ -33,8 +33,6 @@ import org.apache.hudi.common.table.log.LogFileCreationCallback;
 import org.apache.hudi.common.table.log.NativeLogFooterMetadata;
 import org.apache.hudi.common.table.log.block.HoodieLogBlock;
 import org.apache.hudi.common.table.log.block.HoodieLogBlock.HeaderMetadataType;
-import org.apache.hudi.common.table.read.BufferedRecord;
-import org.apache.hudi.common.table.read.BufferedRecords;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.OrderingValues;
 import org.apache.hudi.common.util.collection.ArrayComparable;
@@ -166,13 +164,7 @@ public class HoodieNativeLogFormatWriter extends HoodieLogFormat.Writer {
         recordSchema, recordProperties, orderingFieldNames.toArray(new String[0]));
     Object deleteEngineRecord = recordContext.constructEngineRecord(
         deleteLogSchema, createDeleteLogFieldValues(recordKey, orderingValue));
-    // Keep isDelete=false here so RecordContext constructs a data-bearing HoodieRecord
-    // with the native delete-log row. The delete semantics come from the delete log file
-    // itself; setting isDelete=true would create a HoodieEmptyRecord and lose the row.
-    BufferedRecord deleteRecord = BufferedRecords.fromEngineRecord(
-        deleteEngineRecord, deleteLogSchema, recordContext, orderingValue, recordKey, false);
-    deleteFileWriter.write(recordKey, recordContext.constructHoodieRecord(deleteRecord, record.getPartitionPath()),
-        deleteLogSchema, recordProperties);
+    deleteFileWriter.writeRow(recordKey, deleteEngineRecord);
   }
 
   private Object[] createDeleteLogFieldValues(String recordKey, Comparable orderingValue) {

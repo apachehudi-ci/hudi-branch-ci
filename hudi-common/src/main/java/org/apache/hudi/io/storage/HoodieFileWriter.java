@@ -34,6 +34,8 @@ public interface HoodieFileWriter extends AutoCloseable {
 
   void write(String recordKey, HoodieRecord record, HoodieSchema schema, Properties props) throws IOException;
 
+  void writeRow(String recordKey, Object record) throws IOException;
+
   void close() throws IOException;
 
   default void addFooterMetadata(Map<String, String> footerMetadata) {

@@ -348,10 +348,10 @@ public class HoodieSparkLanceWriter extends HoodieBaseLanceWriter<InternalRow, U
   }
 
   @Override
-  public void writeRow(String recordKey, InternalRow row) throws IOException {
+  public void writeRow(String recordKey, Object row) throws IOException {
     bloomFilterWriteSupportOpt.ifPresent(bloomFilterWriteSupport ->
         bloomFilterWriteSupport.addKey(UTF8String.fromString(recordKey)));
-    super.write(row);
+    super.write((InternalRow) row);
   }
   
   @Override

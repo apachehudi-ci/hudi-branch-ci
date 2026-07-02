@@ -22,6 +22,7 @@ import org.apache.hudi.common.engine.TaskContextSupplier;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableConfig;
+import org.apache.hudi.common.util.HoodieRecordUtils;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.io.v2.RowDataInlineLogWriteHandle;
 import org.apache.hudi.io.v2.RowDataNativeLogWriteHandle;
@@ -328,6 +329,9 @@ public class FlinkWriteHandleFactory {
       final String partitionPath = bucketInfo.getPartitionPath();
       final TaskContextSupplier contextSupplier = table.getTaskContextSupplier();
       if (CommonClientUtils.shouldWriteNativeLogFormat(config)) {
+        if (table.requireSortedRecords()) {
+          recordItr = HoodieRecordUtils.sortRecordsByRecordKey(recordItr);
+        }
         return new FlinkNativeLogAppendHandle<>(config, instantTime, table, partitionPath, fileID,
             bucketInfo.getBucketType(), recordItr, contextSupplier);
       }

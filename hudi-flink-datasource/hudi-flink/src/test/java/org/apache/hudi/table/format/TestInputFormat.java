@@ -42,7 +42,7 @@ import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.table.cdc.HoodieCDCSupplementalLoggingMode;
 import org.apache.hudi.common.table.log.HoodieLogFormat;
-import org.apache.hudi.common.table.log.block.HoodieHFileDataBlock;
+import org.apache.hudi.common.table.log.block.HoodieDeleteBlock;
 import org.apache.hudi.common.table.log.block.HoodieLogBlock;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
@@ -209,7 +209,8 @@ public class TestInputFormat {
 
     TestData.writeData(TestData.DATA_SET_INSERT, conf);
 
-    HoodieStorage storage = StreamerUtil.createMetaClient(conf).getStorage();
+    HoodieTableMetaClient metaClient = StreamerUtil.createMetaClient(conf);
+    HoodieStorage storage = metaClient.getStorage();
     StoragePath recordIndexPath = new StoragePath(
         HoodieTableMetadata.getMetadataTableBasePath(conf.get(FlinkOptions.PATH)),
         MetadataPartitionType.RECORD_INDEX.getPartitionPath());
@@ -222,10 +223,10 @@ public class TestInputFormat {
     for (StoragePathInfo logFile : logFiles) {
       HoodieSchema schema = TableSchemaResolver.readSchemaFromLogFile(storage, logFile.getPath());
       try (HoodieLogFormat.Reader reader =
-               HoodieLogFormat.newReader(storage, new HoodieLogFile(logFile), schema)) {
+               HoodieLogFormat.newReader(storage, metaClient, new HoodieLogFile(logFile), schema)) {
         while (reader.hasNext()) {
           HoodieLogBlock logBlock = reader.next();
-          if (logBlock instanceof HoodieHFileDataBlock) {
+          if (!(logBlock instanceof HoodieDeleteBlock)) {
             assertBloomFilterContainsWrittenKey(storage, logBlock);
             hfileDataBlockCount++;
           }

@@ -69,6 +69,16 @@ public class TestFileWriter implements HoodieFileWriter {
   }
 
   @Override
+  public void writeRow(String recordKey, Object record) throws IOException {
+    if (closed) {
+      throw new IOException("Writer is closed");
+    }
+    if (failOnWrite) {
+      throw new IOException("Simulated file writer write failure");
+    }
+  }
+
+  @Override
   public void close() throws IOException {
     closed = true;
   }

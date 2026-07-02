@@ -60,8 +60,8 @@ public class HoodieSparkParquetStreamWriter implements HoodieSparkFileWriter, Au
   }
 
   @Override
-  public void writeRow(String key, InternalRow record) throws IOException {
-    writer.write(record);
+  public void writeRow(String key, Object record) throws IOException {
+    writer.write((InternalRow) record);
     writeSupport.add(UTF8String.fromString(key));
   }
 
