@@ -1781,6 +1781,10 @@ public class HoodieTableMetadataUtil {
         : partitionPath + "/" + fileName;
     try {
       StoragePath fullFilePath = new StoragePath(datasetMetaClient.getBasePath(), partitionPathFileName);
+      if (FSUtils.isNativeDeleteLogFile(fileName)) {
+        log.info("Skipping column range metadata for native delete log file: {}", partitionPathFileName);
+        return Collections.emptyList();
+      }
       if (partitionPathFileName.endsWith(HoodieFileFormat.PARQUET.getFileExtension())) {
         return HoodieIOFactory.getIOFactory(datasetMetaClient.getStorage())
             .getFileFormatUtils(HoodieFileFormat.PARQUET)
