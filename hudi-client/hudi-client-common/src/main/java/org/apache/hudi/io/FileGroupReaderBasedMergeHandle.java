@@ -39,6 +39,7 @@ import org.apache.hudi.common.model.HoodieRecordDelegate;
 import org.apache.hudi.common.model.HoodieRecordLocation;
 import org.apache.hudi.common.model.HoodieWriteStat;
 import org.apache.hudi.common.schema.HoodieSchema;
+import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.cdc.HoodieCDCUtils;
 import org.apache.hudi.common.table.read.BaseFileUpdateCallback;
 import org.apache.hudi.common.table.read.BufferedRecord;
@@ -181,11 +182,12 @@ public class FileGroupReaderBasedMergeHandle<T, I, K, O> extends HoodieWriteMerg
   }
 
   private HoodieCDCLogWriter<?> createCDCLogWriter() {
-    if (HoodieCDCLogWriterFactory.shouldWriteNativeCDCLogs(config)) {
+    HoodieTableConfig tableConfig = hoodieTable.getMetaClient().getTableConfig();
+    if (HoodieCDCLogWriterFactory.shouldWriteNativeCDCLogs(config, tableConfig)) {
       return new HoodieNativeCDCLogger(
           instantTime,
           config,
-          hoodieTable.getMetaClient().getTableConfig(),
+          tableConfig,
           partitionPath,
           storage,
           getWriterSchema(),
@@ -200,7 +202,7 @@ public class FileGroupReaderBasedMergeHandle<T, I, K, O> extends HoodieWriteMerg
     return new HoodieCDCLogger(
         instantTime,
         config,
-        hoodieTable.getMetaClient().getTableConfig(),
+        tableConfig,
         partitionPath,
         storage,
         getWriterSchema(),
