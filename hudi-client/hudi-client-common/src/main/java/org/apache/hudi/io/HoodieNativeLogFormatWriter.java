@@ -171,13 +171,19 @@ public class HoodieNativeLogFormatWriter extends HoodieLogFormat.Writer {
   public void appendDeleteRecord(HoodieRecord record, HoodieSchema recordSchema, String keyFieldName) throws IOException {
     ensureDeleteFileWriter();
     String recordKey = record.getRecordKey(recordSchema, keyFieldName);
-    Comparable orderingValue = record.getOrderingValue(
-        recordSchema, recordProperties, orderingFieldNames.toArray(new String[0]));
+    Comparable orderingValue = getDeleteOrderingValue(record, recordSchema);
     Object deleteEngineRecord = recordContext.constructEngineRecord(
         deleteLogSchema, createDeleteLogFieldValues(recordKey, orderingValue));
     deleteFileWriter.writeRow(recordKey, deleteEngineRecord);
     long recordPosition = baseFileInstantTimeOfPositions.isPresent() ? record.getCurrentPosition() : -1L;
     deleteRecordPositions.add(recordPosition);
+  }
+
+  private Comparable getDeleteOrderingValue(HoodieRecord record, HoodieSchema recordSchema) {
+    if (orderingFieldNames.isEmpty()) {
+      return OrderingValues.getDefault();
+    }
+    return record.getOrderingValue(recordSchema, recordProperties, orderingFieldNames.toArray(new String[0]));
   }
 
   private Object[] createDeleteLogFieldValues(String recordKey, Comparable orderingValue) {

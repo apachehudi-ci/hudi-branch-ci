@@ -54,8 +54,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -101,6 +103,19 @@ public class TestHoodieNativeLogFormatWriter {
 
     assertFalse(parsedHeader.containsKey(HeaderMetadataType.BASE_FILE_INSTANT_TIME_OF_RECORD_POSITIONS));
     assertFalse(parsedHeader.containsKey(HeaderMetadataType.RECORD_POSITIONS));
+  }
+
+  @Test
+  public void testUsesDefaultOrderingValueForCommitTimeDeleteLog() throws Exception {
+    HoodieSchema schema = mock(HoodieSchema.class);
+    HoodieRecord record = mock(HoodieRecord.class);
+    when(record.getRecordKey(schema, HoodieRecord.RECORD_KEY_METADATA_FIELD)).thenReturn("key-1");
+    when(record.getCurrentPosition()).thenReturn(7L);
+    doReturn(HoodieRecord.DEFAULT_ORDERING_VALUE + 1).when(record).getOrderingValue(eq(schema), any(), any());
+
+    writeDeleteLogFooterWithPositions(Option.empty(), record, schema, new ArrayList<>());
+
+    verify(record, never()).getOrderingValue(eq(schema), any(), any());
   }
 
   private static Map<HeaderMetadataType, String> writeDataLogFooterWithPositions(long... positions) throws Exception {
@@ -164,11 +179,18 @@ public class TestHoodieNativeLogFormatWriter {
 
   private static Map<HeaderMetadataType, String> writeDeleteLogFooterWithPositions(
       Option<String> baseFileInstantTimeOfPositions) throws Exception {
+    HoodieSchema schema = mock(HoodieSchema.class);
+    return writeDeleteLogFooterWithPositions(
+        baseFileInstantTimeOfPositions, recordWithPosition("key-1", 7L, schema), schema, new ArrayList<>());
+  }
+
+  private static Map<HeaderMetadataType, String> writeDeleteLogFooterWithPositions(
+      Option<String> baseFileInstantTimeOfPositions, HoodieRecord record, HoodieSchema schema,
+      List<String> orderingFieldNames) throws Exception {
     String instantTime = "100";
     String schemaString = "{\"type\":\"record\",\"name\":\"test\",\"fields\":[]}";
     HoodieStorage storage = mock(HoodieStorage.class);
     HoodieWriteConfig config = mock(HoodieWriteConfig.class);
-    HoodieSchema schema = mock(HoodieSchema.class);
     HoodieRecordMerger merger = mock(HoodieRecordMerger.class);
     HoodieFileWriter fileWriter = mock(HoodieFileWriter.class);
     RecordContext recordContext = mock(RecordContext.class);
@@ -208,11 +230,10 @@ public class TestHoodieNativeLogFormatWriter {
           schema,
           mock(TaskContextSupplier.class),
           recordContext,
-          new ArrayList<>(),
+          orderingFieldNames,
           baseFileInstantTimeOfPositions);
 
-      writer.appendDeleteRecord(recordWithPosition("key-1", 7L, schema),
-          schema, HoodieRecord.RECORD_KEY_METADATA_FIELD);
+      writer.appendDeleteRecord(record, schema, HoodieRecord.RECORD_KEY_METADATA_FIELD);
 
       Map<HeaderMetadataType, String> header = new HashMap<>();
       header.put(HeaderMetadataType.SCHEMA, schemaString);
