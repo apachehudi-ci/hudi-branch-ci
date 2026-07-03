@@ -379,12 +379,19 @@ public abstract class HoodieAppendHandle<T, I, K, O> extends HoodieWriteHandle<T
       return true;
     } catch (Exception e) {
       log.error("Error writing record " + hoodieRecord, e);
-      if (!config.getIgnoreWriteFailed()) {
+      if (!config.getIgnoreWriteFailed() || shouldFailOnWriteException(e)) {
         throw new HoodieException(e.getMessage(), e);
       }
       writeStatus.markFailure(hoodieRecord, e, recordMetadata);
       return false;
     }
+  }
+
+  /**
+   * Returns whether a write exception should fail the task even when record-level write failures are ignored.
+   */
+  protected boolean shouldFailOnWriteException(Exception e) {
+    return false;
   }
 
   /**
