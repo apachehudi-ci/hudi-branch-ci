@@ -356,6 +356,10 @@ public class FSUtils {
   }
 
   public static String getFileIdFromLogPath(StoragePath path) {
+    Option<Matcher> nativeLogMatcher = matchNativeLogFile(path.getName());
+    if (nativeLogMatcher.isPresent()) {
+      return nativeLogMatcher.get().group(1);
+    }
     Option<Matcher> logFileMatcher = matchLogFile(path.getName());
     if (!logFileMatcher.isPresent()) {
       throw new InvalidHoodiePathException(path, "LogFile");
