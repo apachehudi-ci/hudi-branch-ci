@@ -39,6 +39,7 @@ import org.apache.hudi.storage.StoragePath;
 import org.apache.hudi.table.HoodieTable;
 import org.apache.hudi.util.Lazy;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 
 import java.io.IOException;
@@ -47,6 +48,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -57,6 +59,7 @@ import static org.apache.hudi.metadata.HoodieTableMetadataUtil.PARTITION_NAME_CO
  * Append handle for native log files. Unlike {@link HoodieInlineLogAppendHandle}, this handle streams
  * records directly into native format writers and does not buffer records or build inline log blocks.
  */
+@Slf4j
 public class HoodieNativeLogAppendHandle<T, I, K, O> extends HoodieAppendHandle<T, I, K, O> {
 
   private HoodieNativeLogFormatWriter writer;
@@ -156,7 +159,8 @@ public class HoodieNativeLogAppendHandle<T, I, K, O> extends HoodieAppendHandle<
       header.put(HeaderMetadataType.INSTANT_TIME, instantTime);
       header.put(HeaderMetadataType.SCHEMA, writeSchemaWithMetaFields.toString());
       if (writer != null && writer.hasPendingWrites()) {
-        processAppendResult(writer.flushAppend(getUpdatedHeader(header)));
+        writer.flushAppend(getUpdatedHeader(header));
+        processAppendResults(writer.getLastAppendResults());
       }
     } catch (IOException e) {
       throw new HoodieAppendException("Failed while flushing records to native log for fileId " + fileId, e);
@@ -171,6 +175,34 @@ public class HoodieNativeLogAppendHandle<T, I, K, O> extends HoodieAppendHandle<
     }
   }
 
+  /**
+   * Finalizes accounting for all physical native log files produced by one flush.
+   */
+  protected void processAppendResults(List<AppendResult> results) {
+    if (results.isEmpty()) {
+      return;
+    }
+
+    HoodieDeltaWriteStat baseStat = ((HoodieDeltaWriteStat) this.writeStatus.getStat()).copy();
+    long elapsedTime = timer.endTimer();
+    for (int i = 0; i < results.size(); i++) {
+      AppendResult result = results.get(i);
+      if (i > 0) {
+        initNewStatus(baseStat);
+      }
+
+      HoodieDeltaWriteStat stat = (HoodieDeltaWriteStat) this.writeStatus.getStat();
+      updateWriteStatus(result, stat, i == 0 ? elapsedTime : 0L);
+      stat = (HoodieDeltaWriteStat) this.writeStatus.getStat();
+      collectColumnStats(stat);
+      assert stat.getRuntimeStats() != null;
+      log.info("AppendHandle for partitionPath {} filePath {}, took {} ms.", partitionPath,
+          stat.getPath(), stat.getRuntimeStats().getTotalUpsertTime());
+    }
+    resetWriteCounts();
+    timer.startTimer();
+  }
+
   protected StoragePath getLogFilePath() {
     return writer.getLogFile().getPath();
   }
@@ -178,24 +210,6 @@ public class HoodieNativeLogAppendHandle<T, I, K, O> extends HoodieAppendHandle<
   @Override
   public boolean canWrite(HoodieRecord record) {
     return true;
-  }
-
-  @Override
-  protected void updateLogFiles(HoodieDeltaWriteStat stat) {
-    for (AppendResult appendResult : writer.getLastAppendResults()) {
-      String fileName = appendResult.logFile().getFileName();
-      if (!stat.getLogFiles().contains(fileName)) {
-        stat.addLogFiles(fileName);
-      }
-      // A native flush can produce a separate delete file that is not captured by stat.getPath(). Record it (with
-      // its size) so metadata table file listing and marker reconciliation account for it.
-      if (FSUtils.isNativeDeleteLogFile(fileName)) {
-        String deleteFilePath = partitionPath.isEmpty()
-            ? new StoragePath(fileName).toString()
-            : new StoragePath(partitionPath, fileName).toString();
-        stat.addDeleteFileStat(deleteFilePath, appendResult.size());
-      }
-    }
   }
 
   @Override
@@ -210,11 +224,7 @@ public class HoodieNativeLogAppendHandle<T, I, K, O> extends HoodieAppendHandle<
             config.getMetadataConfig(), Lazy.eagerly(Option.of(writeSchemaWithMetaFields)),
             Option.of(recordMerger.getRecordType()), indexVersion).keySet());
 
-    Option<Object> dataFileFormatMetadata = writer.getLastDataFileFormatMetadata();
-    if (dataFileFormatMetadata.isPresent()) {
-      stat.putRecordsStats(collectNativeLogColumnRangeMetadata(
-          stat.getPath(), dataFileFormatMetadata.get(), columnsToIndexSet, indexVersion));
-    } else if (FSUtils.isNativeDeleteLogFile(new StoragePath(stat.getPath()).getName())) {
+    if (FSUtils.isNativeDeleteLogFile(new StoragePath(stat.getPath()).getName())) {
       // Native delete logs do not contain data values, so there is no min/max range to collect. Still, publishing
       // empty column stats is meaningful for query-side column-stats pruning: it marks the delete log as indexed but
       // empty. Without these records, the query path treats the log as an un-indexed file and keeps the file slice as a
@@ -223,7 +233,42 @@ public class HoodieNativeLogAppendHandle<T, I, K, O> extends HoodieAppendHandle<
           .collect(Collectors.toMap(
               column -> column,
               column -> HoodieColumnRangeMetadata.createEmpty(stat.getPath(), column, indexVersion))));
+      return;
     }
+
+    Option<Object> dataFileFormatMetadata = writer.getLastDataFileFormatMetadata();
+    if (dataFileFormatMetadata.isPresent()) {
+      stat.putRecordsStats(collectNativeLogColumnRangeMetadata(
+          stat.getPath(), dataFileFormatMetadata.get(), columnsToIndexSet, indexVersion));
+    }
+  }
+
+  @Override
+  protected void updateWriteCounts(HoodieDeltaWriteStat stat, AppendResult result) {
+    if (FSUtils.isNativeDeleteLogFile(result.logFile().getFileName())) {
+      stat.setNumWrites(0);
+      stat.setNumUpdateWrites(0);
+      stat.setNumInserts(0);
+      stat.setNumDeletes(recordsDeleted);
+    } else {
+      stat.setNumWrites(recordsWritten);
+      stat.setNumUpdateWrites(updatedRecordsWritten);
+      stat.setNumInserts(insertRecordsWritten);
+      stat.setNumDeletes(0);
+    }
+    stat.setTotalWriteBytes(result.size());
+  }
+
+  @Override
+  protected void accumulateWriteCounts(HoodieDeltaWriteStat stat, AppendResult result) {
+    if (FSUtils.isNativeDeleteLogFile(result.logFile().getFileName())) {
+      stat.setNumDeletes(stat.getNumDeletes() + recordsDeleted);
+    } else {
+      stat.setNumWrites(stat.getNumWrites() + recordsWritten);
+      stat.setNumUpdateWrites(stat.getNumUpdateWrites() + updatedRecordsWritten);
+      stat.setNumInserts(stat.getNumInserts() + insertRecordsWritten);
+    }
+    stat.setTotalWriteBytes(stat.getTotalWriteBytes() + result.size());
   }
 
   private Map<String, HoodieColumnRangeMetadata<Comparable>> collectNativeLogColumnRangeMetadata(

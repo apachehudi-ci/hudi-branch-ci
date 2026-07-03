@@ -374,17 +374,16 @@ class TestSecondaryIndexStreamingTracker {
     assertEquals(Collections.singletonList("2024/01/01/.file_1.log.1"),
         SecondaryIndexStreamingTracker.collectNewLogFilesForSecondaryIndexStats(Collections.singletonList(regularLogFile)));
 
-    // native data file with a separate delete file: both collected
-    WriteStatus nativeDataAndDelete = writeStatus("2024/01/01/.file_1.log.parquet");
-    ((HoodieDeltaWriteStat) nativeDataAndDelete.getStat()).addDeleteFileStat("2024/01/01/.file_1.deletes.parquet", 100L);
+    // native data file with a separate delete file: both collected from independent write stats
+    WriteStatus nativeData = writeStatus("2024/01/01/.file_1.log.parquet");
+    WriteStatus nativeDelete = writeStatus("2024/01/01/.file_1.deletes.parquet");
     assertEquals(Arrays.asList(
             "2024/01/01/.file_1.log.parquet",
             "2024/01/01/.file_1.deletes.parquet"),
-        SecondaryIndexStreamingTracker.collectNewLogFilesForSecondaryIndexStats(Collections.singletonList(nativeDataAndDelete)));
+        SecondaryIndexStreamingTracker.collectNewLogFilesForSecondaryIndexStats(Arrays.asList(nativeData, nativeDelete)));
 
-    // delete-only native file: the delete file matches the stat path and is deduped
+    // delete-only native file: collected through the stat path
     WriteStatus deleteOnlyNativeFile = writeStatus("2024/01/01/.file_1.deletes.parquet");
-    ((HoodieDeltaWriteStat) deleteOnlyNativeFile.getStat()).addDeleteFileStat("2024/01/01/.file_1.deletes.parquet", 100L);
     assertEquals(Collections.singletonList("2024/01/01/.file_1.deletes.parquet"),
         SecondaryIndexStreamingTracker.collectNewLogFilesForSecondaryIndexStats(Collections.singletonList(deleteOnlyNativeFile)));
   }

@@ -55,8 +55,6 @@ public class WriteStatMerger {
       }
     }
     merged.setLogFiles(mergedLogFiles);
-    // delete file stats (native log delete files tracked separately from the data file path)
-    merged.setDeleteFileStats(getMergedStringLongMap(stat1.getDeleteFileStats(), stat2.getDeleteFileStats()));
     // column stats
     if (stat1.getColumnStats().isPresent()) {
       merged.putRecordsStats(stat1.getColumnStats().get());

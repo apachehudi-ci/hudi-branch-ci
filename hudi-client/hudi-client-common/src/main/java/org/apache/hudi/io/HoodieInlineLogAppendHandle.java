@@ -164,6 +164,22 @@ public class HoodieInlineLogAppendHandle<T, I, K, O> extends HoodieAppendHandle<
     numberOfRecords = 0;
   }
 
+  /**
+   * Finalizes accounting for one flushed inline-log append.
+   */
+  protected void processAppendResult(AppendResult result) {
+    HoodieDeltaWriteStat stat = (HoodieDeltaWriteStat) this.writeStatus.getStat();
+    long elapsedTime = timer.endTimer();
+    updateWriteStatus(result, stat, elapsedTime);
+    stat = (HoodieDeltaWriteStat) this.writeStatus.getStat();
+    collectColumnStats(stat);
+    resetWriteCounts();
+    assert stat.getRuntimeStats() != null;
+    log.info("AppendHandle for partitionPath {} filePath {}, took {} ms.", partitionPath,
+        stat.getPath(), stat.getRuntimeStats().getTotalUpsertTime());
+    timer.startTimer();
+  }
+
   @Override
   protected void collectColumnStats(HoodieDeltaWriteStat stat) {
     if (config.isMetadataColumnStatsIndexEnabled()) {

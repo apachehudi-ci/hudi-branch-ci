@@ -133,8 +133,8 @@ public class SecondaryIndexStreamingTracker {
   }
 
   /**
-   * Collects the paths of the new log files (including native delete files) written by an append handle,
-   * so that they can be added to the file slice when generating secondary index stats.
+   * Collects the paths of the new log files written by an append handle, so that they can be added
+   * to the file slice when generating secondary index stats.
    *
    * @param statuses Write statuses produced by the append handle
    * @return De-duplicated list of new log file paths in insertion order
@@ -146,10 +146,6 @@ public class SecondaryIndexStreamingTracker {
       HoodieDeltaWriteStat stat = (HoodieDeltaWriteStat) status.getStat();
       if (stat.getPath() != null) {
         newLogFiles.add(stat.getPath());
-      }
-      Map<String, Long> deleteFileStats = stat.getDeleteFileStats();
-      if (deleteFileStats != null) {
-        newLogFiles.addAll(deleteFileStats.keySet());
       }
     }
     return new ArrayList<>(newLogFiles);

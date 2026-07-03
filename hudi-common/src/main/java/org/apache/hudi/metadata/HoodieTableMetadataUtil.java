@@ -506,16 +506,6 @@ public class HoodieTableMetadataUtil {
                   cdcPathAndSizes.forEach((key, value) ->
                       updatedFilesToSizesMapping.put(FSUtils.getFileName(key, partitionStatName), value));
                 }
-
-                // A native log append flushes a separate delete file that is not captured by stat.getPath();
-                // record it here so it is not missing from the metadata table file listing.
-                if (stat instanceof HoodieDeltaWriteStat) {
-                  Map<String, Long> deleteFileStats = ((HoodieDeltaWriteStat) stat).getDeleteFileStats();
-                  if (deleteFileStats != null && !deleteFileStats.isEmpty()) {
-                    deleteFileStats.forEach((key, value) ->
-                        updatedFilesToSizesMapping.put(FSUtils.getFileName(key, partitionStatName), value));
-                  }
-                }
               }
 
               newFileCount.add(updatedFilesToSizesMapping.size());

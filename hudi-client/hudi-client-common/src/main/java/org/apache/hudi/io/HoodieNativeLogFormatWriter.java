@@ -272,9 +272,8 @@ public class HoodieNativeLogFormatWriter extends HoodieLogFormat.Writer {
       return new AppendResult(logFile, 0, 0);
     }
 
-    // The returned result represents the primary (data) file recorded as the write stat's path. Its size must be the
-    // data file's own size only: a delete file flushed in the same shot is a separate physical file whose size is
-    // tracked independently (HoodieDeltaWriteStat#getDeleteFileStats).
+    // The returned result preserves the legacy single-result writer contract. Native append handles consume
+    // lastAppendResults directly so every physical data/delete file gets its own write stat.
     AppendResult firstResult = lastAppendResults.get(0);
     this.logFile = firstResult.logFile();
     return firstResult;
