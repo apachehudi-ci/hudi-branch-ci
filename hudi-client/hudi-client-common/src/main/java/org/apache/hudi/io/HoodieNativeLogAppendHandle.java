@@ -200,15 +200,29 @@ public class HoodieNativeLogAppendHandle<T, I, K, O> extends HoodieAppendHandle<
 
   @Override
   protected void collectColumnStats(HoodieDeltaWriteStat stat) {
+    if (!config.isMetadataColumnStatsIndexEnabled()) {
+      return;
+    }
+
+    HoodieIndexVersion indexVersion = HoodieTableMetadataUtil.existingIndexVersionOrDefault(PARTITION_NAME_COLUMN_STATS, hoodieTable.getMetaClient());
+    Set<String> columnsToIndexSet = new HashSet<>(HoodieTableMetadataUtil
+        .getColumnsToIndex(hoodieTable.getMetaClient().getTableConfig(),
+            config.getMetadataConfig(), Lazy.eagerly(Option.of(writeSchemaWithMetaFields)),
+            Option.of(recordMerger.getRecordType()), indexVersion).keySet());
+
     Option<Object> dataFileFormatMetadata = writer.getLastDataFileFormatMetadata();
-    if (config.isMetadataColumnStatsIndexEnabled() && dataFileFormatMetadata.isPresent()) {
-      HoodieIndexVersion indexVersion = HoodieTableMetadataUtil.existingIndexVersionOrDefault(PARTITION_NAME_COLUMN_STATS, hoodieTable.getMetaClient());
-      Set<String> columnsToIndexSet = new HashSet<>(HoodieTableMetadataUtil
-          .getColumnsToIndex(hoodieTable.getMetaClient().getTableConfig(),
-              config.getMetadataConfig(), Lazy.eagerly(Option.of(writeSchemaWithMetaFields)),
-              Option.of(recordMerger.getRecordType()), indexVersion).keySet());
+    if (dataFileFormatMetadata.isPresent()) {
       stat.putRecordsStats(collectNativeLogColumnRangeMetadata(
           stat.getPath(), dataFileFormatMetadata.get(), columnsToIndexSet, indexVersion));
+    } else if (FSUtils.isNativeDeleteLogFile(new StoragePath(stat.getPath()).getName())) {
+      // Native delete logs do not contain data values, so there is no min/max range to collect. Still, publishing
+      // empty column stats is meaningful for query-side column-stats pruning: it marks the delete log as indexed but
+      // empty. Without these records, the query path treats the log as an un-indexed file and keeps the file slice as a
+      // fallback candidate, which is not equivalent to the legacy inline-log behavior for delete-only blocks.
+      stat.putRecordsStats(columnsToIndexSet.stream()
+          .collect(Collectors.toMap(
+              column -> column,
+              column -> HoodieColumnRangeMetadata.createEmpty(stat.getPath(), column, indexVersion))));
     }
   }
 
