@@ -26,7 +26,7 @@ import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.schema.HoodieSchema;
 import org.apache.hudi.common.table.log.AppendResult;
 import org.apache.hudi.common.table.log.block.HoodieLogBlock.HeaderMetadataType;
-import org.apache.hudi.common.util.ConfigUtils;
+import org.apache.hudi.common.util.HoodieRecordUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.ParquetUtils;
 import org.apache.hudi.config.HoodieWriteConfig;
@@ -44,7 +44,6 @@ import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -92,7 +91,8 @@ public class HoodieNativeLogAppendHandle<T, I, K, O> extends HoodieAppendHandle<
   @Override
   protected void createLogWriterForAppend(String instantTime, Option<FileSlice> fileSliceOpt) {
     try {
-      String[] orderingFields = ConfigUtils.getOrderingFields(recordProperties);
+      List<String> orderingFields = HoodieRecordUtils.getOrderingFieldNames(
+          hoodieTable.getMetaClient().getTableConfig().getRecordMergeMode(), hoodieTable.getMetaClient());
       this.writer = new HoodieNativeLogFormatWriter(
           storage.getDefaultBufferSize(),
           storage,
@@ -109,7 +109,7 @@ public class HoodieNativeLogAppendHandle<T, I, K, O> extends HoodieAppendHandle<
           writeSchemaWithMetaFields,
           taskContextSupplier,
           hoodieTable.getReaderContextFactoryForWrite().getContext().getRecordContext(),
-          orderingFields == null ? Collections.emptyList() : Arrays.asList(orderingFields),
+          orderingFields,
           baseFileInstantTimeOfPositions);
     } catch (IOException e) {
       throw new HoodieException("Creating native log writer with fileId: " + fileId + ", "
