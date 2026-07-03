@@ -177,7 +177,7 @@ public class TestHoodieNativeLogFormatWriter {
     when(config.getProps()).thenReturn(new TypedProperties());
     when(config.getRecordMerger()).thenReturn(merger);
     when(merger.getRecordType()).thenReturn(HoodieRecord.HoodieRecordType.AVRO);
-    when(recordContext.getRecordType()).thenReturn(HoodieRecord.HoodieRecordType.AVRO);
+    when(recordContext.getEngineRecordType()).thenReturn(HoodieRecord.HoodieRecordType.AVRO);
     when(recordContext.convertValueToEngineType(any())).thenAnswer(invocation -> invocation.getArgument(0));
     when(recordContext.constructEngineRecord(any(HoodieSchema.class), any(Object[].class)))
         .thenReturn(new Object());

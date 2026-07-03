@@ -39,6 +39,7 @@ import org.apache.hudi.metadata.HoodieTableMetadataUtil;
 import org.apache.hudi.stats.HoodieColumnRangeMetadata;
 import org.apache.hudi.storage.StoragePath;
 import org.apache.hudi.table.HoodieTable;
+import org.apache.hudi.util.CommonClientUtils;
 import org.apache.hudi.util.Lazy;
 
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
@@ -85,6 +86,7 @@ public class HoodieNativeLogAppendHandle<T, I, K, O> extends HoodieAppendHandle<
                                       TaskContextSupplier taskContextSupplier, boolean preserveMetadata,
                                       Map<HeaderMetadataType, String> header) {
     super(config, instantTime, hoodieTable, partitionPath, fileId, recordItr, taskContextSupplier, preserveMetadata);
+    CommonClientUtils.validateIndexSupportForNativeLogFormat(config, hoodieTable.getBaseFileFormat());
     this.header.putAll(header);
   }
 

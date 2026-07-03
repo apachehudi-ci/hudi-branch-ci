@@ -161,9 +161,18 @@ class SparkFileFormatInternalRowReaderContext(baseFileReader: SparkColumnarFileR
     if (FSUtils.isLogFile(filePath)) {
       // NOTE: now only primary key based filtering is supported for log files
       // Variant alignment happens later via getLogBlockRecordProjection in the merge buffer.
-      new HoodieSparkFileReaderFactory(storage).newParquetFileReader(filePath)
-        .asInstanceOf[HoodieSparkParquetReader].getUnsafeRowIterator(requiredSchema, readFilters.asJava)
-        .asInstanceOf[ClosableIterator[InternalRow]]
+      HoodieFileFormat.fromFileExtension(filePath.getFileExtension) match {
+        case HoodieFileFormat.PARQUET =>
+          new HoodieSparkFileReaderFactory(storage).newParquetFileReader(filePath)
+            .asInstanceOf[HoodieSparkParquetReader].getUnsafeRowIterator(requiredSchema, readFilters.asJava)
+            .asInstanceOf[ClosableIterator[InternalRow]]
+        case _ =>
+          val fileInfo = sparkAdapter.getSparkPartitionedFileUtils
+            .createPartitionedFile(InternalRow.empty, filePath, start, length)
+          new CloseableInternalRowIterator(baseFileReader.read(fileInfo,
+            readSchema, StructType(Seq.empty), getSchemaHandler.getInternalSchemaOpt,
+            readFilters, storage.getConf.asInstanceOf[StorageConfiguration[Configuration]]))
+      }
     } else {
       // partition value is empty because the spark parquet reader will append the partition columns to
       // each row if they are given. That is the only usage of the partition values in the reader.

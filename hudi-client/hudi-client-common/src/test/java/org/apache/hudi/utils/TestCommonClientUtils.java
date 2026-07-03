@@ -21,6 +21,7 @@
 package org.apache.hudi.utils;
 
 import org.apache.hudi.common.engine.TaskContextSupplier;
+import org.apache.hudi.common.model.HoodieFileFormat;
 import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.config.HoodieWriteConfig;
@@ -118,6 +119,31 @@ class TestCommonClientUtils {
         Arguments.of(HoodieTableVersion.EIGHT, false),
         Arguments.of(HoodieTableVersion.NINE, false),
         Arguments.of(HoodieTableVersion.TEN, true)
+    );
+  }
+
+  @ParameterizedTest(name = "{0} native log with column stats enabled {1} should throw: {2}")
+  @MethodSource("provideNativeLogColumnStatsExpectations")
+  void testValidateIndexSupportForNativeLogFormat(
+      HoodieFileFormat nativeLogFileFormat, boolean enableColumnStats, boolean expectThrow) {
+    HoodieWriteConfig writeConfig = mock(HoodieWriteConfig.class);
+    when(writeConfig.isMetadataColumnStatsIndexEnabled()).thenReturn(enableColumnStats);
+
+    if (expectThrow) {
+      assertThrows(HoodieNotSupportedException.class,
+          () -> CommonClientUtils.validateIndexSupportForNativeLogFormat(writeConfig, nativeLogFileFormat));
+    } else {
+      CommonClientUtils.validateIndexSupportForNativeLogFormat(writeConfig, nativeLogFileFormat);
+    }
+  }
+
+  private static Stream<Arguments> provideNativeLogColumnStatsExpectations() {
+    return Stream.of(
+        Arguments.of(HoodieFileFormat.PARQUET, true, false),
+        Arguments.of(HoodieFileFormat.ORC, true, true),
+        Arguments.of(HoodieFileFormat.LANCE, true, true),
+        Arguments.of(HoodieFileFormat.ORC, false, false),
+        Arguments.of(HoodieFileFormat.LANCE, false, false)
     );
   }
 
