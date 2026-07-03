@@ -895,7 +895,6 @@ public class HoodieTableMetadataUtil {
       Map<String, List<HoodieWriteStat>> writeStatsByFileId = allWriteStats.stream().collect(Collectors.groupingBy(HoodieWriteStat::getFileId));
       int parallelism = Math.max(Math.min(writeStatsByFileId.size(), metadataConfig.getRecordIndexMaxParallelism()), 1);
       String basePath = dataTableMetaClient.getBasePath().toString();
-      HoodieFileFormat baseFileFormat = dataTableMetaClient.getTableConfig().getBaseFileFormat();
       StorageConfiguration storageConfiguration = dataTableMetaClient.getStorageConf();
       Option<HoodieSchema> writerSchemaOpt = tryResolveSchemaForTable(dataTableMetaClient);
       Option<HoodieSchema> finalWriterSchemaOpt = writerSchemaOpt;
@@ -906,10 +905,10 @@ public class HoodieTableMetadataUtil {
             List<HoodieWriteStat> writeStats = writeStatsByFileIdEntry.getValue();
             // Partition the write stats into base file and log file write stats
             List<HoodieWriteStat> baseFileWriteStats = writeStats.stream()
-                .filter(writeStat -> writeStat.getPath().endsWith(baseFileFormat.getFileExtension()))
+                .filter(writeStat -> FSUtils.isBaseFile(new StoragePath(writeStat.getPath())))
                 .collect(Collectors.toList());
             List<HoodieWriteStat> logFileWriteStats = writeStats.stream()
-                .filter(writeStat -> FSUtils.isLogFile(new StoragePath(writeStats.get(0).getPath())))
+                .filter(writeStat -> FSUtils.isLogFile(new StoragePath(writeStat.getPath())))
                 .collect(Collectors.toList());
             // Ensure that only one of base file or log file write stats exists
             checkState(baseFileWriteStats.isEmpty() || logFileWriteStats.isEmpty(),
