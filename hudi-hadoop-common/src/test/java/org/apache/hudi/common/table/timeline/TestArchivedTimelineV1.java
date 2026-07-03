@@ -527,7 +527,7 @@ public class TestArchivedTimelineV1 extends HoodieCommonTestHarness {
 
   private void readAndValidateArchivedFile(String path, HoodieStorage storage) throws IOException {
     try (HoodieLogFormat.Reader reader = HoodieLogFormat.newReader(
-        storage, new HoodieLogFile(path), HoodieSchema.fromAvroSchema(HoodieArchivedMetaEntry.getClassSchema()))) {
+        storage, metaClient, new HoodieLogFile(path), HoodieSchema.fromAvroSchema(HoodieArchivedMetaEntry.getClassSchema()))) {
 
       while (reader.hasNext()) {
         HoodieLogBlock block = reader.next();
