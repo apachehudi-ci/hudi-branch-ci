@@ -26,6 +26,8 @@ import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.schema.HoodieSchema;
 import org.apache.hudi.common.table.cdc.HoodieCDCUtils;
 import org.apache.hudi.common.table.log.LogFileCreationCallback;
+import org.apache.hudi.common.table.log.NativeLogFooterMetadata;
+import org.apache.hudi.common.table.log.block.HoodieLogBlock.HeaderMetadataType;
 import org.apache.hudi.common.util.StringUtils;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.exception.HoodieUpsertException;
@@ -59,6 +61,7 @@ class HoodieNativeCDCFileWriter {
   private final TaskContextSupplier taskContextSupplier;
   private final HoodieRecord.HoodieRecordType recordType;
   private final Properties recordProperties;
+  private final Map<HeaderMetadataType, String> cdcDataBlockHeader;
   private final List<StoragePath> cdcAbsPaths;
   private int nextLogVersion;
   private HoodieFileWriter cdcWriter;
@@ -90,6 +93,9 @@ class HoodieNativeCDCFileWriter {
     this.recordType = recordType;
     this.recordProperties = new Properties();
     this.recordProperties.putAll(config.getProps());
+    this.cdcDataBlockHeader = new HashMap<>();
+    this.cdcDataBlockHeader.put(HeaderMetadataType.INSTANT_TIME, commitTime);
+    this.cdcDataBlockHeader.put(HeaderMetadataType.SCHEMA, cdcSchema.toString());
     this.cdcAbsPaths = new ArrayList<>();
     this.nextLogVersion = HoodieLogFile.LOGFILE_BASE_VERSION;
   }
@@ -128,6 +134,7 @@ class HoodieNativeCDCFileWriter {
     HoodieLogFile cdcLogFile = createNativeCDCLogFile();
     cdcWriter = HoodieFileWriterFactory.getFileWriter(
         commitTime, cdcLogFile.getPath(), storage, config, cdcSchema, taskContextSupplier, recordType);
+    cdcWriter.addFooterMetadata(NativeLogFooterMetadata.toFooterMetadata(cdcDataBlockHeader));
     cdcAbsPaths.add(cdcLogFile.getPath());
   }
 

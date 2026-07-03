@@ -20,11 +20,12 @@ package org.apache.hudi.functional.cdc
 import org.apache.hudi.DataSourceReadOptions._
 import org.apache.hudi.DataSourceWriteOptions._
 import org.apache.hudi.common.config.HoodieMetadataConfig
+import org.apache.hudi.common.fs.FSUtils
 import org.apache.hudi.common.model.{HoodieKey, HoodieLogFile, HoodieRecord}
 import org.apache.hudi.common.model.HoodieRecord.HoodieRecordType
 import org.apache.hudi.common.schema.HoodieSchema
 import org.apache.hudi.common.table.HoodieTableConfig
-import org.apache.hudi.common.table.cdc.{HoodieCDCOperation, HoodieCDCSupplementalLoggingMode, HoodieCDCUtils}
+import org.apache.hudi.common.table.cdc.{HoodieCDCOperation, HoodieCDCSupplementalLoggingMode}
 import org.apache.hudi.common.table.cdc.HoodieCDCSupplementalLoggingMode.{DATA_BEFORE, OP_KEY_ONLY}
 import org.apache.hudi.common.table.log.HoodieLogFormat
 import org.apache.hudi.common.table.log.block.HoodieDataBlock
@@ -99,7 +100,7 @@ abstract class HoodieCDCTestBase extends HoodieSparkClientTestBase {
     hoodieWriteStats.exists { hoodieWriteStat =>
       val cdcPaths = hoodieWriteStat.getCdcStats
       cdcPaths != null && !cdcPaths.isEmpty &&
-        cdcPaths.keySet().asScala.forall(_.endsWith(HoodieCDCUtils.CDC_LOGFILE_SUFFIX))
+        cdcPaths.keySet().asScala.forall(FSUtils.isCDCLogFile)
     }
   }
 
