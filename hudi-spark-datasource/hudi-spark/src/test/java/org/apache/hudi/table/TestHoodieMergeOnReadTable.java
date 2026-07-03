@@ -62,7 +62,6 @@ import org.apache.hudi.testutils.HoodieMergeOnReadTestUtils;
 import org.apache.hudi.testutils.HoodieSparkWriteableTestTable;
 import org.apache.hudi.testutils.MetadataMergeWriteStatus;
 import org.apache.hudi.testutils.SparkClientFunctionalTestHarness;
-import org.apache.hudi.util.CommonClientUtils;
 
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.fs.Path;
