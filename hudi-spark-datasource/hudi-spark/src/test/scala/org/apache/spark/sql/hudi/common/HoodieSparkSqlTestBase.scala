@@ -462,7 +462,7 @@ object HoodieSparkSqlTestBase {
         val logBlock = logReader.next()
         if (logBlock.isInstanceOf[HoodieDeleteBlock]) {
           val deleteLogBlock = logBlock.asInstanceOf[HoodieDeleteBlock]
-          assertTrue(deleteLogBlock.getRecordsToDelete.forall(i => i.getOrderingValue().equals(OrderingValues.getDefault) || i.getOrderingValue() == null))
+          assertTrue(deleteLogBlock.getRecordsToDelete.forall(i => i.getOrderingValue() == null || i.getOrderingValue().equals(OrderingValues.getDefault)))
           deleteLogBlockFound = true
         }
       } finally {
