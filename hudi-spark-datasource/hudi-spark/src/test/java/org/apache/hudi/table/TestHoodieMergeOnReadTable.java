@@ -62,6 +62,7 @@ import org.apache.hudi.testutils.HoodieMergeOnReadTestUtils;
 import org.apache.hudi.testutils.HoodieSparkWriteableTestTable;
 import org.apache.hudi.testutils.MetadataMergeWriteStatus;
 import org.apache.hudi.testutils.SparkClientFunctionalTestHarness;
+import org.apache.hudi.util.CommonClientUtils;
 
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.fs.Path;
@@ -507,14 +508,14 @@ public class TestHoodieMergeOnReadTable extends SparkClientFunctionalTestHarness
             .keySet();
         assertEquals(allPartitions.size(), testTable.listAllBaseFiles().size());
 
-        // Verify that all data file has one log file
+        // Verify that all data files have an update log file and a delete log file
         HoodieTable table = HoodieSparkTable.create(config, context(), metaClient);
         for (String partitionPath : dataGen.getPartitionPaths()) {
           List<FileSlice> groupedLogFiles =
               table.getSliceView().getLatestFileSlices(partitionPath).collect(Collectors.toList());
           for (FileSlice fileSlice : groupedLogFiles) {
             assertEquals(2, fileSlice.getLogFiles().count(),
-                "There should be 1 log file written for the latest data file - " + fileSlice);
+                "There should be an update log file and a delete log file written for the latest data file - " + fileSlice);
           }
         }
 
@@ -538,7 +539,7 @@ public class TestHoodieMergeOnReadTable extends SparkClientFunctionalTestHarness
               table.getSliceView().getLatestFileSlices(partitionPath).collect(Collectors.toList());
           assertEquals(1, fileSlices.size());
           for (FileSlice slice : fileSlices) {
-            assertEquals(3, slice.getLogFiles().count(), "After compaction there will still be one log file.");
+            assertEquals(4, slice.getLogFiles().count(), "Log compaction should add compacted log files to the slice.");
             assertNotNull(slice.getBaseFile(), "Base file is not created by log compaction operation.");
           }
           assertTrue(result.getCommitMetadata().get().getWritePartitionPaths().stream().anyMatch(part -> part.contentEquals(partitionPath)));
