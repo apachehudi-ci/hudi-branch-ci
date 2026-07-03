@@ -959,7 +959,7 @@ class TestBufferedRecordMerger extends SparkClientFunctionalTestHarness {
     }
 
     @Override
-    public HoodieRecord.HoodieRecordType getRecordType() {
+    public HoodieRecord.HoodieRecordType getEngineRecordType() {
       return HoodieRecord.HoodieRecordType.SPARK;
     }
 

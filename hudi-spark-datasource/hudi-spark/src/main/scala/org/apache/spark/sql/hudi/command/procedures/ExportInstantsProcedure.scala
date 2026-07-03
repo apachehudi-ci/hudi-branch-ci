@@ -121,7 +121,7 @@ class ExportInstantsProcedure extends BaseProcedure with ProcedureBuilder with L
     for (fs <- statuses.asScala) {
       // read the archived file
       val reader = HoodieLogFormat.newReader(
-        storage, metaClient, new HoodieLogFile(convertToStoragePath(fs.getPath)), HoodieSchema.fromAvroSchema(HoodieArchivedMetaEntry.getClassSchema))
+        metaClient, new HoodieLogFile(convertToStoragePath(fs.getPath)), HoodieSchema.fromAvroSchema(HoodieArchivedMetaEntry.getClassSchema))
       // read the avro blocks
       while ( {
         reader.hasNext && copyCount < limit

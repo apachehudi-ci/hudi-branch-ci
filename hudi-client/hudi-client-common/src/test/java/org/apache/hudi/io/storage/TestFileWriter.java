@@ -27,7 +27,7 @@ import org.apache.hudi.storage.StoragePath;
 import java.io.IOException;
 import java.util.Properties;
 
-public class TestFileWriter implements HoodieFileWriter {
+public class TestFileWriter implements HoodieFileWriter<Object> {
   private boolean closed = false;
   private boolean failOnWrite = false;
 

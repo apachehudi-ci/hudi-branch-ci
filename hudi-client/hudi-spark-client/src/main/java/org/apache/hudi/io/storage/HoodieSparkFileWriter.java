@@ -27,7 +27,7 @@ import org.apache.spark.sql.catalyst.InternalRow;
 import java.io.IOException;
 import java.util.Properties;
 
-public interface HoodieSparkFileWriter extends HoodieFileWriter {
+public interface HoodieSparkFileWriter extends HoodieFileWriter<InternalRow> {
   boolean canWrite();
 
   void close() throws IOException;

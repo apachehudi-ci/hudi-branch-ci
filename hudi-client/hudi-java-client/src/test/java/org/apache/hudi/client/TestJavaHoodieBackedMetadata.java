@@ -892,7 +892,7 @@ public class TestJavaHoodieBackedMetadata extends TestHoodieMetadataBase {
   private void verifyMetadataRawRecords(HoodieTable table, List<HoodieLogFile> logFiles, boolean enableMetaFields) throws IOException {
     for (HoodieLogFile logFile : logFiles) {
       List<StoragePathInfo> pathInfoList = storage.listDirectEntries(logFile.getPath());
-      HoodieSchema writerSchema = TableSchemaResolver.readSchemaFromLogFile(storage,
+      HoodieSchema writerSchema = TableSchemaResolver.readSchemaFromLogFile(table.getMetaClient(),
           logFile.getPath());
       if (writerSchema == null) {
         // not a data block
@@ -900,7 +900,7 @@ public class TestJavaHoodieBackedMetadata extends TestHoodieMetadataBase {
       }
 
       try (HoodieLogFormat.Reader logFileReader = HoodieLogFormat.newReader(
-          storage, table.getMetaClient(), new HoodieLogFile(pathInfoList.get(0).getPath()), writerSchema)) {
+          table.getMetaClient(), new HoodieLogFile(pathInfoList.get(0).getPath()), writerSchema)) {
         while (logFileReader.hasNext()) {
           HoodieLogBlock logBlock = logFileReader.next();
           if (logBlock instanceof HoodieDataBlock) {
@@ -2930,7 +2930,7 @@ public class TestJavaHoodieBackedMetadata extends TestHoodieMetadataBase {
                                                 List<HoodieLogFile> logFiles) throws IOException {
     for (HoodieLogFile logFile : logFiles) {
       List<StoragePathInfo> pathInfoList = storage.listDirectEntries(logFile.getPath());
-      HoodieSchema writerSchema = TableSchemaResolver.readSchemaFromLogFile(storage,
+      HoodieSchema writerSchema = TableSchemaResolver.readSchemaFromLogFile(metadataMetaClient,
           logFile.getPath());
       if (writerSchema == null) {
         // not a data block
@@ -2938,7 +2938,7 @@ public class TestJavaHoodieBackedMetadata extends TestHoodieMetadataBase {
       }
 
       try (HoodieLogFormat.Reader logFileReader = HoodieLogFormat.newReader(
-          storage, metadataMetaClient, new HoodieLogFile(pathInfoList.get(0).getPath()), writerSchema)) {
+          metadataMetaClient, new HoodieLogFile(pathInfoList.get(0).getPath()), writerSchema)) {
         while (logFileReader.hasNext()) {
           HoodieLogBlock logBlock = logFileReader.next();
           if (logBlock instanceof HoodieDataBlock) {

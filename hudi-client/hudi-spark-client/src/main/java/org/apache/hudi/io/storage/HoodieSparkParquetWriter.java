@@ -80,8 +80,8 @@ public class HoodieSparkParquetWriter extends HoodieBaseParquetWriter<InternalRo
   }
 
   @Override
-  public void writeRow(String recordKey, Object row) throws IOException {
-    super.write((InternalRow) row);
+  public void writeRow(String recordKey, InternalRow row) throws IOException {
+    super.write(row);
     if (populateMetaFields) {
       writeSupport.add(UTF8String.fromString(recordKey));
     }

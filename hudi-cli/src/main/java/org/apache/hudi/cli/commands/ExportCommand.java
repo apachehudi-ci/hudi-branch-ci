@@ -131,7 +131,7 @@ public class ExportCommand {
 
     for (StoragePathInfo pathInfo : pathInfoList) {
       // read the archived file
-      try (Reader reader = HoodieLogFormat.newReader(storage, metaClient, new HoodieLogFile(pathInfo.getPath()),
+      try (Reader reader = HoodieLogFormat.newReader(metaClient, new HoodieLogFile(pathInfo.getPath()),
           HoodieSchema.fromAvroSchema(HoodieArchivedMetaEntry.getClassSchema()))) {
 
         // read the avro blocks

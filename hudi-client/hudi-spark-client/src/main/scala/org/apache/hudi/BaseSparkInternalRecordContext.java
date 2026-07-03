@@ -137,7 +137,7 @@ public abstract class BaseSparkInternalRecordContext extends RecordContext<Inter
   }
 
   @Override
-  public HoodieRecord.HoodieRecordType getRecordType() {
+  public HoodieRecord.HoodieRecordType getEngineRecordType() {
     return HoodieRecord.HoodieRecordType.SPARK;
   }
 

@@ -174,7 +174,6 @@ public class FileGroupReaderBasedMergeHandle<T, I, K, O> extends HoodieWriteMerg
   private void initRecordType(HoodieRecord.HoodieRecordType enginRecordType) {
     // If the table is a metadata table or the base file is an HFile, we use AVRO record type, otherwise we use the engine record type.
     this.recordType = hoodieTable.isMetadataTable() || HFILE.getFileExtension().equals(hoodieTable.getBaseFileExtension()) ? HoodieRecord.HoodieRecordType.AVRO : enginRecordType;
-    this.cdcLogger = Option.empty();
   }
 
   private HoodieCDCLogWriter<?> createCDCLogWriter() {
@@ -424,10 +423,12 @@ public class FileGroupReaderBasedMergeHandle<T, I, K, O> extends HoodieWriteMerg
   }
 
   private Option<HoodieCDCLogWriter<?>> getOrCreateCDCLogWriter() {
-    if (!hoodieTable.getMetaClient().getTableConfig().isCDCEnabled()) {
-      return Option.empty();
+    if (cdcLogger != null) {
+      return cdcLogger;
     }
-    if (cdcLogger.isEmpty()) {
+    if (!hoodieTable.getMetaClient().getTableConfig().isCDCEnabled()) {
+      this.cdcLogger = Option.empty();
+    } else {
       cdcLogger = Option.of(createCDCLogWriter());
     }
     return cdcLogger;

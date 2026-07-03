@@ -1612,14 +1612,14 @@ public class TestHoodieBackedMetadata extends TestHoodieMetadataBase {
     for (HoodieLogFile logFile : logFiles) {
       List<StoragePathInfo> pathInfoList = storage.listDirectEntries(logFile.getPath());
       HoodieSchema writerSchema  =
-          TableSchemaResolver.readSchemaFromLogFile(storage, logFile.getPath());
+          TableSchemaResolver.readSchemaFromLogFile(table.getMetaClient(), logFile.getPath());
       if (writerSchema == null) {
         // not a data block
         continue;
       }
 
       try (HoodieLogFormat.Reader logFileReader = HoodieLogFormat.newReader(
-          storage, table.getMetaClient(), new HoodieLogFile(pathInfoList.get(0).getPath()), writerSchema)) {
+          table.getMetaClient(), new HoodieLogFile(pathInfoList.get(0).getPath()), writerSchema)) {
         while (logFileReader.hasNext()) {
           HoodieLogBlock logBlock = logFileReader.next();
           if (logBlock instanceof HoodieDataBlock) {
@@ -4304,14 +4304,14 @@ public class TestHoodieBackedMetadata extends TestHoodieMetadataBase {
     for (HoodieLogFile logFile : logFiles) {
       List<StoragePathInfo> pathInfoList = storage.listDirectEntries(logFile.getPath());
       HoodieSchema writerSchema =
-          TableSchemaResolver.readSchemaFromLogFile(storage, logFile.getPath());
+          TableSchemaResolver.readSchemaFromLogFile(metadataMetaClient, logFile.getPath());
       if (writerSchema == null) {
         // not a data block
         continue;
       }
 
       try (HoodieLogFormat.Reader logFileReader = HoodieLogFormat.newReader(
-          storage, metadataMetaClient, new HoodieLogFile(pathInfoList.get(0).getPath()), writerSchema)) {
+          metadataMetaClient, new HoodieLogFile(pathInfoList.get(0).getPath()), writerSchema)) {
         while (logFileReader.hasNext()) {
           HoodieLogBlock logBlock = logFileReader.next();
           if (logBlock instanceof HoodieDataBlock) {

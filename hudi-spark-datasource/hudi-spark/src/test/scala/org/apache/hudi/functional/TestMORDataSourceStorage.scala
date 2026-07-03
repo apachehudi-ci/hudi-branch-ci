@@ -356,7 +356,7 @@ class TestMORDataSourceStorage extends SparkClientFunctionalTestHarness {
     val fsv = FileSystemViewManager.createInMemoryFileSystemView(
       context(), metaClient, HoodieMetadataConfig.newBuilder().build())
     logFileList.foreach(filename => {
-      val logFormatReader = HoodieLogFormat.newReader(metaClient.getStorage, metaClient, filename, schema)
+      val logFormatReader = HoodieLogFormat.newReader(metaClient, filename, schema)
       try {
         var numBlocks = 0
         while (logFormatReader.hasNext) {

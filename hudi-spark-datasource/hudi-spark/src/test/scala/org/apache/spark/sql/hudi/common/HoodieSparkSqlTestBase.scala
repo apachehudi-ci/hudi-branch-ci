@@ -456,7 +456,7 @@ object HoodieSparkSqlTestBase {
     val schema = new TableSchemaResolver(metaClient).getTableSchema
     for (i <- 0 until logFilePathList.size()) {
       val logReader = HoodieLogFormat.newReader(
-        metaClient.getStorage, metaClient, new HoodieLogFile(logFilePathList.get(i)), schema)
+        metaClient, new HoodieLogFile(logFilePathList.get(i)), schema)
       try {
         assertTrue(logReader.hasNext)
         val logBlock = logReader.next()

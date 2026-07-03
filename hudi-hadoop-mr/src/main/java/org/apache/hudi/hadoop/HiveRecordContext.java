@@ -101,7 +101,7 @@ public class HiveRecordContext extends RecordContext<ArrayWritable> {
   }
 
   @Override
-  public HoodieRecord.HoodieRecordType getRecordType() {
+  public HoodieRecord.HoodieRecordType getEngineRecordType() {
     return HoodieRecord.HoodieRecordType.HIVE;
   }
 

@@ -359,7 +359,7 @@ public abstract class SchemaHandlerTestBase {
         }
 
         @Override
-        public HoodieRecord.HoodieRecordType getRecordType() {
+        public HoodieRecord.HoodieRecordType getEngineRecordType() {
           return HoodieRecord.HoodieRecordType.AVRO;
         }
 

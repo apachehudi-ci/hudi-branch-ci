@@ -150,7 +150,7 @@ public class AvroRecordContext extends RecordContext<IndexedRecord> {
   }
 
   @Override
-  public HoodieRecord.HoodieRecordType getRecordType() {
+  public HoodieRecord.HoodieRecordType getEngineRecordType() {
     return HoodieRecord.HoodieRecordType.AVRO;
   }
 

@@ -270,7 +270,6 @@ public class LegacyArchivedMetaEntryReader {
           StoragePathInfo pathInfo = pathInfoIterator.next();
           try {
             reader = HoodieLogFormat.newReader(
-                metaClient.getStorage(),
                 metaClient,
                 new HoodieLogFile(pathInfo.getPath()),
                 HoodieSchema.fromAvroSchema(HoodieArchivedMetaEntry.getClassSchema()));

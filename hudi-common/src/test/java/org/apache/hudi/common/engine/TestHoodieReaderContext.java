@@ -154,7 +154,7 @@ class TestHoodieReaderContext {
     }
 
     @Override
-    public HoodieRecord.HoodieRecordType getRecordType() {
+    public HoodieRecord.HoodieRecordType getEngineRecordType() {
       return HoodieRecord.HoodieRecordType.AVRO;
     }
 

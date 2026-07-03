@@ -76,7 +76,7 @@ public class HoodieRowDataParquetOutputStreamWriter implements HoodieRowDataFile
   }
 
   @Override
-  public void writeRow(String key, Object row) throws IOException {
+  public void writeRow(String key, RowData row) throws IOException {
     writer.write(row);
     writeSupport.add(key);
   }

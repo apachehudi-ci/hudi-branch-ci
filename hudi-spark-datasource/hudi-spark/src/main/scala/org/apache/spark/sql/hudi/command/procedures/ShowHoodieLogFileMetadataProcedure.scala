@@ -74,8 +74,8 @@ class ShowHoodieLogFileMetadataProcedure extends BaseProcedure with ProcedureBui
     logFilePaths.foreach {
       logFilePath => {
         val statuses = storage.listDirectEntries(new StoragePath(logFilePath))
-        val schema = TableSchemaResolver.readSchemaFromLogFile(storage, new StoragePath(logFilePath))
-        val reader = HoodieLogFormat.newReader(storage, metaClient, new HoodieLogFile(statuses.get(0).getPath), schema)
+        val schema = TableSchemaResolver.readSchemaFromLogFile(metaClient, new StoragePath(logFilePath))
+        val reader = HoodieLogFormat.newReader(metaClient, new HoodieLogFile(statuses.get(0).getPath), schema)
 
         // read the avro blocks
         while (reader.hasNext) {

@@ -446,6 +446,16 @@ public abstract class HoodieAppendHandle<T, I, K, O> extends HoodieWriteHandle<T
     return updatedHeader;
   }
 
+  protected void processAppendResult(AppendResult result, long elapsedTime) {
+    HoodieDeltaWriteStat stat = (HoodieDeltaWriteStat) this.writeStatus.getStat();
+    updateWriteStatus(result, stat, elapsedTime);
+    stat = (HoodieDeltaWriteStat) this.writeStatus.getStat();
+    collectColumnStats(stat);
+    assert stat.getRuntimeStats() != null;
+    log.info("AppendHandle for partitionPath {} filePath {}, took {} ms.", partitionPath,
+        stat.getPath(), stat.getRuntimeStats().getTotalUpsertTime());
+  }
+
   /**
    * Applies the result of one physical append to the current write status.
    *
@@ -478,10 +488,6 @@ public abstract class HoodieAppendHandle<T, I, K, O> extends HoodieWriteHandle<T
    */
   protected void initNewStatus() {
     HoodieDeltaWriteStat prevStat = (HoodieDeltaWriteStat) this.writeStatus.getStat();
-    initNewStatus(prevStat);
-  }
-
-  protected void initNewStatus(HoodieDeltaWriteStat prevStat) {
     HoodieDeltaWriteStat stat = prevStat.copy();
     this.writeStatus = (WriteStatus) ReflectionUtils.loadClass(config.getWriteStatusClassName(),
         hoodieTable.shouldTrackSuccessRecords(), config.getWriteStatusFailureFraction(), hoodieTable.isMetadataTable());

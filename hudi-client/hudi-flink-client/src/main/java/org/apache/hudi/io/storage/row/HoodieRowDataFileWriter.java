@@ -31,7 +31,7 @@ import java.util.Properties;
 /**
  * Abstraction to assist in writing {@link RowData}s to be used in datasource implementation.
  */
-public interface HoodieRowDataFileWriter extends HoodieFileWriter {
+public interface HoodieRowDataFileWriter extends HoodieFileWriter<RowData> {
 
   /**
    * Returns {@code true} if this RowFileWriter can take in more writes. else {@code false}.

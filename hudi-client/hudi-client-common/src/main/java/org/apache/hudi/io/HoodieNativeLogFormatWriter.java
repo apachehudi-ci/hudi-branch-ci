@@ -269,7 +269,7 @@ public class HoodieNativeLogFormatWriter extends HoodieLogFormat.Writer {
       // type here (e.g. SPARK) would create an engine-native writer that fails on the Avro delete records.
       deleteFileWriter = HoodieFileWriterFactory.getFileWriter(
           instantTime, deleteLogFile.getPath(), storage, writeConfig, deleteLogSchema, taskContextSupplier,
-          recordContext.getRecordType());
+          recordContext.getEngineRecordType());
     }
   }
 

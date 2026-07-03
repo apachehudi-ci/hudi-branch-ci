@@ -654,7 +654,6 @@ public abstract class HoodieBackedTableMetadataWriter<I, O> implements HoodieTab
         partitionFilePathSizeTriplet.add(Pair.of(entry.getKey(), Pair.of(entry.getValue().getBaseFile().get().getPath(), entry.getValue().getBaseFile().get().getFileSize())));
       }
       entry.getValue().getLogFiles()
-          .filter(hoodieLogFile -> !FSUtils.isNativeDeleteLogFile(hoodieLogFile.getFileName()))
           .forEach(hoodieLogFile -> partitionFilePathSizeTriplet.add(Pair.of(entry.getKey(), Pair.of(hoodieLogFile.getPath().toString(), hoodieLogFile.getFileSize()))));
     });
 

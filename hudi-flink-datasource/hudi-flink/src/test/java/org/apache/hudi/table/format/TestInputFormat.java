@@ -221,9 +221,9 @@ public class TestInputFormat {
     assertFalse(logFiles.isEmpty(), "The MDT record index partition should contain log files");
     int hfileDataBlockCount = 0;
     for (StoragePathInfo logFile : logFiles) {
-      HoodieSchema schema = TableSchemaResolver.readSchemaFromLogFile(storage, logFile.getPath());
+      HoodieSchema schema = TableSchemaResolver.readSchemaFromLogFile(metaClient, logFile.getPath());
       try (HoodieLogFormat.Reader reader =
-               HoodieLogFormat.newReader(storage, metaClient, new HoodieLogFile(logFile), schema)) {
+               HoodieLogFormat.newReader(metaClient, new HoodieLogFile(logFile), schema)) {
         while (reader.hasNext()) {
           HoodieLogBlock logBlock = reader.next();
           if (!(logBlock instanceof HoodieDeleteBlock)) {

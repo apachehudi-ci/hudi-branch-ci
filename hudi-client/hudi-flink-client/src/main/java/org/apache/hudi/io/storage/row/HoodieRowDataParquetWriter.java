@@ -65,8 +65,8 @@ public class HoodieRowDataParquetWriter extends HoodieBaseParquetWriter<RowData>
   }
 
   @Override
-  public void writeRow(String key, Object row) throws IOException {
-    super.write((RowData) row);
+  public void writeRow(String key, RowData row) throws IOException {
+    super.write(row);
     writeSupport.add(key);
   }
 

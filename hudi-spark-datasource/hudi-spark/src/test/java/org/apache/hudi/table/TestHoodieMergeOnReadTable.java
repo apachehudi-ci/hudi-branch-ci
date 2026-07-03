@@ -611,7 +611,7 @@ public class TestHoodieMergeOnReadTable extends SparkClientFunctionalTestHarness
         .filter(path -> FSUtils.isLogFile(path.getName()))
         .forEach(logFilePath -> {
           try (HoodieLogFormat.Reader reader = HoodieLogFormat.newReader(
-              hoodieStorage(), tableMetaClient, new HoodieLogFile(logFilePath), HOODIE_SCHEMA)) {
+              tableMetaClient, new HoodieLogFile(logFilePath), HOODIE_SCHEMA)) {
             Map<HoodieLogBlock.HeaderMetadataType, String> headers = Collections.emptyMap();
             while (reader.hasNext()) {
               // Get headers from the final block

@@ -176,7 +176,7 @@ public abstract class RecordContext<T> implements Serializable {
    * feed those engine records into a {@link org.apache.hudi.io.storage.HoodieFileWriter} can pick a writer that
    * matches. Used by the native log delete writer, where the record object type and the writer must agree.
    */
-  public abstract HoodieRecord.HoodieRecordType getRecordType();
+  public abstract HoodieRecord.HoodieRecordType getEngineRecordType();
 
   /**
    * Gets the record key in String.

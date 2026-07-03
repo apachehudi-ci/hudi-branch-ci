@@ -115,7 +115,7 @@ public class ArchivedCommitsCommand {
     List<Comparable[]> allStats = new ArrayList<>();
     for (StoragePathInfo pathInfo : pathInfoList) {
       // read the archived file
-      try (Reader reader = HoodieLogFormat.newReader(storage, metaClient, new HoodieLogFile(pathInfo.getPath()),
+      try (Reader reader = HoodieLogFormat.newReader(metaClient, new HoodieLogFile(pathInfo.getPath()),
           HoodieSchema.fromAvroSchema(HoodieArchivedMetaEntry.getClassSchema()))) {
         List<IndexedRecord> readRecords = new ArrayList<>();
         // read the avro blocks
@@ -188,7 +188,7 @@ public class ArchivedCommitsCommand {
     List<Comparable[]> allCommits = new ArrayList<>();
     for (StoragePathInfo pathInfo : pathInfoList) {
       // read the archived file
-      try (HoodieLogFormat.Reader reader = HoodieLogFormat.newReader(storage, metaClient,
+      try (HoodieLogFormat.Reader reader = HoodieLogFormat.newReader(metaClient,
           new HoodieLogFile(pathInfo.getPath()), HoodieSchema.fromAvroSchema(HoodieArchivedMetaEntry.getClassSchema()))) {
         List<IndexedRecord> readRecords = new ArrayList<>();
         // read the avro blocks

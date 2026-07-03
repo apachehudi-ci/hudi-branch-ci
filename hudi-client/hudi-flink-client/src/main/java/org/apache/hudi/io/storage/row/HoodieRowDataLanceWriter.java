@@ -107,9 +107,9 @@ public class HoodieRowDataLanceWriter extends HoodieBaseLanceWriter<RowData, Str
   }
 
   @Override
-  public void writeRow(String key, Object row) throws IOException {
+  public void writeRow(String key, RowData row) throws IOException {
     bloomFilterWriteSupportOpt.ifPresent(bloomFilterWriteSupport -> bloomFilterWriteSupport.addKey(key));
-    super.write((RowData) row);
+    super.write(row);
   }
 
   @Override
