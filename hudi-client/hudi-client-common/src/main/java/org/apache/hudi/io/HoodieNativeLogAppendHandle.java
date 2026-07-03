@@ -109,7 +109,8 @@ public class HoodieNativeLogAppendHandle<T, I, K, O> extends HoodieAppendHandle<
           writeSchemaWithMetaFields,
           taskContextSupplier,
           hoodieTable.getReaderContextFactoryForWrite().getContext().getRecordContext(),
-          orderingFields == null ? Collections.emptyList() : Arrays.asList(orderingFields));
+          orderingFields == null ? Collections.emptyList() : Arrays.asList(orderingFields),
+          baseFileInstantTimeOfPositions);
     } catch (IOException e) {
       throw new HoodieException("Creating native log writer with fileId: " + fileId + ", "
           + "delta commit time: " + instantTime + " error", e);
