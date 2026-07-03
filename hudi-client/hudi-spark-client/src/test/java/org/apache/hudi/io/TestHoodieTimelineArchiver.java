@@ -2438,7 +2438,7 @@ public class TestHoodieTimelineArchiver extends HoodieSparkClientTestHarness {
     addCleanCommitWithECTR(testTable, "00000006", "00000003", "00000005");
     metaClient = HoodieTableMetaClient.reload(metaClient);
 
-    assertEquals(HoodieTableVersion.NINE, metaClient.getTableConfig().getTableVersion(),
+    assertEquals(HoodieTableVersion.TEN, metaClient.getTableConfig().getTableVersion(),
         "Table should be version 9");
 
     // When: trigger archival using TimelineArchiverV2
