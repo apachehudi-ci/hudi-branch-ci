@@ -245,8 +245,7 @@ public interface HoodieLogFormat {
 
   static HoodieLogFormat.Reader newReader(HoodieStorage storage, HoodieLogFile logFile, HoodieSchema readerSchema)
       throws IOException {
-    rejectNativeLogFileWithoutMetaClient(logFile);
-    return new HoodieLogFileReader(storage, logFile, readerSchema, HoodieLogFileReader.DEFAULT_BUFFER_SIZE);
+    return newReader(storage, logFile, readerSchema, false);
   }
 
   static HoodieLogFormat.Reader newReader(HoodieStorage storage, HoodieLogFile logFile, HoodieSchema readerSchema, boolean reverseReader) throws IOException {
