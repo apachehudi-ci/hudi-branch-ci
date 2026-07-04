@@ -20,7 +20,6 @@ package org.apache.hudi.io;
 
 import org.apache.hudi.common.engine.TaskContextSupplier;
 import org.apache.hudi.common.fs.FSUtils;
-import org.apache.hudi.common.model.HoodieFileFormat;
 import org.apache.hudi.common.schema.HoodieSchema;
 import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.log.HoodieLogFormat;
@@ -81,9 +80,6 @@ final class HoodieCDCLogWriterFactory {
   }
 
   static boolean shouldWriteNativeCDCLogs(HoodieWriteConfig writeConfig, HoodieTableConfig tableConfig) {
-    // Native CDC uses the table's base-file writer; keep Lance CDC logs on Avro until native CDC
-    // Lance writer semantics are enabled consistently across engines.
-    return tableConfig.getBaseFileFormat() != HoodieFileFormat.LANCE
-        && CommonClientUtils.shouldWriteNativeLogFormat(writeConfig);
+    return CommonClientUtils.shouldWriteNativeLogFormat(writeConfig, tableConfig);
   }
 }
