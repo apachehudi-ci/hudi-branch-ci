@@ -410,6 +410,8 @@ public class TestUpgradeDowngrade extends SparkClientFunctionalTestHarness {
 
     Properties props = new Properties();
     props.put(HoodieTableConfig.TYPE.key(), tableType.name());
+    // todo remove this option after https://github.com/apache/hudi/issues/19090 resolved.
+    props.put(HoodieWriteConfig.WRITE_TABLE_VERSION.key(), String.valueOf(fromVersion.versionCode()));
     HoodieTableMetaClient metaClient =
         getHoodieMetaClient(storageConf(), URI.create(basePath()).getPath(), props);
 
@@ -1047,6 +1049,8 @@ public class TestUpgradeDowngrade extends SparkClientFunctionalTestHarness {
     newRecordData.write()
         .format("hudi")
         .option(HoodieWriteConfig.TBL_NAME.key(), metaClientV9.getTableConfig().getTableName())
+        // todo remove this option after https://github.com/apache/hudi/issues/19090 resolved.
+        .option(HoodieWriteConfig.WRITE_TABLE_VERSION.key(), String.valueOf(HoodieTableVersion.NINE.versionCode()))
         .mode(SaveMode.Append)
         .save(metaClientV9.getBasePath().toString());
 
