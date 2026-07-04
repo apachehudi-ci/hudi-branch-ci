@@ -158,10 +158,7 @@ public class HoodieNativeCDCLogger<T> implements HoodieCDCLogWriter<BufferedReco
   }
 
   private Object convertString(String value) {
-    // NOTE: convertValueToEngineType is only meant for value comparison; for Spark it wraps the
-    // string into HoodieUTF8String which cannot be stored in an InternalRow field. Use the
-    // partition-value conversion which yields the raw engine string type (UTF8String/Utf8/StringData).
-    return recordContext.convertPartitionValueToEngineType(value);
+    return recordContext.convertValueToEngineType(value);
   }
 
   private T projectDataRecord(BufferedRecord<T> record) {

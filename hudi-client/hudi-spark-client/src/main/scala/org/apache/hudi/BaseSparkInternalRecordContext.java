@@ -161,11 +161,12 @@ public abstract class BaseSparkInternalRecordContext extends RecordContext<Inter
   @Override
   public Comparable convertValueToEngineType(Comparable value) {
     if (value instanceof String) {
-      // Spark reads String field values as UTF8String.
-      // To foster value comparison, if the value is of String type, e.g., from
-      // the delete record, we convert it to UTF8String type.
-      // [SPARK-46832] UTF8String doesn't support compareTo anymore
-      return SparkAdapterSupport$.MODULE$.sparkAdapter().getUTF8StringFactory().wrapUTF8String(UTF8String.fromString((String) value));
+      // Spark represents String field values as UTF8String in InternalRow.
+      // NOTE: the returned raw UTF8String is meant for storage in an engine record; it does
+      // not support compareTo since [SPARK-46832]. Callers that need comparison must go
+      // through convertOrderingValueToEngineType/ensureComparability, which wrap the value
+      // into HoodieUTF8String.
+      return UTF8String.fromString((String) value);
     }
     return value;
   }
