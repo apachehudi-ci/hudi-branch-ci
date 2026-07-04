@@ -30,9 +30,7 @@ import org.apache.hudi.common.util.HoodieRecordUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.ParquetUtils;
 import org.apache.hudi.config.HoodieWriteConfig;
-import org.apache.hudi.exception.ExceptionUtil;
 import org.apache.hudi.exception.HoodieAppendException;
-import org.apache.hudi.exception.HoodieEarlyConflictDetectionException;
 import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.metadata.HoodieIndexVersion;
 import org.apache.hudi.metadata.HoodieTableMetadataUtil;
@@ -176,14 +174,6 @@ public class HoodieNativeLogAppendHandle<T, I, K, O> extends HoodieAppendHandle<
       writer.close();
       writer = null;
     }
-  }
-
-  @Override
-  protected boolean shouldFailOnWriteException(Exception e) {
-    // Native log writers lazily create the physical log file when appending the first record, so marker-based
-    // early conflict detection can be raised inside the per-record write path. That conflict is a task-level
-    // concurrency failure, not a record-level write failure, and must not be hidden by hoodie.write.ignore.failed.
-    return ExceptionUtil.isCausedBy(e, HoodieEarlyConflictDetectionException.class);
   }
 
   /**

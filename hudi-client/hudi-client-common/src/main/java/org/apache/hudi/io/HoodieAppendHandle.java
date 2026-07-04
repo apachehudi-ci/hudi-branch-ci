@@ -44,6 +44,8 @@ import org.apache.hudi.common.util.HoodieRecordUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.ReflectionUtils;
 import org.apache.hudi.config.HoodieWriteConfig;
+import org.apache.hudi.exception.ExceptionUtil;
+import org.apache.hudi.exception.HoodieEarlyConflictDetectionException;
 import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.exception.HoodieUpsertException;
 import org.apache.hudi.storage.StoragePath;
@@ -379,19 +381,12 @@ public abstract class HoodieAppendHandle<T, I, K, O> extends HoodieWriteHandle<T
       return true;
     } catch (Exception e) {
       log.error("Error writing record " + hoodieRecord, e);
-      if (!config.getIgnoreWriteFailed() || shouldFailOnWriteException(e)) {
+      if (!config.getIgnoreWriteFailed() || ExceptionUtil.isCausedBy(e, HoodieEarlyConflictDetectionException.class)) {
         throw new HoodieException(e.getMessage(), e);
       }
       writeStatus.markFailure(hoodieRecord, e, recordMetadata);
       return false;
     }
-  }
-
-  /**
-   * Returns whether a write exception should fail the task even when record-level write failures are ignored.
-   */
-  protected boolean shouldFailOnWriteException(Exception e) {
-    return false;
   }
 
   /**
