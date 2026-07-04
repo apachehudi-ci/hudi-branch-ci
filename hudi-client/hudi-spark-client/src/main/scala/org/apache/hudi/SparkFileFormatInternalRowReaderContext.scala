@@ -160,6 +160,11 @@ class SparkFileFormatInternalRowReaderContext(baseFileReader: SparkColumnarFileR
     val (readSchema, readFilters) = getSchemaAndFiltersForRead(parquetReadStructType, hasRowIndexField)
     if (FSUtils.isLogFile(filePath)) {
       // NOTE: now only primary key based filtering is supported for log files
+      // Position-based merging pairs log records with the RECORD_POSITIONS bitmap by index (see
+      // PositionBasedFileGroupRecordBuffer), which requires the record stream to contain every
+      // record of the block. Pushing filters into the scan can physically drop records (e.g. with
+      // parquet record-level filtering) and misalign that pairing, so push no filters in that case.
+      val logReadFilters = if (getShouldMergeUseRecordPosition) Seq.empty[Filter] else readFilters
       // Variant alignment happens later via getLogBlockRecordProjection in the merge buffer.
       // Log files reach this method either as an inline parquet data block or as a native log file.
       // Inline paths do not carry the parquet extension, so resolve them by the log block contract.
@@ -171,14 +176,14 @@ class SparkFileFormatInternalRowReaderContext(baseFileReader: SparkColumnarFileR
       fileFormat match {
         case HoodieFileFormat.PARQUET =>
           new HoodieSparkFileReaderFactory(storage).newParquetFileReader(filePath)
-            .asInstanceOf[HoodieSparkParquetReader].getUnsafeRowIterator(requiredSchema, readFilters.asJava)
+            .asInstanceOf[HoodieSparkParquetReader].getUnsafeRowIterator(requiredSchema, logReadFilters.asJava)
             .asInstanceOf[ClosableIterator[InternalRow]]
         case _ =>
           val fileInfo = sparkAdapter.getSparkPartitionedFileUtils
             .createPartitionedFile(InternalRow.empty, filePath, start, length)
           new CloseableInternalRowIterator(baseFileReader.read(fileInfo,
             readSchema, StructType(Seq.empty), getSchemaHandler.getInternalSchemaOpt,
-            readFilters, storage.getConf.asInstanceOf[StorageConfiguration[Configuration]]))
+            logReadFilters, storage.getConf.asInstanceOf[StorageConfiguration[Configuration]]))
       }
     } else {
       // partition value is empty because the spark parquet reader will append the partition columns to
