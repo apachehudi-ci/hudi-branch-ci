@@ -29,7 +29,7 @@ import org.apache.hudi.common.table.cdc.{HoodieCDCOperation, HoodieCDCSupplement
 import org.apache.hudi.common.table.cdc.HoodieCDCSupplementalLoggingMode.{DATA_BEFORE, OP_KEY_ONLY}
 import org.apache.hudi.common.table.log.HoodieLogFormat
 import org.apache.hudi.common.table.log.block.HoodieDataBlock
-import org.apache.hudi.common.table.timeline.HoodieInstant
+import org.apache.hudi.common.table.timeline.{HoodieInstant, HoodieInstantTimeGenerator}
 import org.apache.hudi.config.{HoodieCleanConfig, HoodieWriteConfig}
 import org.apache.hudi.storage.StoragePath
 import org.apache.hudi.testutils.HoodieSparkClientTestBase
@@ -89,6 +89,15 @@ abstract class HoodieCDCTestBase extends HoodieSparkClientTestBase {
 
   protected def cdcDataFrame(startingInstant: String, endingInstant: String = null): DataFrame = {
     cdcDataFrame(basePath, startingInstant, endingInstant)
+  }
+
+  /**
+   * Returns the instant 1ms before the given one, for use as the exclusive begin instant
+   * of an incremental query. Numeric `-1` on the timestamp string is invalid when the
+   * instant falls on a minute boundary (e.g. ...110700000 - 1 = ...110699999, second=99).
+   */
+  protected def instantBefore(instant: String): String = {
+    HoodieInstantTimeGenerator.instantTimeMinusMillis(instant, 1)
   }
 
   /**
