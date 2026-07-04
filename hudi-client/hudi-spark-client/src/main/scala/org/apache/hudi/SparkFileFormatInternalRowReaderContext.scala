@@ -161,7 +161,14 @@ class SparkFileFormatInternalRowReaderContext(baseFileReader: SparkColumnarFileR
     if (FSUtils.isLogFile(filePath)) {
       // NOTE: now only primary key based filtering is supported for log files
       // Variant alignment happens later via getLogBlockRecordProjection in the merge buffer.
-      HoodieFileFormat.fromFileExtension(filePath.getFileExtension) match {
+      // Log files reach this method either as an inline parquet data block or as a native log file.
+      // Inline paths do not carry the parquet extension, so resolve them by the log block contract.
+      val fileFormat = if (FSUtils.matchNativeLogFile(filePath.getName).isEmpty) {
+        HoodieFileFormat.PARQUET
+      } else {
+        HoodieFileFormat.fromFileExtension(filePath.getFileExtension)
+      }
+      fileFormat match {
         case HoodieFileFormat.PARQUET =>
           new HoodieSparkFileReaderFactory(storage).newParquetFileReader(filePath)
             .asInstanceOf[HoodieSparkParquetReader].getUnsafeRowIterator(requiredSchema, readFilters.asJava)
