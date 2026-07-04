@@ -52,6 +52,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
@@ -65,11 +66,19 @@ public class TestHoodieNativeLogFormatWriter {
 
   @Test
   public void testAddsRecordPositionsToDataLogFooter() throws Exception {
-    Map<HeaderMetadataType, String> parsedHeader = writeDataLogFooterWithPositions(7L, 2L);
+    Map<HeaderMetadataType, String> parsedHeader = writeDataLogFooterWithPositions(2L, 7L);
 
     assertEquals("001", parsedHeader.get(HeaderMetadataType.BASE_FILE_INSTANT_TIME_OF_RECORD_POSITIONS));
     assertEquals(Arrays.asList(2L, 7L),
         toList(LogReaderUtils.decodeRecordPositionsHeader(parsedHeader.get(HeaderMetadataType.RECORD_POSITIONS))));
+  }
+
+  @Test
+  public void testSkipsOutOfOrderRecordPositions() throws Exception {
+    Map<HeaderMetadataType, String> parsedHeader = writeDataLogFooterWithPositions(7L, 2L);
+
+    assertFalse(parsedHeader.containsKey(HeaderMetadataType.BASE_FILE_INSTANT_TIME_OF_RECORD_POSITIONS));
+    assertFalse(parsedHeader.containsKey(HeaderMetadataType.RECORD_POSITIONS));
   }
 
   @Test
@@ -84,7 +93,7 @@ public class TestHoodieNativeLogFormatWriter {
   public void testSkipsDuplicateRecordPositions() throws Exception {
     Map<HeaderMetadataType, String> parsedHeader = writeDataLogFooterWithPositions(7L, 7L);
 
-    assertEquals("001", parsedHeader.get(HeaderMetadataType.BASE_FILE_INSTANT_TIME_OF_RECORD_POSITIONS));
+    assertNull(parsedHeader.get(HeaderMetadataType.BASE_FILE_INSTANT_TIME_OF_RECORD_POSITIONS));
     assertFalse(parsedHeader.containsKey(HeaderMetadataType.RECORD_POSITIONS));
   }
 

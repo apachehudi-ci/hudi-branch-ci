@@ -238,12 +238,16 @@ public class HoodieNativeLogFormatWriter extends HoodieLogFormat.Writer {
     }
 
     Set<Long> positionSet = new HashSet<>(recordPositions.size());
+    long previousPosition = Long.MIN_VALUE;
     for (Long position : recordPositions) {
-      if (!HoodieRecordLocation.isPositionValid(position)) {
+      // RECORD_POSITIONS is encoded as a bitmap and decoded in ascending order. Native log records
+      // are read back in file write order, so only publish positions when both orders match.
+      if (!HoodieRecordLocation.isPositionValid(position) || position <= previousPosition) {
         Map<HeaderMetadataType, String> updatedHeader = new HashMap<>(header);
         updatedHeader.remove(HeaderMetadataType.BASE_FILE_INSTANT_TIME_OF_RECORD_POSITIONS);
         return updatedHeader;
       }
+      previousPosition = position;
       positionSet.add(position);
     }
 
