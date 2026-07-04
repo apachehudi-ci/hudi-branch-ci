@@ -41,12 +41,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 /**
  * Manages native CDC log file creation, rolling, writes, and stats.
+ *
+ * @param <T> engine-native record representation, e.g. Avro {@code IndexedRecord} or Spark {@code InternalRow}
  */
-class HoodieNativeCDCFileWriter {
+class HoodieNativeCDCFileWriter<T> {
 
   private final String commitTime;
   private final String partitionPath;
@@ -60,11 +61,10 @@ class HoodieNativeCDCFileWriter {
   private final LogFileCreationCallback fileCreationCallback;
   private final TaskContextSupplier taskContextSupplier;
   private final HoodieRecord.HoodieRecordType recordType;
-  private final Properties recordProperties;
   private final Map<HeaderMetadataType, String> cdcDataBlockHeader;
   private final List<StoragePath> cdcAbsPaths;
   private int nextLogVersion;
-  private HoodieFileWriter cdcWriter;
+  private HoodieFileWriter<T> cdcWriter;
 
   HoodieNativeCDCFileWriter(
       String commitTime,
@@ -91,8 +91,6 @@ class HoodieNativeCDCFileWriter {
     this.fileCreationCallback = fileCreationCallback;
     this.taskContextSupplier = taskContextSupplier;
     this.recordType = recordType;
-    this.recordProperties = new Properties();
-    this.recordProperties.putAll(config.getProps());
     this.cdcDataBlockHeader = new HashMap<>();
     this.cdcDataBlockHeader.put(HeaderMetadataType.INSTANT_TIME, commitTime);
     this.cdcDataBlockHeader.put(HeaderMetadataType.SCHEMA, cdcSchema.toString());
@@ -100,9 +98,16 @@ class HoodieNativeCDCFileWriter {
     this.nextLogVersion = HoodieLogFile.LOGFILE_BASE_VERSION;
   }
 
-  void write(String recordKey, HoodieRecord record) throws IOException {
+  /**
+   * Writes a CDC record in the engine-native representation.
+   *
+   * <p>The record is written as-is via {@link HoodieFileWriter#writeRow}. It must NOT be wrapped into a payload-based
+   * {@link HoodieRecord}: payloads like ExpressionPayload re-interpret the record bytes with their own schema
+   * (e.g. {@code hoodie.payload.record.schema}), which corrupts the CDC record that is already in its final form.
+   */
+  void write(String recordKey, T record) throws IOException {
     ensureCDCWriter();
-    cdcWriter.write(recordKey, record, cdcSchema, recordProperties);
+    cdcWriter.writeRow(recordKey, record);
   }
 
   Map<String, Long> getCDCWriteStats() {
@@ -126,13 +131,14 @@ class HoodieNativeCDCFileWriter {
     }
   }
 
+  @SuppressWarnings("unchecked")
   private void ensureCDCWriter() throws IOException {
     if (cdcWriter != null && cdcWriter.canWrite()) {
       return;
     }
     close();
     HoodieLogFile cdcLogFile = createNativeCDCLogFile();
-    cdcWriter = HoodieFileWriterFactory.getFileWriter(
+    cdcWriter = (HoodieFileWriter<T>) HoodieFileWriterFactory.getFileWriter(
         commitTime, cdcLogFile.getPath(), storage, config, cdcSchema, taskContextSupplier, recordType);
     cdcWriter.addFooterMetadata(NativeLogFooterMetadata.toFooterMetadata(cdcDataBlockHeader));
     cdcAbsPaths.add(cdcLogFile.getPath());

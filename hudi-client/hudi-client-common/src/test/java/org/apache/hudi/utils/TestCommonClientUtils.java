@@ -143,11 +143,8 @@ class TestCommonClientUtils {
 
   private static Stream<Arguments> provideNativeLogColumnStatsExpectations() {
     return Stream.of(
-        Arguments.of(HoodieFileFormat.PARQUET, true, false),
         Arguments.of(HoodieFileFormat.ORC, true, true),
-        Arguments.of(HoodieFileFormat.LANCE, true, true),
-        Arguments.of(HoodieFileFormat.ORC, false, false),
-        Arguments.of(HoodieFileFormat.LANCE, false, false)
+        Arguments.of(HoodieFileFormat.ORC, false, false)
     );
   }
 

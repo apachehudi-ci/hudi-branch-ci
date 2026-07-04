@@ -32,6 +32,7 @@ import org.apache.hudi.io.storage.HoodieFileWriterFactory;
 import org.apache.hudi.storage.HoodieStorage;
 import org.apache.hudi.storage.StoragePath;
 
+import org.apache.avro.generic.IndexedRecord;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
@@ -68,7 +69,7 @@ public class TestHoodieNativeCDCFileWriter {
               any(TaskContextSupplier.class), eq(HoodieRecord.HoodieRecordType.AVRO)))
           .thenReturn(fileWriter);
 
-      HoodieNativeCDCFileWriter writer = new HoodieNativeCDCFileWriter(
+      HoodieNativeCDCFileWriter<IndexedRecord> writer = new HoodieNativeCDCFileWriter<>(
           instantTime,
           "partition",
           storage,
@@ -83,7 +84,7 @@ public class TestHoodieNativeCDCFileWriter {
           mock(TaskContextSupplier.class),
           HoodieRecord.HoodieRecordType.AVRO);
 
-      writer.write("key1", mock(HoodieRecord.class));
+      writer.write("key1", mock(IndexedRecord.class));
     }
 
     ArgumentCaptor<Map<String, String>> footerCaptor = ArgumentCaptor.forClass(Map.class);
