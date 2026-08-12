@@ -64,17 +64,21 @@ import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.io.JsonEncoder;
 import org.apache.avro.specific.SpecificData;
 import org.apache.avro.specific.SpecificRecordBase;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
 import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.net.URL;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -89,6 +93,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Deque;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -112,7 +117,7 @@ import static org.apache.hudi.common.util.ValidationUtils.checkState;
  */
 public class HoodieAvroUtils {
 
-  public static final String AVRO_VERSION = Schema.class.getPackage().getImplementationVersion();
+  public static final String AVRO_VERSION = resolveAvroVersion();
 
   private static final ThreadLocal<BinaryEncoder> BINARY_ENCODER = ThreadLocal.withInitial(() -> null);
   private static final ThreadLocal<BinaryDecoder> BINARY_DECODER = ThreadLocal.withInitial(() -> null);
@@ -123,6 +128,49 @@ public class HoodieAvroUtils {
   public static final Conversions.DecimalConversion DECIMAL_CONVERSION = new Conversions.DecimalConversion();
 
   private static final Properties PROPERTIES = new Properties();
+
+  private static final Logger LOG = LoggerFactory.getLogger(HoodieAvroUtils.class);
+
+  /**
+   * Resolves the Avro library version, preferring Maven's generated pom.properties over
+   * {@link Package#getImplementationVersion()}. The latter comes from whatever manifest happens to
+   * seal the package, which is only avro's own manifest when avro ships as a standalone jar. But once
+   * its classes get merged or relocated into a shaded/fat jar, that lookup silently returns the
+   * assembling jar's version instead of avro's or nothing at all. So better to resolve with pom.properties
+   * followed by manifest version.
+   */
+  private static String resolveAvroVersion() {
+    final String path = "META-INF/maven/org.apache.avro/avro/pom.properties";
+    try {
+      URL schemaClassUrl = Schema.class.getResource("Schema.class");
+      String schemaArchive = schemaClassUrl == null ? null : archiveOf(schemaClassUrl);
+      Enumeration<URL> candidates = Schema.class.getClassLoader().getResources(path);
+      while (candidates.hasMoreElements()) {
+        URL candidate = candidates.nextElement();
+        // only use the pom.properties that ships in the same archive as the loaded Schema class
+        if (schemaArchive != null && !schemaArchive.equals(archiveOf(candidate))) {
+          continue;
+        }
+        Properties avroProperties = new Properties();
+        try (InputStream in = candidate.openStream()) {
+          avroProperties.load(in);
+        }
+        String version = avroProperties.getProperty("version");
+        if (version != null) {
+          return version;
+        }
+      }
+    } catch (Exception e) {
+      LOG.warn("Failed to resolve the avro version from {}, falling back to the jar manifest", path, e);
+    }
+    return Schema.class.getPackage() == null ? null : Schema.class.getPackage().getImplementationVersion();
+  }
+
+  private static String archiveOf(URL url) {
+    String s = url.toString();
+    int separatorIdx = s.indexOf("!/");
+    return separatorIdx < 0 ? s : s.substring(0, separatorIdx);
+  }
 
   /**
    * Convert a given avro record to bytes.
@@ -1531,15 +1579,15 @@ public class HoodieAvroUtils {
   }
 
   public static boolean gteqAvro1_9() {
-    return StringUtils.compareVersions(AVRO_VERSION, "1.9") >= 0;
+    return AVRO_VERSION != null && StringUtils.compareVersions(AVRO_VERSION, "1.9") >= 0;
   }
 
   public static boolean gteqAvro1_10() {
-    return StringUtils.compareVersions(AVRO_VERSION, "1.10") >= 0;
+    return AVRO_VERSION != null && StringUtils.compareVersions(AVRO_VERSION, "1.10") >= 0;
   }
 
   static boolean gteqAvro1_12() {
-    return StringUtils.compareVersions(AVRO_VERSION, "1.12") >= 0;
+    return AVRO_VERSION != null && StringUtils.compareVersions(AVRO_VERSION, "1.12") >= 0;
   }
 
   private static Object convertDefaultValueForAvroCompatibility(Object defaultValue) {
