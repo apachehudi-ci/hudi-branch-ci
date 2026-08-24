@@ -129,6 +129,25 @@ public class TestHoodieMetadataWriteUtils {
     assertEquals(hfileBloomFilterEnabled, metadataWriteConfig.hfileBloomFilterEnabled());
   }
 
+  @Test
+  void testCreateMetadataWriteConfigPropagatesTableServiceSchedulingDelegation() {
+    HoodieMetadataConfig metadataConfig = HoodieMetadataConfig.newBuilder()
+        .withTableServiceManagerEnabled(true)
+        .withTableServiceManagerScheduleActions(ActionType.compaction.name())
+        .build();
+    HoodieWriteConfig writeConfig = HoodieWriteConfig.newBuilder()
+        .withPath("/tmp/base_path/")
+        .withMetadataConfig(metadataConfig)
+        .build();
+
+    HoodieWriteConfig metadataWriteConfig = HoodieMetadataWriteUtils.createMetadataWriteConfig(
+        writeConfig, HoodieFailedWritesCleaningPolicy.EAGER, HoodieTableVersion.EIGHT);
+
+    assertTrue(metadataWriteConfig.getTableServiceManagerConfig().isTableServiceManagerEnabled());
+    assertEquals(ActionType.compaction.name(),
+        metadataWriteConfig.getMetadataConfig().getTableServiceManagerScheduleActions());
+  }
+
   @ParameterizedTest
   @EnumSource(value = MetricsReporterType.class, names = {
       "GRAPHITE", "JMX", "PROMETHEUS_PUSHGATEWAY", "M3", "PROMETHEUS"
