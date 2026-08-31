@@ -67,6 +67,7 @@ import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.unsafe.types.UTF8String;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -90,6 +91,7 @@ import static org.apache.hudi.common.table.HoodieTableConfig.PARTIAL_UPDATE_UNAV
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -294,6 +296,44 @@ class TestBufferedRecordMerger extends SparkClientFunctionalTestHarness {
     } else if (updateMode == PartialUpdateMode.FILL_UNAVAILABLE) {
       assertEquals("Older City", finalResult.getRecord().getString(3));
     }
+  }
+
+  @Test
+  void testEventTimePartialFinalMergeToleratesNullBaseOrderingValue() throws IOException {
+    // Event-time partial update COW final merge: a null base ordering value must not fail the
+    // comparison. The incoming record ranks higher and is partial-merged over the base.
+    BufferedRecordMerger<InternalRow> merger =
+        createMerger(readerContext, EVENT_TIME_ORDERING, Option.of(PartialUpdateMode.IGNORE_DEFAULTS));
+    InternalRow baseRecord = createFullRecord("older_id", "Older Name", 20, "Older City", 500L);
+    InternalRow incomingRecord = createFullRecord("new_id", "New Name", 0, IGNORE_MARKERS_VALUE, 0L);
+    BufferedRecord<InternalRow> baseNullOrdering =
+        new BufferedRecord<>(RECORD_KEY, null, baseRecord, 1, null);
+    BufferedRecord<InternalRow> incoming =
+        new BufferedRecord<>(RECORD_KEY, ORDERING_VALUE, incomingRecord, 1, null);
+    BufferedRecord<InternalRow> result = merger.finalMerge(baseNullOrdering, incoming);
+    assertFalse(result.isDelete());
+    // Incoming wins; its default columns are filled from the base under IGNORE_DEFAULTS.
+    assertEquals(20, result.getRecord().getInt(2));
+    assertEquals(500L, result.getRecord().getLong(4));
+  }
+
+  @Test
+  void testEventTimePartialFinalMergeRejectsNullIncomingOrderingValue() throws IOException {
+    // Event-time partial update COW final merge: a null incoming ordering value is invalid and must
+    // fail the comparison, consistent with the delta path and the non-partial merger.
+    BufferedRecordMerger<InternalRow> merger =
+        createMerger(readerContext, EVENT_TIME_ORDERING, Option.of(PartialUpdateMode.IGNORE_DEFAULTS));
+    InternalRow baseRecord = createFullRecord("older_id", "Older Name", 20, "Older City", 500L);
+    InternalRow incomingRecord = createFullRecord("new_id", "New Name", 0, IGNORE_MARKERS_VALUE, 0L);
+    BufferedRecord<InternalRow> incomingNull =
+        new BufferedRecord<>(RECORD_KEY, null, incomingRecord, 1, null);
+    BufferedRecord<InternalRow> baseReal =
+        new BufferedRecord<>(RECORD_KEY, ORDERING_VALUE, baseRecord, 1, null);
+    assertThrows(NullPointerException.class, () -> merger.finalMerge(baseReal, incomingNull));
+    // Both ordering values null must also fail rather than silently keeping the incoming record.
+    BufferedRecord<InternalRow> baseNull =
+        new BufferedRecord<>(RECORD_KEY, null, baseRecord, 1, null);
+    assertThrows(NullPointerException.class, () -> merger.finalMerge(baseNull, incomingNull));
   }
 
   // ============================================================================

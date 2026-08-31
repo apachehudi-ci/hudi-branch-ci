@@ -96,15 +96,17 @@ class TestBufferedRecordMergerFactory {
   }
 
   @Test
-  void testEventTimeMergeRejectsNullOrderingValues() {
+  void testEventTimeMergeNullOrderingValues() throws IOException {
     BufferedRecordMerger<String> merger = merger(RecordMergeMode.EVENT_TIME_ORDERING);
     BufferedRecord<String> missing = bufferedRecord("missing", null);
     BufferedRecord<String> present = bufferedRecord("present", 100L);
     assertFalse(missing.isCommitTimeOrderingDelete());
-    assertThrows(NullPointerException.class, () -> merger.finalMerge(missing, present));
+    // A null base ordering value ranks lowest, so a real incoming record wins.
+    assertSame(present, merger.finalMerge(missing, present));
+    assertSame(present, merger.deltaMerge(present, missing).get());
+    // A null incoming ordering value stays invalid and fails the comparison.
     assertThrows(NullPointerException.class, () -> merger.finalMerge(present, missing));
     assertThrows(NullPointerException.class, () -> merger.finalMerge(missing, missing));
-    assertThrows(NullPointerException.class, () -> merger.deltaMerge(present, missing));
     assertThrows(NullPointerException.class, () -> merger.deltaMerge(missing, present));
     assertThrows(NullPointerException.class, () -> merger.deltaMerge(missing, missing));
   }

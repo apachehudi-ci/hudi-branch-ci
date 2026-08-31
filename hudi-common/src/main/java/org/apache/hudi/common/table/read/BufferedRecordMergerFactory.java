@@ -260,11 +260,8 @@ public class BufferedRecordMergerFactory {
         return newerRecord;
       }
 
-      Comparable newOrderingValue = newerRecord.getOrderingValue();
-      Comparable oldOrderingValue = olderRecord.getOrderingValue();
       HoodieSchema newSchema = recordContext.getSchemaFromBufferRecord(newerRecord);
-      if (!olderRecord.isCommitTimeOrderingDelete()
-          && oldOrderingValue.compareTo(newOrderingValue) > 0) {
+      if (!shouldKeepNewerRecord(olderRecord, newerRecord)) {
         // Use old record as the base record since old record has higher ordering value.
         olderRecord = partialUpdateHandler.partialMerge(
             olderRecord,
@@ -512,6 +509,13 @@ public class BufferedRecordMergerFactory {
       // The orderingVal is constant 0 (int) and not guaranteed to match the type of the old or new record's ordering value.
       return true;
     }
-    return newRecord.getOrderingValue().compareTo(oldRecord.getOrderingValue()) >= 0;
+    Comparable oldOrderingValue = oldRecord.getOrderingValue();
+    Comparable newOrderingValue = newRecord.getOrderingValue();
+    if (oldOrderingValue == null && newOrderingValue != null) {
+      // A null base ordering value ranks lowest, so a newer record with a real ordering value wins.
+      // A null incoming ordering value is still surfaced by the comparison below.
+      return true;
+    }
+    return newOrderingValue.compareTo(oldOrderingValue) >= 0;
   }
 }

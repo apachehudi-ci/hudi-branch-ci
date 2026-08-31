@@ -45,8 +45,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Commit-time merges preserve nullable ordering columns. Event-time records preserve null until
- * ingestion or a comparison requires a valid ordering value, at which point the operation fails.
+ * End-to-end null ordering (precombine) value behavior on the 1.x FileGroupReader merge path, for
+ * COW and MOR tables and the AVRO and SPARK record types.
+ *
+ * <p>Ordering values are preserved as null (never coerced to a sentinel). On an event-time merge, a
+ * null <em>base</em> ordering value ranks lowest so a real incoming record wins; a null
+ * <em>incoming</em> ordering value is invalid and fails (rejected at write time for AVRO, surfaced as
+ * a NullPointerException on the comparison for SPARK). Commit-time ordering does not compare ordering
+ * values, so nulls pass through and the incoming record wins.
  */
 class TestNullOrderingValueMerge {
 
@@ -81,62 +87,63 @@ class TestNullOrderingValueMerge {
       .add("value", DataTypes.StringType, false);
 
   static Stream<Arguments> cases() {
-    // record type x merge mode x null-case. Record type is forced via the record merger.
+    // record type x table type x merge mode x null-case.
     List<Arguments> args = new ArrayList<>();
     for (String recordType : new String[] {"AVRO", "SPARK"}) {
-      for (String mergeMode : new String[] {"EVENT_TIME_ORDERING", "COMMIT_TIME_ORDERING"}) {
-        args.add(Arguments.of(recordType, mergeMode, "base-null", null, 100L));
-        args.add(Arguments.of(recordType, mergeMode, "incoming-null", 100L, null));
-        args.add(Arguments.of(recordType, mergeMode, "both-null", null, null));
+      for (String tableType : new String[] {"COPY_ON_WRITE", "MERGE_ON_READ"}) {
+        for (String mergeMode : new String[] {"EVENT_TIME_ORDERING", "COMMIT_TIME_ORDERING"}) {
+          args.add(Arguments.of(recordType, tableType, mergeMode, "base-null", null, 100L));
+          args.add(Arguments.of(recordType, tableType, mergeMode, "incoming-null", 100L, null));
+          args.add(Arguments.of(recordType, tableType, mergeMode, "both-null", null, null));
+        }
       }
     }
     return args.stream();
   }
 
-  @ParameterizedTest(name = "{0} / {1} / {2}")
+  @ParameterizedTest(name = "{0} / {1} / {2} / {3}")
   @MethodSource("cases")
-  void nullOrderingValueMerge(String recordType, String mergeMode, String caseName, Long baseTs, Long incomingTs,
-                              @TempDir Path tmp) {
-    boolean expectWriteReject = "AVRO".equals(recordType)
-        && "EVENT_TIME_ORDERING".equals(mergeMode)
-        && incomingTs == null;
-    boolean expectMergeFailure = "EVENT_TIME_ORDERING".equals(mergeMode);
-    String path = tmp.resolve(recordType + "_" + mergeMode + "_" + caseName).toString();
+  void nullOrderingValueMerge(String recordType, String tableType, String mergeMode, String caseName,
+                              Long baseTs, Long incomingTs, @TempDir Path tmp) {
+    // Only a null base ordering value against a real incoming value succeeds (incoming wins). An
+    // event-time upsert whose incoming ordering value is null fails. Commit-time ordering always
+    // succeeds because it does not compare ordering values.
+    boolean expectSuccess = "COMMIT_TIME_ORDERING".equals(mergeMode) || incomingTs != null;
+    String path = tmp.resolve(recordType + "_" + tableType + "_" + mergeMode + "_" + caseName).toString();
 
-    writeRow(path, recordType, mergeMode, "insert", SaveMode.Overwrite, baseTs, "base");
+    writeRow(path, recordType, tableType, mergeMode, "insert", SaveMode.Overwrite, baseTs, "base");
 
-    if (expectWriteReject) {
-      Throwable thrown = assertThrows(Exception.class,
-          () -> writeRow(path, recordType, mergeMode, "upsert", SaveMode.Append, incomingTs, "incoming"));
-      assertTrue(rootMessage(thrown).contains("has null value for record key"),
-          "expected null-ordering write rejection, got: " + rootMessage(thrown));
+    if (!expectSuccess) {
+      // The failure surfaces at the combining write (AVRO reject, and COW where the merge runs at
+      // write time) or on the read merge (MOR for the SPARK record type), so wrap both.
+      Throwable thrown = assertThrows(Exception.class, () -> {
+        writeRow(path, recordType, tableType, mergeMode, "upsert", SaveMode.Append, incomingTs, "incoming");
+        readRows(path);
+      });
+      Throwable root = rootCause(thrown);
+      boolean writeReject = root instanceof IllegalArgumentException
+          && root.getMessage() != null && root.getMessage().contains("has null value for record key");
+      assertTrue(writeReject || root instanceof NullPointerException,
+          "expected a null-ordering write rejection or comparison failure, got: " + root);
       return;
     }
-    if (expectMergeFailure) {
-      Throwable thrown = assertThrows(Exception.class,
-          () -> writeRow(path, recordType, mergeMode, "upsert", SaveMode.Append, incomingTs, "incoming"));
-      assertTrue(rootCause(thrown) instanceof NullPointerException,
-          "expected null-ordering comparison failure, got: " + rootCause(thrown));
-      return;
-    }
 
-    writeRow(path, recordType, mergeMode, "upsert", SaveMode.Append, incomingTs, "incoming");
-    List<Row> rows = spark.read().format("hudi").load(path)
-        .select("id", "ts", "value").where("id = 'k1'").collectAsList();
-
+    writeRow(path, recordType, tableType, mergeMode, "upsert", SaveMode.Append, incomingTs, "incoming");
+    List<Row> rows = readRows(path);
     assertEquals(1, rows.size(), "expected exactly one record for key k1");
     Row row = rows.get(0);
     assertEquals("incoming", row.getAs("value"));
     int tsIdx = row.fieldIndex("ts");
     if (incomingTs == null) {
-      assertTrue(row.isNullAt(tsIdx), "ts should remain NULL, the default sentinel must not be materialized");
+      assertTrue(row.isNullAt(tsIdx), "ts should remain NULL, the sentinel must not be materialized");
     } else {
       assertEquals(incomingTs.longValue(), row.getLong(tsIdx));
     }
   }
 
-  private static String rootMessage(Throwable t) {
-    return rootCause(t).getMessage() == null ? "" : rootCause(t).getMessage();
+  private List<Row> readRows(String path) {
+    return spark.read().format("hudi").load(path)
+        .select("id", "ts", "value").where("id = 'k1'").collectAsList();
   }
 
   private static Throwable rootCause(Throwable t) {
@@ -146,7 +153,8 @@ class TestNullOrderingValueMerge {
     return t;
   }
 
-  private void writeRow(String path, String recordType, String mergeMode, String operation, SaveMode mode, Long ts, String value) {
+  private void writeRow(String path, String recordType, String tableType, String mergeMode, String operation,
+                        SaveMode mode, Long ts, String value) {
     Dataset<Row> df = spark.createDataFrame(
         Arrays.asList(RowFactory.create("k1", "p1", ts, value)), SCHEMA);
     Map<String, String> opts = new HashMap<>();
@@ -154,9 +162,10 @@ class TestNullOrderingValueMerge {
     opts.put("hoodie.datasource.write.recordkey.field", "id");
     opts.put("hoodie.datasource.write.partitionpath.field", "part");
     opts.put("hoodie.datasource.write.keygenerator.class", "org.apache.hudi.keygen.SimpleKeyGenerator");
-    opts.put("hoodie.datasource.write.table.type", "COPY_ON_WRITE");
+    opts.put("hoodie.datasource.write.table.type", tableType);
     opts.put("hoodie.datasource.write.hive_style_partitioning", "true");
     opts.put("hoodie.metadata.enable", "false");
+    opts.put("hoodie.compact.inline", "false");
     opts.put("hoodie.record.merge.mode", mergeMode);
     opts.put("hoodie.datasource.write.operation", operation);
     // Force the record type via the record merger: default (unset) -> AVRO; DefaultSparkRecordMerger -> SPARK.
