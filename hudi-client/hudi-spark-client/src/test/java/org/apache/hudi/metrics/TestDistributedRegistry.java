@@ -22,14 +22,15 @@ import org.apache.hudi.client.common.HoodieSparkEngineContext;
 import org.apache.hudi.common.metrics.Registry;
 import org.apache.hudi.testutils.HoodieClientTestUtils;
 
-import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.util.AccumulatorContext;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -251,55 +252,65 @@ public class TestDistributedRegistry {
 
   @Test
   public void testRegisterHandlesStaleAccumulator() {
-    // Simulate the stale-singleton scenario: a DistributedRegistry that was registered
-    // to a previous SparkContext and cannot be re-registered because AccumulatorV2.metadata
-    // is already set (throws IllegalStateException).
-
-    // Given: a registry cached in the global REGISTRY_MAP
+    // Given: a registered registry cached in the global REGISTRY_MAP
     String registryName = REGISTRY_NAME + "_testStale";
     DistributedRegistry staleRegistry = new DistributedRegistry(registryName);
     staleRegistry.add(METRIC_1, 100);
     staleRegistry.add(METRIC_2, 200);
     String cacheKey = Registry.makeKey("", registryName);
     Registry.REGISTRY_MAP.put(cacheKey, staleRegistry);
-
-    // Given: register to SparkContext #1
-    staleRegistry.register(jsc);
-    Assertions.assertTrue(staleRegistry.isRegistered());
-
-    // Simulate SparkContext restart: stop and create a new one
-    jsc.stop();
-    JavaSparkContext jsc2 = null;
     try {
-      SparkConf conf = HoodieClientTestUtils.getSparkConfForTest(
-          TestDistributedRegistry.class.getSimpleName() + "_stale");
-      jsc2 = new JavaSparkContext(conf);
+      Assertions.assertSame(staleRegistry, staleRegistry.register(jsc));
 
-      // When: register() is called with the new SparkContext
-      // In local mode, isRegistered() may still return true since AccumulatorContext
-      // persists across stop/start. Force the stale path by calling register on jsc2.
-      // The key invariant: it must not throw IllegalStateException.
-      DistributedRegistry result = staleRegistry.register(jsc2);
+      // Given: the accumulator went stale, as after a SparkContext restart once the previous context
+      // dropped it: it is no longer in the AccumulatorContext but can't be registered again
+      makeStale(staleRegistry);
 
-      // Then: result is registered and functional
+      // When: register() is called
+      DistributedRegistry result = staleRegistry.register(jsc);
+
+      // Then: a registered replacement carrying the counters is returned and cached
+      Assertions.assertNotSame(staleRegistry, result);
       Assertions.assertTrue(result.isRegistered());
       Assertions.assertEquals(registryName, result.getName());
-
-      // Then: counters were preserved
       Map<String, Long> counts = result.getAllCounts();
-      Assertions.assertTrue(counts.containsKey(METRIC_1));
-      Assertions.assertTrue(counts.containsKey(METRIC_2));
       Assertions.assertEquals(100, counts.get(METRIC_1));
       Assertions.assertEquals(200, counts.get(METRIC_2));
+      Assertions.assertSame(result, Registry.REGISTRY_MAP.get(cacheKey));
+
+      // Then: another holder of the stale instance gets the same replacement
+      Assertions.assertSame(result, staleRegistry.register(jsc));
     } finally {
       Registry.REGISTRY_MAP.remove(cacheKey);
-      if (jsc2 != null) {
-        jsc2.stop();
-      }
-      // Restore class-level SparkContext for other tests
-      jsc = new JavaSparkContext(HoodieClientTestUtils.getSparkConfForTest(
-          TestDistributedRegistry.class.getSimpleName()));
-      engineContext = new HoodieSparkEngineContext(jsc);
     }
+  }
+
+  @Test
+  public void testEngineContextRecoversStaleRegistry() {
+    // Given: a registry obtained through the engine context, which caches it in a static map
+    String registryName = REGISTRY_NAME + "_testEngineStale";
+    DistributedRegistry staleRegistry = (DistributedRegistry) engineContext.getMetricRegistry("", registryName);
+    staleRegistry.add(METRIC_1, 7);
+    try {
+      // Given: the cached accumulator went stale
+      makeStale(staleRegistry);
+
+      // Then: engine operations ship only registered accumulators to executors
+      Assertions.assertEquals(Arrays.asList(2, 4), engineContext.map(Arrays.asList(1, 2), i -> i * 2, 2));
+
+      // Then: lookups return the registered replacement with the counters
+      DistributedRegistry result = (DistributedRegistry) engineContext.getMetricRegistry("", registryName);
+      Assertions.assertNotSame(staleRegistry, result);
+      Assertions.assertTrue(result.isRegistered());
+      Assertions.assertEquals(7, result.getAllCounts().get(METRIC_1));
+      Assertions.assertSame(result, Registry.REGISTRY_MAP.get(Registry.makeKey("", registryName)));
+    } finally {
+      Registry.REGISTRY_MAP.remove(Registry.makeKey("", registryName));
+    }
+  }
+
+  private static void makeStale(DistributedRegistry registry) {
+    AccumulatorContext.remove(registry.id());
+    Assertions.assertFalse(registry.isRegistered());
   }
 }

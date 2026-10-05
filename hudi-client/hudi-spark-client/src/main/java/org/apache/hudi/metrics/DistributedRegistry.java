@@ -35,6 +35,8 @@ public class DistributedRegistry extends AccumulatorV2<Map<String, Long>, Map<St
     implements Registry, Serializable {
   private final String name;
   ConcurrentHashMap<String, Long> counters = new ConcurrentHashMap<>();
+  // The registered accumulator that replaced this one if it went stale, see register().
+  private transient volatile DistributedRegistry replacement;
 
   public DistributedRegistry(String name) {
     this.name = name;
@@ -45,9 +47,23 @@ public class DistributedRegistry extends AccumulatorV2<Map<String, Long>, Map<St
     return name;
   }
 
-  public DistributedRegistry register(JavaSparkContext jsc) {
+  /**
+   * Registers this accumulator with the given SparkContext if it is not registered yet.
+   *
+   * <p>A cached instance that was registered to a previous SparkContext can no longer be registered
+   * (AccumulatorV2 rejects a second registration). In that case a fresh accumulator carrying the same
+   * counters is registered instead and swapped into {@link Registry#REGISTRY_MAP}. Callers must use the
+   * returned instance.
+   *
+   * @return this instance, or its registered replacement.
+   */
+  public synchronized DistributedRegistry register(JavaSparkContext jsc) {
     if (isRegistered()) {
       return this;
+    }
+    // Another cache may still hold this stale instance after it was already replaced.
+    if (replacement != null && replacement.isRegistered()) {
+      return replacement;
     }
     try {
       jsc.sc().register(this);
@@ -60,11 +76,8 @@ public class DistributedRegistry extends AccumulatorV2<Map<String, Long>, Map<St
       DistributedRegistry fresh = new DistributedRegistry(this.name);
       fresh.counters.putAll(this.counters);
       jsc.sc().register(fresh);
-      Registry.REGISTRY_MAP.forEach((key, registry) -> {
-        if (registry == this) {
-          Registry.REGISTRY_MAP.replace(key, this, fresh);
-        }
-      });
+      Registry.REGISTRY_MAP.replaceAll((key, registry) -> registry == this ? fresh : registry);
+      replacement = fresh;
       return fresh;
     }
   }
