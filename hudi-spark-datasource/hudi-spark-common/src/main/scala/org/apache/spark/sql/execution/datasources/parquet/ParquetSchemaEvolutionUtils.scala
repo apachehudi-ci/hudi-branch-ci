@@ -162,7 +162,8 @@ object ParquetSchemaEvolutionUtils {
    * Maps a pushed-down query filter onto the names the file actually carries: a column renamed
    * under schema-on-read is rewritten to its file-schema name, and one the file does not hold at
    * all collapses to AlwaysTrue, since a filter on an absent column cannot skip any of its row
-   * groups. A table without an internal schema passes its filters through untouched.
+   * groups. A name the query schema does not hold at all (see fileFilterName) collapses to
+   * AlwaysTrue as well. A table without an internal schema passes its filters through untouched.
    */
   def rebuildFilterFromParquet(oldFilter: Filter, fileSchema: InternalSchema, querySchema: InternalSchema): Filter = {
     if (fileSchema == null || querySchema == null) {
@@ -170,31 +171,31 @@ object ParquetSchemaEvolutionUtils {
     } else {
       oldFilter match {
         case eq: EqualTo =>
-          val newAttribute = InternalSchemaUtils.reBuildFilterName(eq.attribute, fileSchema, querySchema)
+          val newAttribute = fileFilterName(eq.attribute, fileSchema, querySchema)
           if (newAttribute.isEmpty) AlwaysTrue else eq.copy(attribute = newAttribute)
         case eqs: EqualNullSafe =>
-          val newAttribute = InternalSchemaUtils.reBuildFilterName(eqs.attribute, fileSchema, querySchema)
+          val newAttribute = fileFilterName(eqs.attribute, fileSchema, querySchema)
           if (newAttribute.isEmpty) AlwaysTrue else eqs.copy(attribute = newAttribute)
         case gt: GreaterThan =>
-          val newAttribute = InternalSchemaUtils.reBuildFilterName(gt.attribute, fileSchema, querySchema)
+          val newAttribute = fileFilterName(gt.attribute, fileSchema, querySchema)
           if (newAttribute.isEmpty) AlwaysTrue else gt.copy(attribute = newAttribute)
         case gtr: GreaterThanOrEqual =>
-          val newAttribute = InternalSchemaUtils.reBuildFilterName(gtr.attribute, fileSchema, querySchema)
+          val newAttribute = fileFilterName(gtr.attribute, fileSchema, querySchema)
           if (newAttribute.isEmpty) AlwaysTrue else gtr.copy(attribute = newAttribute)
         case lt: LessThan =>
-          val newAttribute = InternalSchemaUtils.reBuildFilterName(lt.attribute, fileSchema, querySchema)
+          val newAttribute = fileFilterName(lt.attribute, fileSchema, querySchema)
           if (newAttribute.isEmpty) AlwaysTrue else lt.copy(attribute = newAttribute)
         case lte: LessThanOrEqual =>
-          val newAttribute = InternalSchemaUtils.reBuildFilterName(lte.attribute, fileSchema, querySchema)
+          val newAttribute = fileFilterName(lte.attribute, fileSchema, querySchema)
           if (newAttribute.isEmpty) AlwaysTrue else lte.copy(attribute = newAttribute)
         case i: In =>
-          val newAttribute = InternalSchemaUtils.reBuildFilterName(i.attribute, fileSchema, querySchema)
+          val newAttribute = fileFilterName(i.attribute, fileSchema, querySchema)
           if (newAttribute.isEmpty) AlwaysTrue else i.copy(attribute = newAttribute)
         case isn: IsNull =>
-          val newAttribute = InternalSchemaUtils.reBuildFilterName(isn.attribute, fileSchema, querySchema)
+          val newAttribute = fileFilterName(isn.attribute, fileSchema, querySchema)
           if (newAttribute.isEmpty) AlwaysTrue else isn.copy(attribute = newAttribute)
         case isnn: IsNotNull =>
-          val newAttribute = InternalSchemaUtils.reBuildFilterName(isnn.attribute, fileSchema, querySchema)
+          val newAttribute = fileFilterName(isnn.attribute, fileSchema, querySchema)
           if (newAttribute.isEmpty) AlwaysTrue else isnn.copy(attribute = newAttribute)
         case And(left, right) =>
           And(rebuildFilterFromParquet(left, fileSchema, querySchema), rebuildFilterFromParquet(right, fileSchema, querySchema))
@@ -203,13 +204,13 @@ object ParquetSchemaEvolutionUtils {
         case Not(child) =>
           Not(rebuildFilterFromParquet(child, fileSchema, querySchema))
         case ssw: StringStartsWith =>
-          val newAttribute = InternalSchemaUtils.reBuildFilterName(ssw.attribute, fileSchema, querySchema)
+          val newAttribute = fileFilterName(ssw.attribute, fileSchema, querySchema)
           if (newAttribute.isEmpty) AlwaysTrue else ssw.copy(attribute = newAttribute)
         case ses: StringEndsWith =>
-          val newAttribute = InternalSchemaUtils.reBuildFilterName(ses.attribute, fileSchema, querySchema)
+          val newAttribute = fileFilterName(ses.attribute, fileSchema, querySchema)
           if (newAttribute.isEmpty) AlwaysTrue else ses.copy(attribute = newAttribute)
         case sc: StringContains =>
-          val newAttribute = InternalSchemaUtils.reBuildFilterName(sc.attribute, fileSchema, querySchema)
+          val newAttribute = fileFilterName(sc.attribute, fileSchema, querySchema)
           if (newAttribute.isEmpty) AlwaysTrue else sc.copy(attribute = newAttribute)
         case AlwaysTrue =>
           AlwaysTrue
@@ -218,6 +219,23 @@ object ParquetSchemaEvolutionUtils {
         case _ =>
           AlwaysTrue
       }
+    }
+  }
+
+  /**
+   * InternalSchemaUtils.reBuildFilterName, except a name the query schema does not hold comes back
+   * empty, so its filter collapses to AlwaysTrue instead of failing the read. The one producer is a
+   * predicate on a variant that Spark's PushVariantIntoScan rewrote: it is pushed as a nested filter
+   * on the projection struct's ordinal-named member (v.`0`), which is no column of the table.
+   * Dropping it is always safe, since Spark evaluates every pushed filter again above the scan, and
+   * it lets the read reach validateNoShreddedVariants, which rejects that request with the
+   * actionable message.
+   */
+  private def fileFilterName(attribute: String, fileSchema: InternalSchema, querySchema: InternalSchema): String = {
+    if (querySchema.findIdByName(attribute) == -1) {
+      ""
+    } else {
+      InternalSchemaUtils.reBuildFilterName(attribute, fileSchema, querySchema)
     }
   }
 
