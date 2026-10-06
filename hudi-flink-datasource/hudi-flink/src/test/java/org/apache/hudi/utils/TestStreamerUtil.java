@@ -28,6 +28,7 @@ import org.apache.hudi.common.config.HoodieStorageConfig;
 import org.apache.hudi.common.config.RecordMergeMode;
 import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.model.EventTimeAvroPayload;
+import org.apache.hudi.common.model.MetaFieldsMode;
 import org.apache.hudi.common.model.OverwriteWithLatestAvroPayload;
 import org.apache.hudi.common.model.PartialUpdateAvroPayload;
 import org.apache.hudi.common.model.WriteOperationType;
@@ -62,10 +63,14 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -89,6 +94,20 @@ class TestStreamerUtil {
 
   @TempDir
   File tempFile;
+
+  @ParameterizedTest
+  @EnumSource(MetaFieldsMode.class)
+  void testInitTableMetaFieldsMode(MetaFieldsMode mode) throws IOException {
+    Configuration conf = TestConfigurations.getDefaultConf(tempFile.getAbsolutePath());
+    conf.set(FlinkOptions.TABLE_TYPE, "COPY_ON_WRITE");
+    conf.set(FlinkOptions.WRITE_TABLE_VERSION, HoodieTableVersion.TEN.versionCode());
+    conf.setString(HoodieTableConfig.META_FIELDS_MODE.key(), mode.name());
+    // The explicit mode must win over the legacy default.
+    conf.setString(HoodieTableConfig.POPULATE_META_FIELDS.key(), "true");
+    HoodieTableMetaClient metaClient = StreamerUtil.initTableIfNotExists(conf);
+    assertEquals(mode, metaClient.getTableConfig().getMetaFieldsMode());
+    assertEquals(mode.toLegacyPopulateMetaFields(), metaClient.getTableConfig().populateMetaFields());
+  }
 
   @Test
   void testMetadataConfigIncludesMetadataTableBloomFilterSettings() {
@@ -361,6 +380,26 @@ class TestStreamerUtil {
   }
 
   @Test
+  void testParsePartitionDate() {
+    DateTimeFormatter dayFormatter = DateTimeFormatter.ofPattern(FlinkOptions.PARTITION_FORMAT_DAY);
+    assertEquals(LocalDate.of(2026, 8, 6), StreamerUtil.parsePartitionDate("20260806", dayFormatter, false));
+
+    DateTimeFormatter dashedDayFormatter = DateTimeFormatter.ofPattern(FlinkOptions.PARTITION_FORMAT_DASHED_DAY);
+    assertEquals(LocalDate.of(2026, 8, 6), StreamerUtil.parsePartitionDate("2026-08-06", dashedDayFormatter, false));
+
+    assertEquals(LocalDate.of(2026, 8, 6), StreamerUtil.parsePartitionDate("dt=20260806", dayFormatter, true));
+
+    // hiveStylePartitioning=false must not strip the "dt=" prefix, so parsing fails.
+    assertNull(StreamerUtil.parsePartitionDate("dt=20260806", dayFormatter, false));
+
+    // no '=' present, hive-style parsing falls back to the raw path.
+    assertEquals(LocalDate.of(2026, 8, 6), StreamerUtil.parsePartitionDate("20260806", dayFormatter, true));
+
+    assertNull(StreamerUtil.parsePartitionDate("not-a-date", dayFormatter, false));
+    assertNull(StreamerUtil.parsePartitionDate("2026-08-06", dayFormatter, false));
+  }
+
+  @Test
   void testOrderingFieldAndKeyGeneratorValidation() {
     Configuration conf = TestConfigurations.getDefaultConf(tempFile.getAbsolutePath());
     conf.set(FlinkOptions.ORDERING_FIELDS, "missing");
@@ -377,10 +416,15 @@ class TestStreamerUtil {
     StreamerUtil.checkOrderingFields(customPayloadConf, Collections.singletonList("id"));
     assertEquals(FlinkOptions.NO_PRE_COMBINE, customPayloadConf.get(FlinkOptions.ORDERING_FIELDS));
 
-    Configuration keygenConf = TestConfigurations.getDefaultConf(tempFile.getAbsolutePath());
+    Configuration keygenConf = new Configuration();
     StreamerUtil.checkKeygenGenerator(true, keygenConf);
     assertEquals(ComplexAvroKeyGenerator.class.getName(),
         keygenConf.get(FlinkOptions.KEYGEN_CLASS_NAME));
+    assertEquals("FIELD_PREFIXED", keygenConf.getString(HoodieTableConfig.COMPLEX_KEYGEN_ENCODING.key(), null));
+
+    keygenConf.setString(HoodieTableConfig.COMPLEX_KEYGEN_ENCODING.key(), "VALUE_ONLY");
+    StreamerUtil.checkKeygenGenerator(true, keygenConf);
+    assertEquals("VALUE_ONLY", keygenConf.getString(HoodieTableConfig.COMPLEX_KEYGEN_ENCODING.key(), null));
   }
 
   @Test

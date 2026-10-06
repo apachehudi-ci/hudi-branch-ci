@@ -32,7 +32,9 @@ import org.apache.hudi.common.model.HoodieRecordLocation;
 import org.apache.hudi.common.model.HoodieRecordPayload;
 import org.apache.hudi.common.model.WriteOperationType;
 import org.apache.hudi.common.table.HoodieTableConfig;
+import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.util.ConfigUtils;
+import org.apache.hudi.common.util.HoodieStorageUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.ReflectionUtils;
 import org.apache.hudi.common.util.StringUtils;
@@ -45,6 +47,7 @@ import org.apache.hudi.data.HoodieJavaRDD;
 import org.apache.hudi.exception.HoodieDuplicateKeyException;
 import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.exception.TableNotFoundException;
+import org.apache.hudi.keygen.KeyGenUtils;
 import org.apache.hudi.storage.HoodieStorage;
 import org.apache.hudi.storage.StoragePath;
 import org.apache.hudi.table.BulkInsertPartitioner;
@@ -183,7 +186,19 @@ public class DataSourceUtils {
 
   public static SparkRDDWriteClient createHoodieClient(JavaSparkContext jssc, String schemaStr, String basePath,
                                                        String tblName, Map<String, String> parameters) {
-    return new SparkRDDWriteClient<>(new HoodieSparkEngineContext(jssc), createHoodieConfig(schemaStr, basePath, tblName, parameters));
+    HoodieSparkEngineContext context = new HoodieSparkEngineContext(jssc);
+    HoodieWriteConfig writeConfig = createHoodieConfig(schemaStr, basePath, tblName, parameters);
+    // The write options carry the table config of an existing table, so only a single-field complex keygen table
+    // whose encoding is not known yet pays for loading the table config here; every other write skips it.
+    if (KeyGenUtils.mayNeedComplexKeyGenEncodingRecorded(writeConfig)) {
+      HoodieStorage storage = HoodieStorageUtils.getStorage(basePath, context.getStorageConf());
+      if (TablePathUtils.isHoodieTablePath(storage, new StoragePath(basePath))) {
+        HoodieTableMetaClient metaClient = HoodieTableMetaClient.builder()
+            .setConf(context.getStorageConf()).setBasePath(basePath).build();
+        KeyGenUtils.recordComplexKeygenEncodingIfMissing(metaClient, writeConfig);
+      }
+    }
+    return new SparkRDDWriteClient<>(context, writeConfig);
   }
 
   public static HoodieWriteResult doWriteOperation(SparkRDDWriteClient client, JavaRDD<HoodieRecord> hoodieRecords,
@@ -272,30 +287,6 @@ public class DataSourceUtils {
       throw new HoodieDuplicateKeyException(record.getRecordKey());
     }
     return false;
-  }
-
-  /**
-   * Resolves duplicate records in the provided {@code incomingHoodieRecords}.
-   *
-   * <p>If {@code failOnDuplicates} is {@code false}, duplicate records already present in the dataset
-   * are dropped. Otherwise, a {@link HoodieDuplicateKeyException} is thrown if duplicates are found.</p>
-   *
-   * @param jssc the Spark context used for executing the deduplication
-   * @param incomingHoodieRecords the input {@link JavaRDD} of {@link HoodieRecord} objects to process
-   * @param parameters a map of configuration parameters, including the dataset path under the key {@code "path"}
-   * @param failOnDuplicates a flag indicating whether to fail when duplicates are found
-   * @return a {@link JavaRDD} of deduplicated {@link HoodieRecord} objects
-   */
-  @SuppressWarnings("unchecked")
-  public static JavaRDD<HoodieRecord> resolveDuplicates(JavaSparkContext jssc,
-                                                        JavaRDD<HoodieRecord> incomingHoodieRecords,
-                                                        Map<String, String> parameters,
-                                                        boolean failOnDuplicates) {
-    HoodieWriteConfig writeConfig = HoodieWriteConfig.newBuilder()
-        .withPath(parameters.get("path"))
-        .withProps(parameters).build();
-    return handleDuplicates(
-        new HoodieSparkEngineContext(jssc), incomingHoodieRecords, writeConfig, failOnDuplicates);
   }
 
   /**
