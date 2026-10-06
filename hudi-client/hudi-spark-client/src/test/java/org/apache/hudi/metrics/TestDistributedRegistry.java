@@ -280,6 +280,23 @@ public class TestDistributedRegistry {
 
       // Then: another holder of the stale instance gets the same replacement
       Assertions.assertSame(result, staleRegistry.register(jsc));
+
+      // Then: updates through the stale instance are reported by the replacement
+      staleRegistry.add(METRIC_1, 5);
+      Assertions.assertEquals(105, result.getAllCounts().get(METRIC_1));
+
+      // Given: the replacement went stale too, as after another SparkContext restart
+      makeStale(result);
+
+      // When: a holder of the original stale instance calls register()
+      DistributedRegistry result2 = staleRegistry.register(jsc);
+
+      // Then: a new registered replacement sharing the counters is returned and cached
+      Assertions.assertNotSame(result, result2);
+      Assertions.assertTrue(result2.isRegistered());
+      Assertions.assertEquals(105, result2.getAllCounts().get(METRIC_1));
+      Assertions.assertSame(result2, Registry.REGISTRY_MAP.get(cacheKey));
+      Assertions.assertSame(result2, result.register(jsc));
     } finally {
       Registry.REGISTRY_MAP.remove(cacheKey);
     }
